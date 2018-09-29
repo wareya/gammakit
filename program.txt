@@ -1,0 +1,282 @@
+obj Ab
+{
+
+}
+
+var ab;
+ab = instance_create(Ab);
+instance_add_variable(ab, "id", ab);
+ab.id.y = ab+1;
+
+obj Character
+{
+    def create()
+    {
+        far localvar = 1;
+    }
+    def printthing(arg)
+    {
+        print(arg);
+        print("I printed it!");
+        print(localvar);
+        return -12;
+    }
+    def getprintthing()
+    {
+        return printthing;
+    }
+    def getholder()
+    {
+        return holder;
+    }
+    def destroy()
+    {
+        print("instance died");
+    }
+}
+obj BlankObj
+{
+    
+}
+
+def noopfunc()
+{
+    
+}
+
+with(BlankObj)
+{
+    
+}
+
+noopfunc();
+
+var lasdfiawefd = instance_create(BlankObj);
+
+var i;
+i = instance_create(Character);
+instance_add_variable(i, "id", i);
+i.id.y = i+1;
+print(i);
+print(i.id);
+print(i.y);
+print(i.id.y);
+
+def makez(argument)
+{
+    far z = argument;
+}
+
+def printz()
+{
+    print(z);
+}
+
+def printx(argument)
+{
+    print(x);
+    x += 1;
+    print(argument);
+    return 1234;
+}
+
+def asdf()
+{
+    return 234658;
+}
+
+var as = asdf();
+print(as);
+print(asdf()*2);
+
+instance_execute(i, printx, "test");
+var a = instance_execute(i, printx, "test");
+print(a);
+a = print("asdf");
+print(a);
+
+instance_execute(i, makez, "test");
+instance_execute(i, printz);
+
+with(i)
+{
+    print(x);
+    x -= 1;
+}
+print(i.x);
+
+var i2 = instance_create(Character);
+i2.localvar = 10;
+
+with(Character)
+{
+    var asdfe4 = 10;
+    printthing("this is an argument");
+}
+
+with(Character)
+    var asdfe4 = 10;
+
+with(i)
+    far holder = i2;
+
+i2.localvar = 5672453;
+
+var bs = i2.printthing("alkergikadsg");
+
+var bs2 = i.getholder().getprintthing()("alkergikadsg");
+print(bs);
+print(bs2);
+
+i2.getprintthing()("alkergikadsg");
+
+var mylambda = [x = "hello, world!", y = "adsf"](){print(x); x = "f"; print(x); {var x = "hello, nobody!"; print(x);}};
+mylambda();
+mylambda();
+mylambda();
+mylambda();
+
+print("asdfasdf");
+
+var trash = [0, mylambda, [1, 42]];
+
+print(trash[2][1]);
+
+trash[2][1] += 2;
+
+print("asdfasdf3");
+
+print(trash[2][1]);
+
+trash[1]();
+
+var blanklambda = [](){};
+blanklambda();
+
+var countdown = [](x, self)
+{
+    if(x > 0)
+    {
+        print(x);
+        self(x-1, self);
+    }
+    else
+        print("Liftoff!");
+};
+
+countdown(10, countdown);
+
+print(len(trash));
+
+var myarray = [0, 10, 2594];
+
+var mydict = {"a":0,"b":20,135:-1,2:myarray};
+
+print(mydict["b"]);
+
+var newdict = mydict;
+
+newdict["a"] = 5;
+
+var mybad = [newdict];
+
+newdict["b"] = 15;
+
+mydict[2] = newdict[2];
+
+newdict[2][0] = -453;
+
+print([10, 100]);
+print(newdict);
+print(mydict);
+print(mybad);
+
+var mykeys = keys(mydict);
+
+for(var j = 0; j < 10; {j += 1;})
+    print(j);
+
+for(var j = 0; j < 10; {j += 1;})
+{
+    if(j == 4)
+        continue;
+    print(j);
+    if(j == 8)
+        break;
+}
+
+var j = 34;
+
+var myf = compile_text("print(\"test\");");
+myf();
+
+var myast = parse_text("print(\"toast\");");
+
+var myotherast = myast;
+
+def rewrite(ast, callback)
+{
+    ast = callback(ast);
+    if(ast["isparent"])
+    {
+        var max = len(ast["children"]);
+        for(var i = 0; i < max; i += 1)
+            ast["children"][i] = rewrite(ast["children"][i], callback);
+    }
+    return ast;
+}
+
+myotherast = rewrite(myotherast, [](ast)
+{
+    if(ast["isparent"] and ast["text"] == "string" and len(ast["children"]) > 0)
+        if(!ast["children"][0]["isparent"] and !ast["children"][0]["opdata"]["isop"] and ast["children"][0]["text"] == "\"toast\"")
+            ast["children"][0]["text"] = "\"not toast\"";
+    return ast;
+});
+
+var mycode = compile_ast(myast);
+mycode();
+var myothercode = compile_ast(myotherast);
+myothercode();
+
+def add(x)
+{
+    var addX = [x = x](y)
+    {
+        return y + x;
+    };
+    return addX;
+}
+
+var add1 = add(1);
+print(add1(3));
+
+var trew = 0;
+while(trew < 5)
+    trew += 1;
+print(trew);
+
+def getarray()
+{
+    print(myarray);
+    return myarray;
+}
+
+print("ghjdfgsrty");
+
+print(getarray()[0]);
+
+print("aksdfguasdf");
+
+var xaa = "myarray";
+print("asdf");
+print(xaa[1]);
+print(myarray[1]);
+print("asdf2");
+
+print(i.getholder().getprintthing()("alkergikadsg"));
+
+xaa[1] = "e";
+
+print(xaa);
+

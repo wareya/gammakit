@@ -1,0 +1,206 @@
+TOKEN number:
+%[0-9]+\.[0-9]+([eE]([+-])?[0-9]+)?%
+%[0-9]+\.([eE]([+-])?[0-9]+)?%
+%\.[0-9]+([eE]([+-])?[0-9]+)?%
+%[0-9]+([eE]([+-])?[0-9]+)?%
+
+TOKEN string:
+%"([^"\\]|\\["nrt\\])*"%
+
+TOKEN name:
+%[a-zA-Z_][0-9a-zA-Z_]*%
+
+arglist:
+$expr$...,
+
+funcargs:
+( $arglist$? )
+
+funccall:
+$rhunexpr$
+
+indirection:
+. $name$
+
+rhunexpr_right:
+$funcargs$
+$arrayindex$
+$indirection$
+
+rhunexpr:
+$supersimplexpr$ $rhunexpr_right$+
+
+arrayindex:
+[ $expr$ ]
+
+unusedcomma:
+,
+
+arraybody:
+[ ]
+[ $expr$..., $unusedcomma$? ]
+
+dictval:
+$expr$ : $expr$
+
+dictbody:
+{ }
+{ $dictval$..., $unusedcomma$? }
+
+supersimplexpr:
+( $expr$ )
+$lambda$
+$arraybody$
+$dictbody$
+$number$
+$string$
+$name$
+
+simplexpr:
+( $expr$ )
+$lambda$
+$arraybody$
+$dictbody$
+$number$
+$string$
+$rvar$
+
+rvar:
+$rhunexpr$
+$name$
+
+lvar:
+$rhunexpr$
+$name$
+
+expr:
+$binexpr_0$
+
+binexpr_0:
+$binexpr_1$ >>? $binop_0$ $binexpr_0$
+
+binexpr_1:
+$binexpr_2$ >>? $binop_1$ $binexpr_1$
+
+binexpr_2:
+$binexpr_3$ >>? $binop_2$ $binexpr_2$
+
+binexpr_3:
+$lhunop$ >>? $binop_3$ $binexpr_3$
+
+lhunop:
+$unop$ $lhunop$
+$simplexpr$
+
+unop:
+!
+-
++
+
+binop_0:
+and \l 0
+or \l 0
+&& \l 0
+|| \l 0
+
+binop_1:
+== \l 1
+!= \l 1
+>= \l 1
+<= \l 1
+> \l 1
+< \l 1
+
+binop_2:
++ \l 2
+- \l 2
+
+binop_3:
+* \l 3
+/ \l 3
+% \l 3
+
+statement:
+{ $statement$* }
+$string$ ;
+$declaration$ ;
+$condition$
+$withstatement$
+$funcdef$
+$objdef$
+$lvar$ $binstateop$ $expr$ ;
+$instruction$ ;
+$funccall$ ;
+
+objdef:
+obj $name$ { $funcdef$* }
+
+instruction:
+break
+continue
+return $expr$
+return
+
+condition:
+$ifcondition$
+$whilecondition$
+$forcondition$
+
+withstatement:
+with ( $expr$ ) $block$
+
+whilecondition:
+while ( $expr$ ) $block$
+
+barestatement:
+{ $statement$* }
+$declaration$
+$lvar$ $binstateop$ $expr$
+$funccall$
+
+forcondition:
+for ( $barestatement$? ; $expr$? ; $barestatement$? ) $block$
+
+ifcondition:
+if ( $expr$ ) $block$ >>? else $block$
+
+block:
+$statement$
+
+declaration:
+var $declname$...,
+far $declname$...,
+
+declname:
+$name$ >>? = $expr$
+
+funcdef:
+def $name$ ( ) { $statement$* }
+def $name$ ( $name$..., ) { $statement$* }
+
+binstateop:
+=
++=
+-=
+*=
+/=
+
+program:
+$statement$*
+
+lambda:
+$lambdacapture$ $lambdaargs$ $lambdabody$
+
+lambcapexpr:
+$name$ = $expr$
+
+lambdacapture:
+[ ]
+[ $lambcapexpr$..., ]
+
+lambdaargs:
+( )
+( $name$..., )
+
+lambdabody:
+{ $statement$* }

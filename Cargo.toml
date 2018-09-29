@@ -1,0 +1,8 @@
+[package]
+name = "rusttoy"
+version = "0.1.0"
+authors = ["wareya <wareya@gmail.com>"]
+
+[dependencies]
+regex = "1"
+maplit = "1"
