@@ -9,3 +9,5 @@ TODO:
 - allow interpreters to act like generators
 - add real generators, friendly with what non-programmers expect "script" to mean (e.g. an AI script, VN script, etc - changing state, returning, later coming back to where returned from)
 - add bindings for input, graphics, sound
+- document transformations from parse tree (as in grammarsimple.txt) to syntax tree (input to compilation process)
+- investigate feasibility of grammar, parser, compiler, and interpreter hooks (limited to child interpreters)
