@@ -5248,10 +5248,13 @@ fn main() -> std::io::Result<()>
         println!();
         */
         
-        let disassembly = disassemble_bytecode(&code, 0, 0);
-        for line in disassembly
+        if false
         {
-            println!("{}", line);
+            let disassembly = disassemble_bytecode(&code, 0, 0);
+            for line in disassembly
+            {
+                println!("{}", line);
+            }
         }
         
         let mut global = GlobalState::new(parser.clone());
