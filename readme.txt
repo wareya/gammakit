@@ -68,7 +68,7 @@ TODO:
 - make sure format_val does the same as the above
 - make compile_ast() verify that the ast has a coherent "type" (parent, text, operator)
 - make sure frames are handled coherently / add a way of declaring functions that blocks access to outer frame scopes
-- foreach with syntax foreach $name$ = $expr$ $block$
+- foreach with syntax foreach (or for) ( $name$ in $expr$ ) $block$ operating on arrays, dicts, strings, and maybe object IDs
 - turn runtime panics into internal signals instead
 - give the runtime control over interpreters of its own; runtime panics will invalidate interpreters
 - allow interpreters to act like generators
