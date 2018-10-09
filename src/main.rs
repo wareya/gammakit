@@ -498,6 +498,7 @@ impl Parser {
         println!("init took {:?}", Instant::now().duration_since(start_time));
     }
     
+    // FIXME: change it to not be line-based; seek to the next newline instead. necessary for things like strings containing newline literals, which should definitely be supported.
     fn tokenize(&mut self, text: String, silent: bool) -> VecDeque<LexToken>
     {
         let start_time = Instant::now();
