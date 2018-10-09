@@ -5,6 +5,7 @@ use std::fs::File;
 use std::io::Read;
 use std::vec::Vec;
 use std::rc::Rc;
+use std::rc::Weak;
 use std::collections::VecDeque;
 use std::collections::HashMap;
 use std::collections::HashSet;
@@ -506,18 +507,53 @@ impl Parser {
         let mut ret : VecDeque<LexToken> = VecDeque::new();
         let mut linecount = 1;
         
+        let mut in_multiline_comment = false;
+        
         for line in lines
         {
             let mut offset : usize = 0; // in bytes
             while offset < line.len() // also in bytes
             {
-                let mut continue_the_while = false;
-                // check for whitespace before doing anything else
+                // check for comments before doing anything else
+                if offset+1 < line.len()
+                {
+                    let signal = &line[offset..offset+2];
+                    if in_multiline_comment
+                    {
+                        if signal == "*/"
+                        {
+                            in_multiline_comment = false;
+                            offset += 2;
+                            continue;
+                        }
+                    }
+                    else // not currently in a multiline comment
+                    {
+                        if signal == "/*"
+                        {
+                            in_multiline_comment = true;
+                            offset += 2;
+                            continue;
+                        }
+                        else if signal == "//"
+                        {
+                            break;
+                        }
+                    }
+                }
+                if in_multiline_comment
+                {
+                    offset += 1;
+                    continue;
+                }
+                // check for whitespace before doing any tokens
                 if let Some(text) = self.internal_regexes.match_at("[ \r\n\t]+", &line, offset)
                 {
                     offset += text.len();
                     continue;
                 }
+                
+                let mut continue_the_while = false;
                 for rule in &self.regexes
                 {
                     if let Some(text) = self.internal_regexes.match_at(&rule, &line, offset)
@@ -1225,6 +1261,10 @@ fn compile_astnode(ast : &ASTNode, mut scopedepth : usize) -> Vec<u8>
                 }
                 code.push(UNSCOPE);
                 code.extend(pack_u16(scopedepth as u16));
+                if scopedepth >= 0xFFFF
+                {
+                    panic!("error: internal scope depth limit of 0xFFFF reached; nest your code less.");
+                }
             }
             else if ast.children.len() == 3 && ast.children[1].isparent && ast.children[1].text == "binstateop"
             {
@@ -2389,6 +2429,30 @@ fn disassemble_bytecode(code : &Vec<u8>, mut pc : usize, mut end : usize) -> Vec
     return ret;
 }
 
+#[derive(Clone)]
+#[derive(Debug)]
+struct FrameIdentity {
+    code: Weak<Vec<u8>>,
+    startpc: usize,
+    endpc: usize,
+    scopestarts: Vec<usize>,
+}
+
+impl FrameIdentity {
+    fn new(frame : &Frame) -> FrameIdentity
+    {
+        FrameIdentity { code : Rc::downgrade(&frame.code), startpc : frame.startpc, endpc : frame.endpc, scopestarts : frame.scopestarts.clone() }
+    }
+}
+
+#[derive(Clone)]
+#[derive(Debug)]
+struct FuncSpecLocation {
+    outer_frames : Vec<FrameIdentity>,
+    top_frame : FrameIdentity,
+}
+
+
 // inaccessible types
 #[derive(Debug)]
 #[derive(Clone)]
@@ -2396,10 +2460,11 @@ struct FuncSpec {
     varnames: Vec<String>,
     code: Rc<Vec<u8>>,
     startaddr: usize,
-    //finishaddr: usize,
+    endaddr: usize,
     fromobj: bool,
     parentobj: usize,
     forcecontext: usize,
+    location: FuncSpecLocation,
 }
 struct ObjSpec {
     #[allow(unused)]
@@ -3095,8 +3160,11 @@ struct ControlData {
 }
 struct Frame {
     code: Rc<Vec<u8>>,
+    startpc: usize,
     pc: usize,
+    endpc: usize,
     scopes: Vec<HashMap<String, Value>>,
+    scopestarts: Vec<usize>,
     instancestack: Vec<usize>,
     controlstack: Vec<ControlData>,
     stack: Vec<Value>,
@@ -3106,11 +3174,11 @@ struct Frame {
 impl Frame {
     fn new_root(code : Rc<Vec<u8>>) -> Frame
     {
-        Frame { code : Rc::clone(&code), pc : 0, scopes : vec!(HashMap::<String, Value>::new()), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0 }
+        Frame { code : Rc::clone(&code), startpc : 0, pc : 0, endpc : code.len(), scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0 }
     }
-    fn new_from_call(code : Rc<Vec<u8>>, pc : usize, isexpr : bool) -> Frame
+    fn new_from_call(code : Rc<Vec<u8>>, startpc : usize, endpc : usize, isexpr : bool) -> Frame
     {
-        Frame { code : Rc::clone(&code), pc, scopes : vec!(HashMap::<String, Value>::new()), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0 }
+        Frame { code : Rc::clone(&code), startpc, pc : startpc, endpc, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0 }
     }
 }
 
@@ -3207,7 +3275,7 @@ impl Interpreter {
             panic!("error: provided too many arguments to function");
         }
         
-        let mut newframe = Frame::new_from_call(Rc::clone(&function.code), function.startaddr, isexpr);
+        let mut newframe = Frame::new_from_call(Rc::clone(&function.code), function.startaddr, function.endaddr, isexpr);
         std::mem::swap(&mut newframe, &mut self.top_frame);
         self.frames.push(newframe); // actually the old frame
         
@@ -3527,6 +3595,15 @@ impl Interpreter {
             panic!("error: first argument to parse_text() must be a string");
         }
     }
+    fn build_funcspec_location(&self) -> FuncSpecLocation
+    {
+        let mut outer_frames = Vec::<FrameIdentity>::new();
+        for frame in &self.frames
+        {
+            outer_frames.push(FrameIdentity::new(&frame));
+        }
+        FuncSpecLocation { outer_frames, top_frame : FrameIdentity::new(&self.top_frame) }
+    }
     fn sim_func_compile_text(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() != 1
@@ -3540,9 +3617,10 @@ impl Interpreter {
             {
                 let code = compile_bytecode(ast);
                 
+                // endaddr at the start because Rc::new() moves `code`
                 return (Value::Func(FuncVal
                     { internal : false, internalname : None, predefined : None,
-                      userdefdata : Some(FuncSpec { varnames : Vec::new(), code : Rc::new(code), startaddr : 0, fromobj : false, parentobj : 0, forcecontext : 0 } )
+                      userdefdata : Some(FuncSpec { endaddr : code.len(), varnames : Vec::new(), code : Rc::new(code), startaddr : 0, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location() } )
                     } ), false);
             }
             else
@@ -3567,9 +3645,10 @@ impl Interpreter {
             
             let code = compile_bytecode(&ast);
             
+                // endaddr at the start because Rc::new() moves `code`
             return (Value::Func(FuncVal
                 { internal : false, internalname : None, predefined : None,
-                  userdefdata : Some(FuncSpec { varnames : Vec::new(), code : Rc::new(code), startaddr : 0, fromobj : false, parentobj : 0, forcecontext : 0 } )
+                  userdefdata : Some(FuncSpec { endaddr : code.len(), varnames : Vec::new(), code : Rc::new(code), startaddr : 0, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location() } )
                 } ), false);
         }
         else
@@ -3698,7 +3777,7 @@ impl Interpreter {
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        return (name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, fromobj : false, parentobj : 0, forcecontext : 0 } );
+        return (name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location() } );
     }
     
     fn read_lambda(&mut self) -> (HashMap<String, Value>, FuncSpec)
@@ -3749,7 +3828,7 @@ impl Interpreter {
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        return (captures, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, fromobj : false, parentobj : 0, forcecontext : 0 } );
+        return (captures, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location() } );
     }
     #[allow(non_snake_case)] 
     fn sim_NOP(&mut self, _global : &mut GlobalState)
@@ -4148,6 +4227,8 @@ impl Interpreter {
     fn sim_SCOPE(&mut self, _global : &mut GlobalState)
     {
         self.top_frame.scopes.push(HashMap::new());
+        let here = self.get_pc();
+        self.top_frame.scopestarts.push(here);
         if self.top_frame.scopes.len() >= 0x10000
         {
             panic!("error: scope recursion limit of 0x10000 reached at line {}\n(note: use more functions!)", self.top_frame.currline);
@@ -4158,10 +4239,7 @@ impl Interpreter {
     {
         let immediate = unpack_u16(&self.pull_from_code(2)) as usize;
         
-        while self.top_frame.scopes.len() > immediate+1
-        {
-            self.top_frame.scopes.pop();
-        }
+        self.drain_scopes((immediate+1) as u16);
     }
     
     fn pop_controlstack_until_loop(&mut self)
@@ -4700,6 +4778,7 @@ impl Interpreter {
         while self.top_frame.scopes.len() > desired_depth as usize
         {
             self.top_frame.scopes.pop();
+            self.top_frame.scopestarts.pop();
         }
     }
     
