@@ -311,7 +311,7 @@ impl GrammarForm {
 struct GrammarPoint {
     name: String,
     forms: Vec<GrammarForm>,
-    _istoken: bool,
+    istoken: bool,
 }
 
 #[derive(Clone)]
@@ -347,7 +347,52 @@ fn dummy_astnode() -> ASTNode
 {
     return ASTNode{text: "".to_string(), line: 0, position: 0, isparent: false, children: Vec::new(), opdata: dummy_opdata()};
 }
+    
+#[derive(Clone)]
+#[derive(Debug)]
+struct ParseError {
+    token : usize, // location of the token that caused the error
+    expected : HashSet<String>,
+}
 
+impl ParseError {
+    fn new(token : usize, text : &String) -> ParseError
+    {
+        return ParseError{token, expected : vec!(text.clone()).into_iter().collect()}
+    }
+}
+
+fn build_best_error(myself : &mut Option<ParseError>, other : &mut Option<ParseError>)
+{
+    if let Some(other) = other.as_mut()
+    {
+        if myself.is_some()
+        {
+            if let Some(myself) = myself.as_mut()
+            {
+                if other.token < myself.token
+                {
+                    return;
+                }
+                if other.token > myself.token
+                {
+                    *myself = other.clone();
+                }
+                if other.token == myself.token
+                {
+                    for text in &other.expected
+                    {
+                        myself.expected.insert(text.clone());
+                    }
+                }
+            }
+        }
+        else
+        {
+            *myself = Some(other.clone());
+        }
+    }
+}
 #[derive(Clone)]
 struct Parser {
     regexes: Vec<String>,
@@ -393,7 +438,7 @@ impl Parser {
                 let istoken = line.starts_with("TOKEN ");
                 let name = slice(&line, if istoken {6} else {0}, -1).to_string();
                 // last line is guaranteed to be "" which means we are unable to pop past the end here
-                let mut nodetype : GrammarPoint = GrammarPoint{name: name, forms: Vec::new(), _istoken: istoken};
+                let mut nodetype : GrammarPoint = GrammarPoint{name: name, forms: Vec::new(), istoken};
                 line = pop!();
                 while line != ""
                 {
@@ -499,11 +544,9 @@ impl Parser {
     }
     
     // FIXME: change it to not be line-based; seek to the next newline instead. necessary for things like strings containing newline literals, which should definitely be supported.
-    fn tokenize(&mut self, text: String, silent: bool) -> VecDeque<LexToken>
+    fn tokenize(&mut self, lines : &Vec<String>, silent: bool) -> VecDeque<LexToken>
     {
         let start_time = Instant::now();
-        
-        let lines : Vec<String> = text.lines().map(|x| x.trim().to_string()).collect();
         
         let mut ret : VecDeque<LexToken> = VecDeque::new();
         let mut linecount = 1;
@@ -613,24 +656,22 @@ impl Parser {
     }
 
     // attempts to parse a token list as a particular form of a grammar point
-    fn parse_form(&self, tokens : &VecDeque<LexToken>, index : usize, form : &GrammarForm) -> (Option<Vec<ASTNode>>, usize)
+    fn parse_form(&self, tokens : &VecDeque<LexToken>, index : usize, form : &GrammarForm) -> (Option<Vec<ASTNode>>, usize, Option<ParseError>)
     {
         if tokens.len() == 0
         {
-            return (None, 0);
+            return (None, 0, None);
         }
         
         let mut nodes : Vec<ASTNode> = Vec::new();
         let mut totalconsumed : usize = 0;
         
+        let mut latesterror : Option<ParseError> = None;
+        
         let mut defaultreturn : (Option<Vec<ASTNode>>, usize) = (None, 0);
         
         for part in &form.tokens
         {
-            if tokens.len() == 0
-            {
-                return defaultreturn;
-            }
             match part
             {
                 GrammarToken::Name(text) =>
@@ -639,7 +680,8 @@ impl Parser {
                     {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
-                    let (bit, consumed) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    let (bit, consumed, mut error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    build_best_error(&mut latesterror, &mut error);
                     if bit.is_some()
                     {
                         let node = bit.unwrap();
@@ -648,7 +690,7 @@ impl Parser {
                     }
                     else
                     {
-                        return defaultreturn;
+                        return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
                 }
                 GrammarToken::NameList(text) =>
@@ -657,10 +699,11 @@ impl Parser {
                     {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
-                    let (mut bit, mut consumed) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    build_best_error(&mut latesterror, &mut error);
                     if !bit.is_some()
                     {
-                        return defaultreturn;
+                        return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
                     while bit.is_some()
                     {
@@ -671,6 +714,9 @@ impl Parser {
                         let tuple = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
                         bit = tuple.0;
                         consumed = tuple.1;
+                        error = tuple.2;
+                        
+                        build_best_error(&mut latesterror, &mut error);
                     }
                 }
                 GrammarToken::OptionalName(text) =>
@@ -679,7 +725,8 @@ impl Parser {
                     {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
-                    let (bit, consumed) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    let (bit, consumed, mut error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    build_best_error(&mut latesterror, &mut error);
                     if bit.is_some()
                     {
                         let node = bit.unwrap();
@@ -693,7 +740,8 @@ impl Parser {
                     {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
-                    let (mut bit, mut consumed) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    build_best_error(&mut latesterror, &mut error);
                     while bit.is_some()
                     {
                         let node = bit.unwrap();
@@ -703,6 +751,9 @@ impl Parser {
                         let tuple = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
                         bit = tuple.0;
                         consumed = tuple.1;
+                        error = tuple.2;
+                        
+                        build_best_error(&mut latesterror, &mut error);
                     }
                 }
                 GrammarToken::SeparatorNameList{text, separator} =>
@@ -711,10 +762,11 @@ impl Parser {
                     {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
-                    let (mut bit, mut consumed) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    build_best_error(&mut latesterror, &mut error);
                     if !bit.is_some()
                     {
-                        return defaultreturn;
+                        return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
                     while bit.is_some()
                     {
@@ -730,6 +782,9 @@ impl Parser {
                         let tuple = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
                         bit = tuple.0;
                         consumed = tuple.1;
+                        error = tuple.2;
+                        
+                        build_best_error(&mut latesterror, &mut error);
                         
                         // undo separator drain if right-hand rule parse failed
                         if !bit.is_some()
@@ -740,7 +795,12 @@ impl Parser {
                 }
                 GrammarToken::Plain(text) =>
                 {
-                    if tokens.len() <= index+totalconsumed { return defaultreturn; }
+                    if tokens.len() <= index+totalconsumed
+                    {
+                        let mut error = Some(ParseError::new(index+totalconsumed, &text));
+                        build_best_error(&mut latesterror, &mut error);
+                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                    }
                     let token_text = tokens[index+totalconsumed].text.clone();
                     //println!("comparing {} to {}", token_text, *text);
                     if token_text == *text
@@ -748,11 +808,21 @@ impl Parser {
                         nodes.push(ASTNode{text : token_text.to_string(), line : tokens[index+totalconsumed].line, position : tokens[index+totalconsumed].position, isparent: false, children : Vec::new(), opdata : dummy_opdata()});
                         totalconsumed += 1;
                     }
-                    else { return defaultreturn; }
+                    else
+                    {
+                        let mut error = Some(ParseError::new(index+totalconsumed, &text));
+                        build_best_error(&mut latesterror, &mut error);
+                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                    }
                 }
                 GrammarToken::Regex(text) =>
                 {
-                    if tokens.len() <= index+totalconsumed { return defaultreturn; }
+                    if tokens.len() <= index+totalconsumed
+                    {
+                        let mut error = Some(ParseError::new(index+totalconsumed, &text));
+                        build_best_error(&mut latesterror, &mut error);
+                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                    }
                     let token_text = tokens[index+totalconsumed].text.clone();
                     //println!("regex comparing {} to {}", token_text, *text);
                     if self.internal_regexes.is_exact_immut(text, &token_text)
@@ -760,18 +830,33 @@ impl Parser {
                         nodes.push(ASTNode{text : token_text.to_string(), line : tokens[index+totalconsumed].line, position : tokens[index+totalconsumed].position, isparent: false, children : Vec::new(), opdata : dummy_opdata()});
                         totalconsumed += 1;
                     }
-                    else { return defaultreturn; }
+                    else
+                    {
+                        let mut error = Some(ParseError::new(index+totalconsumed, &text));
+                        build_best_error(&mut latesterror, &mut error);
+                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                    }
                 }
                 GrammarToken::Op{text, assoc, precedence} =>
                 {
-                    if tokens.len() <= index+totalconsumed { return defaultreturn; }
+                    if tokens.len() <= index+totalconsumed
+                    {
+                        let mut error = Some(ParseError::new(index+totalconsumed, &text));
+                        build_best_error(&mut latesterror, &mut error);
+                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                    }
                     let token_text = tokens[index+totalconsumed].text.clone();
                     if token_text == *text
                     {
                         nodes.push(ASTNode{text : token_text.to_string(), line : tokens[index+totalconsumed].line, position : tokens[index+totalconsumed].position, isparent: false, children : Vec::new(), opdata : OpData{isop : true, assoc: *assoc, precedence: *precedence}});
                         totalconsumed += 1;
                     }
-                    else { return defaultreturn; }
+                    else
+                    {
+                        let mut error = Some(ParseError::new(index+totalconsumed, &text));
+                        build_best_error(&mut latesterror, &mut error);
+                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                    }
                 }
                 GrammarToken::RestIsOptional =>
                 {
@@ -780,26 +865,29 @@ impl Parser {
             }
         }
         
-        return (Some(nodes), totalconsumed);
+        return (Some(nodes), totalconsumed, latesterror);
     }
 
     // attempts to parse a token list as each form of a grammar point in order and uses the first valid one
-    fn parse(&self, tokens : &VecDeque<LexToken>, index : usize, nodetype : &GrammarPoint) -> (Option<ASTNode>, usize)
+    fn parse(&self, tokens : &VecDeque<LexToken>, index : usize, nodetype : &GrammarPoint) -> (Option<ASTNode>, usize, Option<ParseError>)
     {
         if tokens.len() == 0
         {
-            return (None, 0);
+            return (None, 0, None);
         }
+        
+        let mut latesterror : Option<ParseError> = None;
         
         for form in &nodetype.forms
         {
-            let (nodes, consumed) = self.parse_form(&tokens, index, form);
+            let (nodes, consumed, mut error) = self.parse_form(&tokens, index, form);
+            build_best_error(&mut latesterror, &mut error);
             if let Some(nodes) = nodes
             {
-                return (Some(ASTNode{text : nodetype.name.clone(), line : tokens[index].line, position : tokens[index].position, isparent : true, children : nodes, opdata : dummy_opdata()}), consumed);
+                return (Some(ASTNode{text : nodetype.name.clone(), line : tokens[index].line, position : tokens[index].position, isparent : true, children : nodes, opdata : dummy_opdata()}), consumed, latesterror);
             }
         }
-        return (None, 0);
+        return (None, 0, latesterror);
     }
     fn rotate(ast : &mut ASTNode)
     {
@@ -991,7 +1079,7 @@ impl Parser {
             }
         }
     }
-    fn parse_program(&self, tokens : &VecDeque<LexToken>, silent: bool) -> Option<ASTNode>
+    fn parse_program(&self, tokens : &VecDeque<LexToken>, lines : &Vec<String>, silent: bool) -> Option<ASTNode>
     {
         let start_time = Instant::now();
         
@@ -999,7 +1087,7 @@ impl Parser {
         {
             println!("parsing...");
         }
-        let (raw_ast, consumed) = self.parse(&tokens, 0, self.nodetypemap.get("program").unwrap());
+        let (raw_ast, consumed, latesterror) = self.parse(&tokens, 0, self.nodetypemap.get("program").unwrap());
         if !silent
         {
             println!("successfully parsed {} out of {} tokens", consumed, tokens.len());
@@ -1008,9 +1096,32 @@ impl Parser {
         
         if consumed != tokens.len() || !raw_ast.is_some()
         {
-            println!("error: unexpected or malformed expression");
-            println!("(line {})", tokens.get(consumed).unwrap().line);
-            println!("(position {})", tokens.get(consumed).unwrap().position);
+            if let Some(error) = latesterror
+            {
+                let mut expected : Vec<String> = error.expected.iter().map(|x| x.clone()).collect();
+                expected.sort();
+                if error.expected.len() == 1
+                {
+                    println!("error: expected `{}`", expected[0]);
+                }
+                else
+                {
+                    println!("error: expected one of `{}`", expected.join("`, `"));
+                }
+                let token = tokens.get(error.token).unwrap().clone();
+                let linenum = token.line;
+                let position = token.position;
+                println!("context:\n{}\n{}^", lines.get(linenum-1).unwrap(), " ".repeat(position));
+                //println!("(token {})", error.token);
+                //println!("(line {})", tokens.get(error.token).unwrap().line);
+                //println!("(position {})", );
+            }
+            else
+            {
+                println!("error: unexpected or malformed expression");
+                println!("(line {})", tokens.get(consumed).unwrap().line);
+                println!("(position {})", tokens.get(consumed).unwrap().position);
+            }
             
             return None;
         }
@@ -3581,8 +3692,9 @@ impl Interpreter {
         }
         if let Ok(text) = self.list_pop_text(&mut args)
         {
-            let tokens = global.parser.tokenize(text, true);
-            if let Some(ref ast) = global.parser.parse_program(&tokens, true)
+            let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
+            let tokens = global.parser.tokenize(&program_lines, true);
+            if let Some(ref ast) = global.parser.parse_program(&tokens, &program_lines, true)
             {
                 return (ast_to_dict(ast), false);
             }
@@ -3613,8 +3725,9 @@ impl Interpreter {
         }
         if let Ok(text) = self.list_pop_text(&mut args)
         {
-            let tokens = global.parser.tokenize(text, true);
-            if let Some(ref ast) = global.parser.parse_program(&tokens, true)
+            let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
+            let tokens = global.parser.tokenize(&program_lines, true);
+            if let Some(ref ast) = global.parser.parse_program(&tokens, &program_lines, true)
             {
                 let code = compile_bytecode(ast);
                 
@@ -5313,9 +5426,11 @@ fn main() -> std::io::Result<()>
     let mut contents2 = String::new();
     file2.read_to_string(&mut contents2)?;
     
-    let tokens = parser.tokenize(contents2, false);
+    let program_lines : Vec<String> = contents2.lines().map(|x| x.to_string()).collect();
     
-    if let Some(ref ast) = parser.parse_program(&tokens, false)
+    let tokens = parser.tokenize(&program_lines, false);
+    
+    if let Some(ref ast) = parser.parse_program(&tokens, &program_lines, false)
     {
         let code = compile_bytecode(ast);
         
