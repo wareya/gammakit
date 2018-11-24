@@ -63,7 +63,6 @@ instance_create
 instance_add_variable (novelty)
 
 TODO:
-- support comments
 - make keys() iterate over dict keys in insertion order
 - make sure format_val does the same as the above
 - make compile_ast() verify that the ast has a coherent "type" (parent, text, operator)
