@@ -800,9 +800,9 @@ impl Parser {
                         build_best_error(&mut latesterror, error);
                         return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
-                    let token_text = tokens[index+totalconsumed].text.clone();
+                    let token_text = &tokens[index+totalconsumed].text;
                     //println!("comparing {} to {}", token_text, *text);
-                    if token_text == *text
+                    if token_text == text
                     {
                         nodes.push(ASTNode{text : token_text.to_string(), line : tokens[index+totalconsumed].line, position : tokens[index+totalconsumed].position, isparent: false, children : Vec::new(), opdata : dummy_opdata()});
                         totalconsumed += 1;
@@ -822,9 +822,9 @@ impl Parser {
                         build_best_error(&mut latesterror, error);
                         return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
-                    let token_text = tokens[index+totalconsumed].text.clone();
+                    let token_text = &tokens[index+totalconsumed].text;
                     //println!("regex comparing {} to {}", token_text, *text);
-                    if self.internal_regexes.is_exact_immut(text, &token_text)
+                    if self.internal_regexes.is_exact_immut(text, token_text)
                     {
                         nodes.push(ASTNode{text : token_text.to_string(), line : tokens[index+totalconsumed].line, position : tokens[index+totalconsumed].position, isparent: false, children : Vec::new(), opdata : dummy_opdata()});
                         totalconsumed += 1;
@@ -844,8 +844,8 @@ impl Parser {
                         build_best_error(&mut latesterror, error);
                         return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
-                    let token_text = tokens[index+totalconsumed].text.clone();
-                    if token_text == *text
+                    let token_text = &tokens[index+totalconsumed].text;
+                    if token_text == text
                     {
                         nodes.push(ASTNode{text : token_text.to_string(), line : tokens[index+totalconsumed].line, position : tokens[index+totalconsumed].position, isparent: false, children : Vec::new(), opdata : OpData{isop : true, assoc: *assoc, precedence: *precedence}});
                         totalconsumed += 1;
