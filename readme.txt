@@ -6,8 +6,6 @@ Gammakit supports GameMaker-like objects and with() (i.e. with() is a loop).
 
 Gammakit is dynamically typed, and arrays and dictionaries are copied by value, not reference.
 
-The lexer unfortunately currently does not handle comments.
-
 Gammakit allows the programmer to generate or parse and modify ASTs and compile them into pseudofunctions at runtime.
 
 For example, the following code:
