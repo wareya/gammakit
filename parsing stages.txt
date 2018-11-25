@@ -1,0 +1,47 @@
+The language implementation essentially consists of the following parts:
+
+- A declarative grammar
+
+- A grammar for the grammar, turning it into an in-memory representation of each parsing rule for each grammar rule
+
+- A lexer/tokenizer, which detects possible tokens automatically according to the grammar, in addition to stripping comments and unnecessary whitespace
+
+- A parser, which uses recursive descent and backtracking to parse the lexer's token sequence into a parse tree (the "raw" form of the abstract syntax tree/AST)
+-- Parse errors just give a list of all possible valid tokens at the point where the parser couldn't figure out how to go any further despite backtracking and trying different rules
+-- The parser is very simple and leaves bare, meaningless tokens like parens intact.
+
+- A number of post-processing steps that turn the AST into something usable by the compiler, in order:
+-- The associativity of left-recursive binary operators is repaired by rotating the affected parts of the tree, taking precedence into account to avoid incorrect transformations
+--- (this is specifically done to rules with names starting with binexpr_)
+--- (the grammar specifies left-recursive operators as right-recursive in form, with a left-recursion flag saying to fix them later)
+--- (e.g. 5.0/2.4/1.5 parses as (5.0/(2.5/1.5)) at first, even though it should be ((5.0/2.5)/1.5) - this step fixes it)
+--- (this is done because recursive descent has problems with true left-recursion, and the alternative solutions are difficult to implement with a declarative grammar)
+-- The AST is tweaked and simplified slightly to be easier to compile
+--- Simple expressions (binexpr_*, simplexpr, and supersimplexpr) with single children are replaced with their children
+--- The parens are removed from funcargs expressions
+--- The left-recursive unary operator expressions initially parse as a list of suffixes. This is changed to a tree of unary operations.
+---- (e.g. function() can return an array, which can be accessed as function()[5], and it parses as function: ()[5], which can't be compiled. It's transformed into (function())[5].)
+--- if/with/for conditions have their parens removed
+-- A small number of verifications are done.
+--- The create and destroy functions of objects must not have any arguments.
+--- Those left-recursive unary operator expressions are checked and their structure is ensured to be coherent, just in case transforming them into a tree broke something.
+
+- The compiler now runs on the processed AST.
+-- It compiles to bytecode designed to be run on an ad-hoc virtual machine.
+--- Lexical scope is emulated with "SCOPE" and "UNSCOPE" instructions. The compiler doesn't do any high-level analysis of the program at all, nor detect actions with no side effects to prune them.
+--- Functions work like macros; they take on the scope of the location in which they are called. This might change in the future so that some functions execute in the zeroth-level (global) scope.
+
+- The interpreter is a simple ad-hoc VM that Does Its Best(tm).
+
+- The compiler can be accessed by the program itself, to turn text into an AST, manually alter it, and compile it into a pseudo-function (which takes no arguments and doesn't capture anything).
+-- In the distant future it might be possible to add compiler and interpreter hooks so that you can define and use your own bytecode operations.
+--- If so, it will not be possible to operate with the VM at a very low level (i.e. you can't poke at its internals), and hooks would always run in the "vanilla" interpreter.
+
+A random list of language features:
+
+- C/GameMaker-like syntax
+- Dynamically typed, with semi-lexical scope
+- Lambdas (capture by value, not reference)
+- Programmable metaprogramming
+- GameMaker-like objects with manually-managed IDs (instance_create), and with(){} as a loop taking instance IDs or object IDs
+- Arrays and dicts, moved around by value, not reference

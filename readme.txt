@@ -61,16 +61,21 @@ instance_create
 instance_add_variable (novelty)
 
 TODO:
+- global variables and global functions
 - make keys() iterate over dict keys in insertion order
 - make sure format_val does the same as the above
 - make compile_ast() verify that the ast has a coherent "type" (parent, text, operator)
-- make sure frames are handled coherently / add a way of declaring functions that blocks access to outer frame scopes
-- foreach with syntax foreach (or for) ( $name$ in $expr$ ) $block$ operating on arrays, dicts, strings, and maybe object IDs
+- make sure frames are handled coherently / add a way of declaring functions that blocks access to outer frame scopes (puredef?)
+
+- foreach with syntax for ( $name$ in $expr$ ) $block$ operating on arrays, dicts, strings, and maybe object IDs
 - forbid if-else inside an if condition's block with no enclosing braces
+- add bindings for input, graphics, sound
 - turn runtime panics into internal signals instead
+- real structs, copied by value like arrays/dicts are (if you don't want them copied by value just use objects/instances)
+- non-first-class arrays/dicts copied by id like instances? taking the same syntax of course
+
 - give the runtime control over interpreters of its own; runtime panics will invalidate interpreters
 - allow interpreters to act like generators
 - add real generators, friendly with what non-programmers expect "script" to mean (e.g. an AI script, VN script, etc - changing state, returning, later coming back to where returned from)
-- add bindings for input, graphics, sound
 - document transformations from parse tree (as in grammarsimple.txt) to syntax tree (input to compilation process)
 - investigate feasibility of grammar, parser, compiler, and interpreter hooks (limited to child interpreters)
