@@ -280,3 +280,42 @@ xaa[1] = "e";
 
 print(xaa);
 
+
+
+{
+    var aster = 1;
+    
+    def aster_test()
+    {
+        print(aster);
+    }
+    
+    aster_test();
+    
+    if (aster)
+    {
+        var aster = "test";
+        aster_test();
+    }
+}
+
+{
+    var aster = 1;
+    
+    var aster_tester;
+    
+    if (aster)
+    {
+        var aster = "test";
+
+        def aster_test()
+        {
+            print(aster);
+        }
+        aster_tester = aster_test;
+        
+        aster_tester();
+    }
+    
+    aster_tester();
+}

@@ -362,9 +362,9 @@ impl ParseError {
     }
 }
 
-fn build_best_error(myself : &mut Option<ParseError>, other : &mut Option<ParseError>)
+fn build_best_error(myself : &mut Option<ParseError>, other : Option<ParseError>)
 {
-    if let Some(other) = other.as_mut()
+    if let Some(other) = other
     {
         if myself.is_some()
         {
@@ -374,22 +374,22 @@ fn build_best_error(myself : &mut Option<ParseError>, other : &mut Option<ParseE
                 {
                     return;
                 }
-                if other.token > myself.token
+                else if other.token > myself.token
                 {
-                    *myself = other.clone();
+                    *myself = other;
                 }
-                if other.token == myself.token
+                else if other.token == myself.token
                 {
-                    for text in &other.expected
+                    for text in other.expected
                     {
-                        myself.expected.insert(text.clone());
+                        myself.expected.insert(text);
                     }
                 }
             }
         }
         else
         {
-            *myself = Some(other.clone());
+            *myself = Some(other);
         }
     }
 }
@@ -680,8 +680,8 @@ impl Parser {
                     {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
-                    let (bit, consumed, mut error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
-                    build_best_error(&mut latesterror, &mut error);
+                    let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    build_best_error(&mut latesterror, error);
                     if bit.is_some()
                     {
                         let node = bit.unwrap();
@@ -700,7 +700,7 @@ impl Parser {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
                     let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
-                    build_best_error(&mut latesterror, &mut error);
+                    build_best_error(&mut latesterror, error);
                     if !bit.is_some()
                     {
                         return (defaultreturn.0, defaultreturn.1, latesterror);
@@ -716,7 +716,7 @@ impl Parser {
                         consumed = tuple.1;
                         error = tuple.2;
                         
-                        build_best_error(&mut latesterror, &mut error);
+                        build_best_error(&mut latesterror, error);
                     }
                 }
                 GrammarToken::OptionalName(text) =>
@@ -726,7 +726,7 @@ impl Parser {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
                     let (bit, consumed, mut error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
-                    build_best_error(&mut latesterror, &mut error);
+                    build_best_error(&mut latesterror, error);
                     if bit.is_some()
                     {
                         let node = bit.unwrap();
@@ -741,7 +741,7 @@ impl Parser {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
                     let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
-                    build_best_error(&mut latesterror, &mut error);
+                    build_best_error(&mut latesterror, error);
                     while bit.is_some()
                     {
                         let node = bit.unwrap();
@@ -753,7 +753,7 @@ impl Parser {
                         consumed = tuple.1;
                         error = tuple.2;
                         
-                        build_best_error(&mut latesterror, &mut error);
+                        build_best_error(&mut latesterror, error);
                     }
                 }
                 GrammarToken::SeparatorNameList{text, separator} =>
@@ -763,7 +763,7 @@ impl Parser {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
                     let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
-                    build_best_error(&mut latesterror, &mut error);
+                    build_best_error(&mut latesterror, error);
                     if !bit.is_some()
                     {
                         return (defaultreturn.0, defaultreturn.1, latesterror);
@@ -775,8 +775,7 @@ impl Parser {
                         totalconsumed += consumed;
                         
                         if tokens.len() <= index+totalconsumed { break; }
-                        let comma = tokens[index+totalconsumed].text.clone();
-                        if comma != *separator { break; }
+                        if tokens[index+totalconsumed].text != *separator { break; }
                         totalconsumed += 1;
                         
                         let tuple = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
@@ -784,7 +783,7 @@ impl Parser {
                         consumed = tuple.1;
                         error = tuple.2;
                         
-                        build_best_error(&mut latesterror, &mut error);
+                        build_best_error(&mut latesterror, error);
                         
                         // undo separator drain if right-hand rule parse failed
                         if !bit.is_some()
@@ -797,8 +796,8 @@ impl Parser {
                 {
                     if tokens.len() <= index+totalconsumed
                     {
-                        let mut error = Some(ParseError::new(index+totalconsumed, &text));
-                        build_best_error(&mut latesterror, &mut error);
+                        let error = Some(ParseError::new(index+totalconsumed, &text));
+                        build_best_error(&mut latesterror, error);
                         return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
                     let token_text = tokens[index+totalconsumed].text.clone();
@@ -810,8 +809,8 @@ impl Parser {
                     }
                     else
                     {
-                        let mut error = Some(ParseError::new(index+totalconsumed, &text));
-                        build_best_error(&mut latesterror, &mut error);
+                        let error = Some(ParseError::new(index+totalconsumed, &text));
+                        build_best_error(&mut latesterror, error);
                         return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
                 }
@@ -819,8 +818,8 @@ impl Parser {
                 {
                     if tokens.len() <= index+totalconsumed
                     {
-                        let mut error = Some(ParseError::new(index+totalconsumed, &text));
-                        build_best_error(&mut latesterror, &mut error);
+                        let error = Some(ParseError::new(index+totalconsumed, &text));
+                        build_best_error(&mut latesterror, error);
                         return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
                     let token_text = tokens[index+totalconsumed].text.clone();
@@ -832,8 +831,8 @@ impl Parser {
                     }
                     else
                     {
-                        let mut error = Some(ParseError::new(index+totalconsumed, &text));
-                        build_best_error(&mut latesterror, &mut error);
+                        let error = Some(ParseError::new(index+totalconsumed, &text));
+                        build_best_error(&mut latesterror, error);
                         return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
                 }
@@ -841,8 +840,8 @@ impl Parser {
                 {
                     if tokens.len() <= index+totalconsumed
                     {
-                        let mut error = Some(ParseError::new(index+totalconsumed, &text));
-                        build_best_error(&mut latesterror, &mut error);
+                        let error = Some(ParseError::new(index+totalconsumed, &text));
+                        build_best_error(&mut latesterror, error);
                         return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
                     let token_text = tokens[index+totalconsumed].text.clone();
@@ -853,8 +852,8 @@ impl Parser {
                     }
                     else
                     {
-                        let mut error = Some(ParseError::new(index+totalconsumed, &text));
-                        build_best_error(&mut latesterror, &mut error);
+                        let error = Some(ParseError::new(index+totalconsumed, &text));
+                        build_best_error(&mut latesterror, error);
                         return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
                 }
@@ -880,8 +879,8 @@ impl Parser {
         
         for form in &nodetype.forms
         {
-            let (nodes, consumed, mut error) = self.parse_form(&tokens, index, form);
-            build_best_error(&mut latesterror, &mut error);
+            let (nodes, consumed, error) = self.parse_form(&tokens, index, form);
+            build_best_error(&mut latesterror, error);
             if let Some(nodes) = nodes
             {
                 return (Some(ASTNode{text : nodetype.name.clone(), line : tokens[index].line, position : tokens[index].position, isparent : true, children : nodes, opdata : dummy_opdata()}), consumed, latesterror);
