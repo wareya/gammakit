@@ -305,11 +305,23 @@ impl Interpreter
             
             let code = compile_bytecode(&ast);
             
-                // endaddr at the start because Rc::new() moves `code`
-            return (Value::Func(FuncVal
-                { internal : false, internalname : None, predefined : None,
-                  userdefdata : Some(FuncSpec { endaddr : code.len(), varnames : Vec::new(), code : Rc::new(code), startaddr : 0, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location() } )
-                } ), false);
+            // endaddr at the start because Rc::new() moves `code`
+            return
+            ( Value::new_funcval
+              ( false,
+                None,
+                None,
+                Some(FuncSpec
+                { endaddr : code.len(),
+                  varnames : Vec::new(),
+                  code : Rc::new(code),
+                  startaddr : 0,
+                  fromobj : false,
+                  parentobj : 0,
+                  forcecontext : 0,
+                  location : self.build_funcspec_location()
+                }
+                )), false);
         }
         else
         {
@@ -332,10 +344,22 @@ impl Interpreter
                 let code = compile_bytecode(ast);
                 
                 // endaddr at the start because Rc::new() moves `code`
-                return (Value::Func(FuncVal
-                    { internal : false, internalname : None, predefined : None,
-                      userdefdata : Some(FuncSpec { endaddr : code.len(), varnames : Vec::new(), code : Rc::new(code), startaddr : 0, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location() } )
-                    } ), false);
+                return
+                ( Value::new_funcval
+                  ( false,
+                    None,
+                    None,
+                    Some(FuncSpec
+                    { endaddr : code.len(),
+                      varnames : Vec::new(),
+                      code : Rc::new(code),
+                      startaddr : 0,
+                      fromobj : false,
+                      parentobj : 0,
+                      forcecontext : 0,
+                      location : self.build_funcspec_location()
+                    }
+                    )), false);
             }
             else
             {

@@ -63,7 +63,11 @@ impl Interpreter
     }
     pub(super) fn list_pop_func(&mut self, args : &mut Vec<Value>) -> Result<FuncVal, i32>
     {
-        list_pop_generic!(args, Func)
+        match list_pop_generic!(args, Func)
+        {
+            Ok(s) => Ok(*s),
+            Err(e) => Err(e)
+        }
     }
     pub(super) fn list_pop_dict(&mut self, args : &mut Vec<Value>) -> Result<HashMap<HashableValue, Value>, i32>
     {

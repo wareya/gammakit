@@ -38,7 +38,7 @@ impl Interpreter
                         {
                             if let Value::Func(funcdata) = funcdata_val
                             {
-                                self.call_function(global, funcdata, args, isexpr)
+                                self.call_function(global, *funcdata, args, isexpr)
                             }
                             else
                             {
@@ -52,7 +52,7 @@ impl Interpreter
                     }
                     else if let Value::Func(funcdata) = funcdata
                     {
-                        self.call_function(global, funcdata, args, isexpr)
+                        self.call_function(global, *funcdata, args, isexpr)
                     }
                     else
                     {
@@ -287,7 +287,7 @@ impl Interpreter
                                 {
                                     let mut mydata = funcdat.clone();
                                     mydata.forcecontext = inst.ident;
-                                    return Some(Value::Func(FuncVal{internal : false, internalname : None, predefined : None, userdefdata : Some(mydata)}));
+                                    return Some(Value::new_funcval(false, None, None, Some(mydata)));
                                 }
                             }
                         }
@@ -364,7 +364,7 @@ impl Interpreter
                             {
                                 let mut mydata = funcdat.clone();
                                 mydata.forcecontext = indirvar.ident;
-                                return Some(Value::Func(FuncVal{internal : false, internalname : None, predefined : None, userdefdata : Some(mydata)}));
+                                return Some(Value::new_funcval(false, None, None, Some(mydata)));
                             }
                         }
                         else
@@ -403,7 +403,7 @@ impl Interpreter
                 // TODO: Store actual function pointer instead?
                 if let Some(_internal_func) = self.get_internal_function(&dirvar.name)
                 {
-                    return Some(Value::Func(FuncVal { internal : true, internalname : Some(dirvar.name.clone()), predefined : None, userdefdata : None }));
+                    return Some(Value::new_funcval(true, Some(dirvar.name.clone()), None, None ));
                 }
                 
                 panic!("error: unknown identifier `{}`", dirvar.name);

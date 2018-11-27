@@ -131,9 +131,18 @@ pub(super) enum Value {
     Text(String),
     Array(VecDeque<Value>),
     Dict(HashMap<HashableValue, Value>),
-    Func(FuncVal),
+    Func(Box<FuncVal>),
     Var(Variable),
 }
+
+impl Value
+{
+    pub(super) fn new_funcval(internal : bool, internalname : Option<String>, predefined : Option<HashMap<String, Value>>, userdefdata : Option<FuncSpec>) -> Value
+    {
+        Value::Func(Box::new(FuncVal{internal, internalname, predefined, userdefdata}))
+    }
+}
+
 #[derive(Debug)]
 #[derive(Clone)]
 pub(super) enum HashableValue {
@@ -192,18 +201,17 @@ pub(super) fn format_val(val : &Value) -> Option<String>
     {
         Value::Number(float) =>
         {
-            Some(format!("{}", format!("{:.10}", float).trim_right_matches('0').trim_right_matches('.')))
+            Some(format!("{:.10}", float).trim_right_matches('0').trim_right_matches('.').to_string())
         }
         Value::Text(string) =>
         {
-            Some(format!("{}", string))
+            Some(string.clone())
         }
         Value::Array(array) =>
         {
             let mut ret = String::new();
             ret.push_str("[");
-            let mut i : usize = 0;
-            for val in array
+            for (i, val) in array.iter().enumerate()
             {
                 if let Value::Text(text) = val
                 {
@@ -217,7 +225,6 @@ pub(super) fn format_val(val : &Value) -> Option<String>
                 {
                     return None
                 }
-                i += 1;
                 if i != array.len()
                 {
                     ret.push_str(", ");
@@ -231,8 +238,7 @@ pub(super) fn format_val(val : &Value) -> Option<String>
         {
             let mut ret = String::new();
             ret.push_str("{");
-            let mut i : usize = 0;
-            for (key, val) in dict
+            for (i, (key, val)) in dict.iter().enumerate()
             {
                 if let Some(part) = format_val(&hashval_to_val(key))
                 {
@@ -256,7 +262,6 @@ pub(super) fn format_val(val : &Value) -> Option<String>
                 {
                     return None
                 }
-                i += 1;
                 if i != dict.len()
                 {
                     ret.push_str(", ");
@@ -352,9 +357,9 @@ pub(super) fn value_op_modulo(left : &Value, right : &Value) -> Result<Value, St
         }
     }
 }
-pub(super) fn float_booly(f : &f64) -> bool
+pub(super) fn float_booly(f : f64) -> bool
 {
-    *f >= 0.5 // FIXME do we want to replicate this or can we get away with using f.round() != 0.0 instead?
+    f >= 0.5 // FIXME do we want to replicate this or can we get away with using f.round() != 0.0 instead?
 }
 pub(super) fn bool_floaty(b : bool) -> f64
 {
@@ -366,6 +371,7 @@ pub(super) fn value_op_equal(left : &Value, right : &Value) -> Result<Value, Str
     {
         (Value::Number(left), Value::Number(right)) =>
         {
+            #[cfg_attr(feature = "cargo-clippy", allow(float_cmp))]
             Ok(Value::Number(bool_floaty(left==right)))
         }
         (Value::Text(left), Value::Text(right)) =>
@@ -384,6 +390,7 @@ pub(super) fn value_op_not_equal(left : &Value, right : &Value) -> Result<Value,
     {
         (Value::Number(left), Value::Number(right)) =>
         {
+            #[cfg_attr(feature = "cargo-clippy", allow(float_cmp))]
             Ok(Value::Number(bool_floaty(left!=right)))
         }
         (Value::Text(left), Value::Text(right)) =>
@@ -463,7 +470,7 @@ pub(super) fn value_op_and(left : &Value, right : &Value) -> Result<Value, Strin
     {
         (Value::Number(left), Value::Number(right)) =>
         {
-            Ok(Value::Number(bool_floaty(float_booly(left)&&float_booly(right))))
+            Ok(Value::Number(bool_floaty(float_booly(*left)&&float_booly(*right))))
         }
         // TODO dicts
         _ =>
@@ -478,7 +485,7 @@ pub(super) fn value_op_or(left : &Value, right : &Value) -> Result<Value, String
     {
         (Value::Number(left), Value::Number(right)) =>
         {
-            Ok(Value::Number(bool_floaty(float_booly(left)||float_booly(right))))
+            Ok(Value::Number(bool_floaty(float_booly(*left)||float_booly(*right))))
         }
         // TODO dicts
         _ =>
@@ -568,7 +575,7 @@ pub(super) fn value_op_not(value : &Value) -> Result<Value, String>
     {
         Value::Number(value) =>
         {
-            Ok(Value::Number(bool_floaty(!float_booly(value))))
+            Ok(Value::Number(bool_floaty(!float_booly(*value))))
         }
         _ =>
         {
@@ -601,7 +608,7 @@ pub(super) fn value_truthy(imm : &Value) -> bool
     {
         Value::Number(value) =>
         {
-            float_booly(value)
+            float_booly(*value)
         }
         // TODO: string and array concatenation
         _ =>
@@ -647,7 +654,9 @@ pub(super) fn ast_to_dict(ast : &ASTNode) -> Value
     */
     
     opdata.insert(to_key!("isop"), Value::Number(bool_floaty(ast.opdata.isop)));
+    #[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
     opdata.insert(to_key!("assoc"), Value::Number(ast.opdata.assoc as f64));
+    #[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
     opdata.insert(to_key!("precedence"), Value::Number(ast.opdata.precedence as f64));
     
     astdict.insert(to_key!("opdata"), Value::Dict(opdata));
@@ -685,7 +694,7 @@ pub(super) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> ASTNode
     handle!(ast, dict, "position", position, Number, round, usize, "a number");
     if let Some(Value::Number(isparent)) = get!(dict, "isparent")
     {
-        ast.isparent = float_booly(isparent);
+        ast.isparent = float_booly(*isparent);
     }
     else
     {
@@ -716,7 +725,7 @@ pub(super) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> ASTNode
     {
         if let Some(Value::Number(isop)) = get!(val_opdata, "isop")
         {
-            ast.opdata.isop = float_booly(isop);
+            ast.opdata.isop = float_booly(*isop);
         }
         else
         {

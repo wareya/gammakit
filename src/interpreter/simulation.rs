@@ -418,7 +418,7 @@ impl Interpreter
             {
                 panic!("error: redeclared identifier {}, name")
             }
-            scope.insert(funcname, Value::Func(FuncVal { internal : false, internalname : None, predefined : None, userdefdata : Some(myfuncspec) }));
+            scope.insert(funcname, Value::Func(Box::new(FuncVal { internal : false, internalname : None, predefined : None, userdefdata : Some(myfuncspec) })));
         }
         else
         {
@@ -573,7 +573,7 @@ impl Interpreter
     pub(super) fn sim_LAMBDA(&mut self, _global : &mut GlobalState)
     {
         let (captures, myfuncspec) = self.read_lambda();
-        self.top_frame.stack.push(Value::Func(FuncVal{internal : false, internalname : None, predefined : Some(captures), userdefdata : Some(myfuncspec)}));
+        self.top_frame.stack.push(Value::Func(Box::new(FuncVal{internal : false, internalname : None, predefined : Some(captures), userdefdata : Some(myfuncspec)})));
     }
     #[allow(non_snake_case)]
     pub(super) fn sim_OBJDEF(&mut self, global : &mut GlobalState)

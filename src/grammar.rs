@@ -111,21 +111,19 @@ impl GrammarForm {
                 ret.tokens.push(GrammarToken::Plain(token.to_string()));
                 if re.is_exact(r"[a-zA-Z_][a-zA-Z_0-9]*", token)
                 {
-                    let thing = token.clone();
-                    if !text_set.contains(thing)
+                    if !text_set.contains(*token)
                     {
-                        text_set.insert(thing.to_string());
-                        parser.texts.push(thing.to_string());
+                        text_set.insert(token.to_string());
+                        parser.texts.push(token.to_string());
                     }
                     text_set.insert(token.to_string());
                 }
                 else if re.is_exact(r"[^a-zA-Z0-9_]+", token)
                 {
-                    let thing = token.clone();
-                    if !symbol_set.contains(thing)
+                    if !symbol_set.contains(*token)
                     {
-                        symbol_set.insert(thing.to_string());
-                        parser.symbols.push(thing.to_string());
+                        symbol_set.insert(token.to_string());
+                        parser.symbols.push(token.to_string());
                     }
                 }
                 else
