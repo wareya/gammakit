@@ -144,27 +144,24 @@ impl Interpreter {
                         {
                             self.suppress_for_expr_end = false;
                         }
-                        else
+                        // if we are at the end of the loop expression, test it, jump past the block if it's false
+                        else if let Ok(testval) = self.stack_pop_any()
                         {
-                            // if we are at the end of the loop expression, test it, jump past the block if it's false
-                            if let Ok(testval) = self.stack_pop_any()
+                            if !value_truthy(&testval)
                             {
-                                if !value_truthy(&testval)
-                                {
-                                    self.set_pc(controller.controlpoints[3]);
-                                    self.drain_scopes(controller.scopes);
-                                    must_put_back = false;
-                                }
-                                // otherwise jump to code (end of post expression)
-                                else
-                                {
-                                    self.set_pc(controller.controlpoints[2]);
-                                }
+                                self.set_pc(controller.controlpoints[3]);
+                                self.drain_scopes(controller.scopes);
+                                must_put_back = false;
                             }
+                            // otherwise jump to code (end of post expression)
                             else
                             {
-                                panic!("internal error: not enough values on stack while handling FOR controller");
+                                self.set_pc(controller.controlpoints[2]);
                             }
+                        }
+                        else
+                        {
+                            panic!("internal error: not enough values on stack while handling FOR controller");
                         }
                     }
                     else if self.get_pc() == controller.controlpoints[2]

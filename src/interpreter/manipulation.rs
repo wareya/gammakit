@@ -42,7 +42,7 @@ impl Interpreter
     
     pub(super) fn pull_from_code(&mut self, n : usize) -> Vec<u8>
     {
-        let vec = self.get_code()[self.get_pc()..self.get_pc()+n].iter().cloned().collect();
+        let vec = self.get_code()[self.get_pc()..self.get_pc()+n].to_vec();
         self.add_pc(n);
         return vec;
     }

@@ -18,9 +18,9 @@ pub struct ParseError {
 }
 
 impl ParseError {
-    pub fn new(token : usize, text : &String) -> ParseError
+    pub fn new(token : usize, text : &str) -> ParseError
     {
-        return ParseError{token, expected : vec!(text.clone()).into_iter().collect()}
+        return ParseError{token, expected : vec!(text.to_string()).into_iter().collect()}
     }
 }
 
@@ -71,7 +71,7 @@ impl Parser {
         Parser { regexes: Vec::new(), symbols: Vec::new(), texts: Vec::new(), nodetypemap: HashMap::new(), internal_regexes: RegexHolder::new(), inited: false }
     }
     
-    pub fn init(&mut self, text: &String)
+    pub fn init(&mut self, text: &str)
     {
         let start_time = Instant::now();
         
@@ -100,11 +100,11 @@ impl Parser {
                 let istoken = line.starts_with("TOKEN ");
                 let name = slice(&line, if istoken {6} else {0}, -1).to_string();
                 // last line is guaranteed to be "" which means we are unable to pop past the end here
-                let mut nodetype : GrammarPoint = GrammarPoint{name: name, forms: Vec::new(), istoken};
+                let mut nodetype : GrammarPoint = GrammarPoint{name, forms: Vec::new(), istoken};
                 line = pop!();
                 while line != ""
                 {
-                    nodetype.forms.push(GrammarForm::new(line, self, &mut regex_set, &mut symbol_set, &mut text_set, istoken));
+                    nodetype.forms.push(GrammarForm::new(&line, self, &mut regex_set, &mut symbol_set, &mut text_set, istoken));
                     line = pop!();
                 }
                 if !self.nodetypemap.contains_key(&nodetype.name)
@@ -144,7 +144,7 @@ impl Parser {
                         GrammarToken::NameList(text) |
                         GrammarToken::OptionalName(text) |
                         GrammarToken::OptionalNameList(text) => {text.clone()}
-                        GrammarToken::SeparatorNameList{text: name, separator: _} => {name.clone()}
+                        GrammarToken::SeparatorNameList{text: name, ..} => {name.clone()}
                         _ => {"".to_string()}
                     };
                     if name != ""
@@ -157,7 +157,7 @@ impl Parser {
                 }
             }
             let name = &tuple.1.name;
-            let point = self.nodetypemap.get(name).unwrap();
+            let point = &self.nodetypemap[name];
             //if point.name == "declname"
             if false
             {
@@ -182,14 +182,14 @@ impl Parser {
                             { print!("{} ", text); }
                             GrammarToken::Regex(text) =>
                             { print!("r:{} ", text); }
-                            GrammarToken::Op{text, assoc : _, precedence : _} =>
+                            GrammarToken::Op{text, ..} =>
                             { print!("op:{} ", text); }
                             GrammarToken::RestIsOptional => { print!(">>? "); }
                         }
                     }
-                    print!("\n");
+                    println!();
                 }
-                print!("\n");
+                println!();
             }
         }
         if !self.nodetypemap.contains_key("program")
@@ -206,7 +206,7 @@ impl Parser {
     }
     
     // FIXME: change it to not be line-based; seek to the next newline instead. necessary for things like strings containing newline literals, which should definitely be supported.
-    pub fn tokenize(&mut self, lines : &Vec<String>, silent: bool) -> VecDeque<LexToken>
+    pub fn tokenize(&mut self, lines : &[String], silent: bool) -> VecDeque<LexToken>
     {
         let start_time = Instant::now();
         
@@ -342,7 +342,7 @@ impl Parser {
                     {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
-                    let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
                     build_best_error(&mut latesterror, error);
                     if bit.is_some()
                     {
@@ -361,9 +361,9 @@ impl Parser {
                     {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
-                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
                     build_best_error(&mut latesterror, error);
-                    if !bit.is_some()
+                    if bit.is_none()
                     {
                         return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
@@ -373,7 +373,7 @@ impl Parser {
                         nodes.push(node);
                         totalconsumed += consumed;
                         
-                        let tuple = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                        let tuple = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
                         bit = tuple.0;
                         consumed = tuple.1;
                         error = tuple.2;
@@ -387,7 +387,7 @@ impl Parser {
                     {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
-                    let (bit, consumed, mut error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    let (bit, consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
                     build_best_error(&mut latesterror, error);
                     if bit.is_some()
                     {
@@ -402,7 +402,7 @@ impl Parser {
                     {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
-                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
                     build_best_error(&mut latesterror, error);
                     while bit.is_some()
                     {
@@ -410,7 +410,7 @@ impl Parser {
                         nodes.push(node);
                         totalconsumed += consumed;
                         
-                        let tuple = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                        let tuple = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
                         bit = tuple.0;
                         consumed = tuple.1;
                         error = tuple.2;
@@ -424,9 +424,9 @@ impl Parser {
                     {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
-                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
                     build_best_error(&mut latesterror, error);
-                    if !bit.is_some()
+                    if bit.is_none()
                     {
                         return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
@@ -440,7 +440,7 @@ impl Parser {
                         if tokens[index+totalconsumed].text != *separator { break; }
                         totalconsumed += 1;
                         
-                        let tuple = self.parse(&tokens, index+totalconsumed, self.nodetypemap.get(text).unwrap());
+                        let tuple = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
                         bit = tuple.0;
                         consumed = tuple.1;
                         error = tuple.2;
@@ -448,7 +448,7 @@ impl Parser {
                         build_best_error(&mut latesterror, error);
                         
                         // undo separator drain if right-hand rule parse failed
-                        if !bit.is_some()
+                        if bit.is_none()
                         {
                             totalconsumed -= 1;
                         }
@@ -740,7 +740,7 @@ impl Parser {
             }
         }
     }
-    pub fn parse_program(&self, tokens : &VecDeque<LexToken>, lines : &Vec<String>, silent: bool) -> Option<ASTNode>
+    pub fn parse_program(&self, tokens : &VecDeque<LexToken>, lines : &[String], silent: bool) -> Option<ASTNode>
     {
         let start_time = Instant::now();
         
@@ -748,18 +748,18 @@ impl Parser {
         {
             println!("parsing...");
         }
-        let (raw_ast, consumed, latesterror) = self.parse(&tokens, 0, self.nodetypemap.get("program").unwrap());
+        let (raw_ast, consumed, latesterror) = self.parse(&tokens, 0, &self.nodetypemap["program"]);
         if !silent
         {
             println!("successfully parsed {} out of {} tokens", consumed, tokens.len());
             println!("parse took {:?}", Instant::now().duration_since(start_time));
         }
         
-        if consumed != tokens.len() || !raw_ast.is_some()
+        if consumed != tokens.len() || raw_ast.is_none()
         {
             if let Some(error) = latesterror
             {
-                let mut expected : Vec<String> = error.expected.iter().map(|x| x.clone()).collect();
+                let mut expected : Vec<String> = error.expected.iter().cloned().collect();
                 expected.sort();
                 if error.expected.len() == 1
                 {
@@ -772,7 +772,7 @@ impl Parser {
                 let token = tokens.get(error.token).unwrap().clone();
                 let linenum = token.line;
                 let position = token.position;
-                println!("context:\n{}\n{}^", lines.get(linenum-1).unwrap(), " ".repeat(position));
+                println!("context:\n{}\n{}^", lines[linenum-1], " ".repeat(position));
                 //println!("(token {})", error.token);
                 //println!("(line {})", tokens.get(error.token).unwrap().line);
                 //println!("(position {})", );

@@ -64,6 +64,7 @@ impl Interpreter
     pub(super) fn sim_PUSHSHORT(&mut self, _global : &mut GlobalState)
     {
         let value = unpack_u16(&self.pull_from_code(2));
+        #[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
         self.top_frame.stack.push(Value::Number(value as f64));
     }
     #[allow(non_snake_case)]
@@ -95,7 +96,7 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub(super) fn sim_DECLVAR(&mut self, _global : &mut GlobalState)
     {
-        if self.top_frame.stack.len() < 1
+        if self.top_frame.stack.is_empty()
         {
             panic!("internal error: DECLVAR instruction requires 1 values on the stack but only found 0");
         }
@@ -123,7 +124,7 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub(super) fn sim_DECLFAR(&mut self, global : &mut GlobalState)
     {
-        if self.top_frame.stack.len() < 1
+        if self.top_frame.stack.is_empty()
         {
             panic!("internal error: DECLFAR instruction requires 1 values on the stack but only found 0");
         }
@@ -133,6 +134,7 @@ impl Interpreter
             {
                 if let Some(instance) = global.instances.get_mut(instance_id)
                 {
+                    // work around clippy false positive
                     if !instance.variables.contains_key(&name)
                     {
                         instance.variables.insert(name, Value::Number(0.0));
@@ -189,7 +191,7 @@ impl Interpreter
             }
             else
             {
-                panic!("error: tried to use indirection on a type that can't be an identifier")
+                panic!("error: tried to use indirection on a type that can't be an identifier (only numbers can be identifiers)")
             }
         }
         else
@@ -220,9 +222,9 @@ impl Interpreter
                                 panic!("internal error: evaluate_or_store returned None when just storing a variable");
                             }
                         }
-                        Variable::Direct(_) =>
+                        Variable::Direct(var) =>
                         {
-                            panic!("internal error: tried to evaluate direct variable `{}`\n(note: the evaluation instruction is for indirect (id.y) variables and array (arr[0]) variables; bytecode metaprogramming for dynamic direct variable access is unsupported)");
+                            panic!("internal error: tried to evaluate direct variable `{}`\n(note: the evaluation instruction is for indirect (id.y) variables and array (arr[0]) variables; bytecode metaprogramming for dynamic direct variable access is unsupported)", var.name);
                         }
                     }
                 }
@@ -271,7 +273,7 @@ impl Interpreter
     {
         self.pop_controlstack_until_loop();
         
-        if self.top_frame.controlstack.len() == 0
+        if self.top_frame.controlstack.is_empty()
         {
             panic!("error: break instruction not inside of loop");
         }
@@ -300,7 +302,7 @@ impl Interpreter
     {
         self.pop_controlstack_until_loop();
         
-        if self.top_frame.controlstack.len() == 0
+        if self.top_frame.controlstack.is_empty()
         {
             panic!("error: continue instruction not inside of loop");
         }
@@ -364,7 +366,7 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub(super) fn sim_WITH(&mut self, global : &mut GlobalState)
     {
-        if self.top_frame.stack.len() < 1
+        if self.top_frame.stack.is_empty()
         {
             panic!("internal error: WITH instruction requires 1 values on the stack but found 0");
         }
@@ -416,7 +418,7 @@ impl Interpreter
         {
             if scope.contains_key(&funcname)
             {
-                panic!("error: redeclared identifier {}, name")
+                panic!("error: redeclared identifier {}", funcname)
             }
             scope.insert(funcname, Value::Func(Box::new(FuncVal { internal : false, internalname : None, predefined : None, userdefdata : Some(myfuncspec) })));
         }
@@ -536,7 +538,7 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub(super) fn sim_UNOP(&mut self, _global : &mut GlobalState)
     {
-        if self.top_frame.stack.len() < 1
+        if self.top_frame.stack.is_empty()
         {
             panic!("internal error: UNOP instruction requires 2 values on the stack but found {}", self.top_frame.stack.len());
         }

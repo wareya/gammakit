@@ -85,9 +85,8 @@ impl Interpreter
                     let mut ptr = $var as *mut Value;
                     
                     let num_indexes = $indexes.len();
-                    let mut current_index = 0;
                     
-                    for index in &$indexes
+                    for (current_index, ref index) in $indexes.iter().enumerate()
                     {
                         if let Value::Array(ref mut newvar) = *ptr
                         {
@@ -193,7 +192,6 @@ impl Interpreter
                         {
                             panic!("error: tried to index into a non-array, non-dict value");
                         }
-                        current_index += 1;
                     }
                     
                     if let Some(value) = $value

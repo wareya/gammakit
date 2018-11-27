@@ -22,11 +22,11 @@ pub struct GrammarForm {
 }
 
 impl GrammarForm {
-    pub fn new(line : String, parser : &mut Parser, regex_set : &mut HashSet<String>, symbol_set : &mut HashSet<String>, text_set : &mut HashSet<String>, intoken : bool) -> GrammarForm
+    pub fn new(line : &str, parser : &mut Parser, regex_set : &mut HashSet<String>, symbol_set : &mut HashSet<String>, text_set : &mut HashSet<String>, intoken : bool) -> GrammarForm
     {
         let re = &mut parser.internal_regexes;
         let mut ret = GrammarForm { tokens : Vec::new() };
-        let tokens : Vec<&str> = line.split(" ").collect();
+        let tokens : Vec<&str> = line.split(' ').collect();
         let tokenslen = tokens.len();
         let mut handle_operator_spec = false;
         for token in &tokens
@@ -42,13 +42,10 @@ impl GrammarForm {
             else if re.is_exact(r"%.+%$", token)
             {
                 let bare = slice(token, 1, -1);
-                if intoken
+                if intoken && !regex_set.contains(&bare)
                 {
-                    if !regex_set.contains(&bare)
-                    {
-                        regex_set.insert(bare.clone());
-                        parser.regexes.push(bare.clone());
-                    }
+                    regex_set.insert(bare.clone());
+                    parser.regexes.push(bare.clone());
                 }
                 ret.tokens.push(GrammarToken::Regex(bare));
             }
@@ -146,7 +143,7 @@ impl GrammarForm {
             }
             if let Ok(precedence) = tokens[2].parse::<i32>()
             {
-                ret.tokens[0] = GrammarToken::Op{text: optext, assoc: if tokens[1] == r"\l" {1} else {0}, precedence: precedence};
+                ret.tokens[0] = GrammarToken::Op{text: optext, assoc: if tokens[1] == r"\l" {1} else {0}, precedence};
             }
             else
             {

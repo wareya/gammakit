@@ -47,7 +47,7 @@ fn unpack_u32(vec : &Vec<u8>) -> u32
 pub fn pack_u64(num : u64) -> Vec<u8>
 {
     return vec!(((num>>56)&0xFF) as u8, ((num>>48)&0xFF) as u8, ((num>>40)&0xFF) as u8, ((num>>32)&0xFF) as u8,
-                ((num>>24)&0xFF) as u8, ((num>>16)&0xFF) as u8, ((num>>08)&0xFF) as u8, ((num>>00)&0xFF) as u8,
+                ((num>>24)&0xFF) as u8, ((num>>16)&0xFF) as u8, ((num>> 8)&0xFF) as u8, ((num>>00)&0xFF) as u8,
     );
 }
 pub fn unpack_u64(vec : &[u8]) -> u64
@@ -67,7 +67,7 @@ pub fn unpack_f64(vec : &[u8]) -> f64
 {
     assert!(vec.len() == 8);
     let num = unpack_u64(vec);
-    let as_f64 : f64 = unsafe { std::mem::transmute(num) };
+    let as_f64 = f64::from_bits(num);
     return as_f64;
 }
 

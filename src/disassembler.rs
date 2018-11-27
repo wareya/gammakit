@@ -1,7 +1,7 @@
 use super::strings::*;
 use super::bytecode::*;
 
-pub fn disassemble_bytecode(code : &Vec<u8>, mut pc : usize, mut end : usize) -> Vec<String>
+pub fn disassemble_bytecode(code : &[u8], mut pc : usize, mut end : usize) -> Vec<String>
 {
     let mut ret = Vec::<String>::new();
     

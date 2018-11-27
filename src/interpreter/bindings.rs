@@ -5,7 +5,7 @@ use interpreter::*;
 
 impl Interpreter
 {
-    pub(super) fn get_internal_function(&mut self, name : &String) -> Option<Box<Fn(&mut Interpreter, &mut GlobalState, Vec<Value>, bool) -> (Value, bool)>>
+    pub(super) fn get_internal_function(&mut self, name : &str) -> Option<Box<Fn(&mut Interpreter, &mut GlobalState, Vec<Value>, bool) -> (Value, bool)>>
     {
         macro_rules! enbox {
             ( $x:ident ) =>
@@ -13,7 +13,7 @@ impl Interpreter
                 Some(Box::new(Interpreter::$x))
             }
         }
-        match name.as_str()
+        match name
         {
             "print"                 => enbox!(sim_func_print),
             "len"                   => enbox!(sim_func_len),
@@ -27,9 +27,9 @@ impl Interpreter
             _ => None
         }
     }
-    pub(super) fn internal_function_is_noreturn(&mut self, name : &String) -> bool
+    pub(super) fn internal_function_is_noreturn(&mut self, name : &str) -> bool
     {
-        match name.as_str()
+        match name
         {
             "instance_execute" => true,
             _ => false
@@ -62,7 +62,7 @@ impl Interpreter
             {
                 Value::Text(string) =>
                 {
-                    return (Value::Number(string.chars().collect::<Vec<char>>().len() as f64), false);
+                    return (Value::Number(string.chars().count() as f64), false);
                 }
                 Value::Array(array) =>
                 {

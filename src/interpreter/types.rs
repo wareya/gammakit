@@ -25,11 +25,12 @@ pub(super) struct Frame {
 impl Frame {
     pub(super) fn new_root(code : Rc<Vec<u8>>) -> Frame
     {
-        Frame { code : Rc::clone(&code), startpc : 0, pc : 0, endpc : code.len(), scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0 }
+        let codelen = code.len();
+        Frame { code, startpc : 0, pc : 0, endpc : codelen, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0 }
     }
     pub(super) fn new_from_call(code : Rc<Vec<u8>>, startpc : usize, endpc : usize, isexpr : bool) -> Frame
     {
-        Frame { code : Rc::clone(&code), startpc, pc : startpc, endpc, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0 }
+        Frame { code, startpc, pc : startpc, endpc, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0 }
     }
 }
 
@@ -225,7 +226,7 @@ pub(super) fn format_val(val : &Value) -> Option<String>
                 {
                     return None
                 }
-                if i != array.len()
+                if i+1 != array.len()
                 {
                     ret.push_str(", ");
                 }
@@ -262,7 +263,7 @@ pub(super) fn format_val(val : &Value) -> Option<String>
                 {
                     return None
                 }
-                if i != dict.len()
+                if i+1 != dict.len()
                 {
                     ret.push_str(", ");
                 }

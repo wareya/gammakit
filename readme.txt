@@ -79,3 +79,7 @@ TODO:
 - add real generators, friendly with what non-programmers expect "script" to mean (e.g. an AI script, VN script, etc - changing state, returning, later coming back to where returned from)
 - document transformations from parse tree (as in grammarsimple.txt) to syntax tree (input to compilation process)
 - investigate feasibility of grammar, parser, compiler, and interpreter hooks (limited to child interpreters)
+
+
+As of writing, clippy processes gammakit with no complaints after giving the following invocation:
+cargo clippy -- -A clippy::type_complexity -A clippy::cyclomatic_complexity -A clippy::len_zero -A clippy::cast_lossless -A clippy::identity_op -A clippy::unreadable_literal -A clippy::needless_return -A clippy::map_entry -A clippy::collapsible_if

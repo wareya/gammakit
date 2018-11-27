@@ -15,13 +15,14 @@ impl RegexHolder {
     }
     pub fn prepare_exact(&mut self, regex_text : &str)
     {
-        if let Some(_) = self.exact_regexes.get(regex_text)
+        if self.exact_regexes.contains_key(regex_text)
         {
             return;
         }
         let regex = Regex::new(&format!("^{}$", regex_text));
         self.exact_regexes.insert(regex_text.to_string(), regex);
     }
+    #[cfg_attr(feature = "cargo-clippy", allow(wrong_self_convention))]
     pub fn is_exact(&mut self, regex_text : &str, text : &str) -> bool
     {
         if let Some(regex) = self.exact_regexes.get(regex_text)
