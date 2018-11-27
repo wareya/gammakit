@@ -47,7 +47,7 @@ fn unpack_u32(vec : &Vec<u8>) -> u32
 pub fn pack_u64(num : u64) -> Vec<u8>
 {
     return vec!(((num>>56)&0xFF) as u8, ((num>>48)&0xFF) as u8, ((num>>40)&0xFF) as u8, ((num>>32)&0xFF) as u8,
-                ((num>>24)&0xFF) as u8, ((num>>16)&0xFF) as u8, ((num>> 8)&0xFF) as u8, ((num>>00)&0xFF) as u8,
+                ((num>>24)&0xFF) as u8, ((num>>16)&0xFF) as u8, ((num>> 8)&0xFF) as u8, ((num    )&0xFF) as u8,
     );
 }
 pub fn unpack_u64(vec : &[u8]) -> u64

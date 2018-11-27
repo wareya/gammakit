@@ -34,7 +34,7 @@ pub struct GlobalState {
 impl GlobalState {
     pub fn new(parser : Parser) -> GlobalState
     {
-        GlobalState { instance_id : 100000000, object_id : 300000000, instances : HashMap::new(), instances_by_type : HashMap::new(), objectnames : HashMap::new(), objects : HashMap::new() , regex_holder : RegexHolder::new(), parser }
+        GlobalState { instance_id : 1_0000_0000, object_id : 3_0000_0000, instances : HashMap::new(), instances_by_type : HashMap::new(), objectnames : HashMap::new(), objects : HashMap::new() , regex_holder : RegexHolder::new(), parser }
     }
 }
 
