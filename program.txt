@@ -319,3 +319,6 @@ print(xaa);
     
     aster_tester();
 }
+
+
+print((5)+5);

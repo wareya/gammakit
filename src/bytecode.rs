@@ -104,7 +104,8 @@ pub const LINENUM : u8 = 0xF8;
 pub fn get_assignment_type(optext : &str) -> Option<u8>
 {
     match optext
-    { "+="   => Some(0x30),
+    { "="    => Some(0x00),
+      "+="   => Some(0x30),
       "-="   => Some(0x31),
       "*="   => Some(0x40),
       "/="   => Some(0x41),
