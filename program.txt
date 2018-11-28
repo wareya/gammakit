@@ -164,6 +164,8 @@ var countdown = [](x)
         print("Liftoff!");
 };
 
+countdown(10);
+
 print(len(trash));
 
 var myarray = [0, 10, 2594];
