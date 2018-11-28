@@ -152,7 +152,8 @@ impl Interpreter
                 
                 if let Some(function) = object.functions.get("create")
                 {
-                    self.jump_to_function(function, Vec::new(), false, None);
+                    let pseudo_funcvar = FuncVal{internal : false, name : Some("create".to_string()), predefined : None, userdefdata : Some(function.clone())};
+                    self.jump_to_function(function, Vec::new(), false, &pseudo_funcvar);
                     self.top_frame.instancestack.push(instance_id);
                     frame_moved = true;
                 }
@@ -240,11 +241,11 @@ impl Interpreter
                 {
                     panic!("error: unsupported: tried to use instance_execute() with an internal function");
                 }
-                if let Some(defdata) = func.userdefdata
+                if let Some(ref defdata) = func.userdefdata
                 {
                     if let Some(_inst) = global.instances.get_mut(&instance_id)
                     {
-                        self.jump_to_function(&defdata, args.into_iter().rev().collect(), isexpr, func.predefined);
+                        self.jump_to_function(defdata, args.into_iter().rev().collect(), isexpr, &func);
                         self.top_frame.instancestack.push(instance_id);
                     }
                     else
@@ -312,14 +313,15 @@ impl Interpreter
                 None,
                 None,
                 Some(FuncSpec
-                { endaddr : code.len(),
+                { endaddr : code.len(), // must be before code : Rc::new(code)
                   varnames : Vec::new(),
                   code : Rc::new(code),
                   startaddr : 0,
                   fromobj : false,
                   parentobj : 0,
                   forcecontext : 0,
-                  location : self.build_funcspec_location()
+                  location : self.build_funcspec_location(),
+                  impassable : true,
                 }
                 )), false);
         }
@@ -350,14 +352,15 @@ impl Interpreter
                     None,
                     None,
                     Some(FuncSpec
-                    { endaddr : code.len(),
+                    { endaddr : code.len(), // must be before code : Rc::new(code)
                       varnames : Vec::new(),
                       code : Rc::new(code),
                       startaddr : 0,
                       fromobj : false,
                       parentobj : 0,
                       forcecontext : 0,
-                      location : self.build_funcspec_location()
+                      location : self.build_funcspec_location(),
+                      impassable : true
                     }
                     )), false);
             }

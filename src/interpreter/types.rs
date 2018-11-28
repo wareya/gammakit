@@ -21,16 +21,17 @@ pub(super) struct Frame {
     pub stack: Vec<Value>,
     pub isexpr: bool,
     pub currline: usize,
+    pub impassable: bool,
 }
 impl Frame {
     pub(super) fn new_root(code : Rc<Vec<u8>>) -> Frame
     {
         let codelen = code.len();
-        Frame { code, startpc : 0, pc : 0, endpc : codelen, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0 }
+        Frame { code, startpc : 0, pc : 0, endpc : codelen, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0, impassable: true }
     }
-    pub(super) fn new_from_call(code : Rc<Vec<u8>>, startpc : usize, endpc : usize, isexpr : bool) -> Frame
+    pub(super) fn new_from_call(code : Rc<Vec<u8>>, startpc : usize, endpc : usize, isexpr : bool, impassable : bool) -> Frame
     {
-        Frame { code, startpc, pc : startpc, endpc, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0 }
+        Frame { code, startpc, pc : startpc, endpc, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, impassable }
     }
 }
 
@@ -70,6 +71,7 @@ pub(super) struct FuncSpec {
     pub parentobj: usize,
     pub forcecontext: usize,
     pub location: FuncSpecLocation,
+    pub impassable: bool,
 }
 pub(super) struct ObjSpec {
     #[allow(unused)]
@@ -121,7 +123,7 @@ pub(super) enum NonArrayVariable {
 #[derive(Clone)]
 pub(super) struct FuncVal {
     pub internal: bool,
-    pub internalname: Option<String>,
+    pub name: Option<String>,
     pub predefined: Option<HashMap<String, Value>>,
     pub userdefdata: Option<FuncSpec>
 }
@@ -138,9 +140,9 @@ pub(super) enum Value {
 
 impl Value
 {
-    pub(super) fn new_funcval(internal : bool, internalname : Option<String>, predefined : Option<HashMap<String, Value>>, userdefdata : Option<FuncSpec>) -> Value
+    pub(super) fn new_funcval(internal : bool, name : Option<String>, predefined : Option<HashMap<String, Value>>, userdefdata : Option<FuncSpec>) -> Value
     {
-        Value::Func(Box::new(FuncVal{internal, internalname, predefined, userdefdata}))
+        Value::Func(Box::new(FuncVal{internal, name, predefined, userdefdata}))
     }
 }
 

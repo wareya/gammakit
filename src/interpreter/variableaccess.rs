@@ -5,7 +5,6 @@ fn assign_or_return(value : Option<Value>, var : &mut Value) -> Option<Value>
     if let Some(value) = value
     {
         *var = value;
-        
         return None;
     }
     else
@@ -14,27 +13,12 @@ fn assign_or_return(value : Option<Value>, var : &mut Value) -> Option<Value>
     }
 }
 
-fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &[Value], isconst : bool) -> Option<Value>
+fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &[Value]) -> Option<Value>
 {
     let num_indexes = indexes.len();
     if num_indexes == 0
     {
-        if let Some(value) = value
-        {
-            if isconst
-            {
-                panic!("error: tried to assign to non-variable or read-only value");
-            }
-            else
-            {
-                *var = value;
-            }
-            return None;
-        }
-        else
-        {
-            return Some(var.clone());
-        }
+        return assign_or_return(value, var);
     }
     else
     {
@@ -47,7 +31,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                 {
                     if let Some(mut newvar) = var.get_mut(indexnum.round() as usize)
                     {
-                        return assign_or_return_indexed(value, &mut newvar, &indexes[1..], isconst);
+                        return assign_or_return_indexed(value, &mut newvar, &indexes[1..]);
                     }
                     else
                     {
@@ -65,7 +49,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                 {
                     if let Some(mut newvar) = var.get_mut(&HashableValue::Number(*indexnum))
                     {
-                        return assign_or_return_indexed(value, &mut newvar, &indexes[1..], isconst);
+                        return assign_or_return_indexed(value, &mut newvar, &indexes[1..]);
                     }
                     else
                     {
@@ -76,7 +60,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                 {
                     if let Some(mut newvar) = var.get_mut(&HashableValue::Text(indexstr.clone()))
                     {
-                        return assign_or_return_indexed(value, &mut newvar, &indexes[1..], isconst);
+                        return assign_or_return_indexed(value, &mut newvar, &indexes[1..]);
                     }
                     else
                     {
@@ -177,7 +161,7 @@ fn access_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, di
     {
         if let Some(var) = scope.get_mut(&dirvar.name)
         {
-            return assign_or_return_indexed(value, var, indexes, false);
+            return assign_or_return_indexed(value, var, indexes);
         }
     }
     for id in frame.instancestack.iter_mut().rev()
@@ -186,13 +170,13 @@ fn access_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, di
         {
             if let Some(var) = inst.variables.get_mut(&dirvar.name)
             {
-                return assign_or_return_indexed(value, var, indexes, false);
+                return assign_or_return_indexed(value, var, indexes);
             }
             // no need to check for instance function names because they can't be indexed - it will either skip them and look for something else, or fail with a generic error
             // FIXME is this good behavior?
         }
     }
-    return None; // FIXME should this be a panic?
+    panic!("internal error: tried to assign (via index) to a variable that could not be found");
 }
 fn check_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar) -> bool
 {
@@ -254,13 +238,13 @@ fn access_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &
                     {
                         let mut mydata = funcdat.clone();
                         mydata.forcecontext = inst.ident;
-                        return Some(Value::new_funcval(false, None, None, Some(mydata)));
+                        return Some(Value::new_funcval(false, Some(dirvar.name.clone()), None, Some(mydata)));
                     }
                 }
             }
         }
     }
-    return None; // FIXME should this be a panic?
+    panic!("internal error: tried to assign to a variable that could not be found");
 }
 impl Interpreter
 {
@@ -274,7 +258,7 @@ impl Interpreter
                 {
                     if let Some(mut var) = instance.variables.get_mut(&indirvar.name)
                     {
-                        return assign_or_return_indexed(value, &mut var, &arrayvar.indexes[..], false);
+                        return assign_or_return_indexed(value, &mut var, &arrayvar.indexes[..]);
                     }
                     else
                     {
@@ -292,11 +276,15 @@ impl Interpreter
                 {
                     return access_frame_dirvar_indexed(global, &mut self.top_frame, dirvar, value, &arrayvar.indexes[..]);
                 }
-                for mut frame in self.frames.iter_mut().rev()
+                if !self.top_frame.impassable
                 {
-                    if check_frame_dirvar_indexed(global, &mut frame, dirvar)
+                    for mut frame in self.frames.iter_mut().rev()
                     {
-                        return access_frame_dirvar_indexed(global, &mut frame, dirvar, value, &arrayvar.indexes[..]);
+                        if check_frame_dirvar_indexed(global, &mut frame, dirvar)
+                        {
+                            return access_frame_dirvar_indexed(global, &mut frame, dirvar, value, &arrayvar.indexes[..]);
+                        }
+                        if frame.impassable { break; }
                     }
                 }
                 if global.objectnames.get(&dirvar.name).is_some()
@@ -311,7 +299,14 @@ impl Interpreter
             }
             NonArrayVariable::ActualArray(ref array) =>
             {
-                return assign_or_return_indexed(value, &mut Value::Array(array.clone()), &arrayvar.indexes[..], true);
+                if value.is_some()
+                {
+                    panic!("error: tried to assign to a non-variable array value");
+                }
+                else
+                {
+                    return assign_or_return_indexed(None, &mut Value::Array(array.clone()), &arrayvar.indexes[..]);
+                }
             }
         }
     }
@@ -335,7 +330,7 @@ impl Interpreter
                     {
                         let mut mydata = funcdat.clone();
                         mydata.forcecontext = indirvar.ident;
-                        return Some(Value::new_funcval(false, None, None, Some(mydata)));
+                        return Some(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata)));
                     }
                 }
                 else
@@ -359,11 +354,15 @@ impl Interpreter
         {
             return access_frame_dirvar(global, &mut self.top_frame, dirvar, value);
         }
-        for mut frame in self.frames.iter_mut().rev()
+        if !self.top_frame.impassable
         {
-            if check_frame_dirvar(global, &mut frame, dirvar)
+            for mut frame in self.frames.iter_mut().rev()
             {
-                return access_frame_dirvar(global, &mut frame, dirvar, value);
+                if check_frame_dirvar(global, &mut frame, dirvar)
+                {
+                    return access_frame_dirvar(global, &mut frame, dirvar, value);
+                }
+                if frame.impassable { break; }
             }
         }
         if let Some(var) = global.objectnames.get(&dirvar.name)

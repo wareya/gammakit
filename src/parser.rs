@@ -28,6 +28,7 @@ pub fn build_best_error(myself : &mut Option<ParseError>, other : Option<ParseEr
 {
     if let Some(other) = other
     {
+        // guards against borrow of "myself" so that ```*myself = Some(other);``` works
         if myself.is_some()
         {
             if let Some(myself) = myself.as_mut()
@@ -349,9 +350,8 @@ impl Parser {
                     }
                     let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
                     build_best_error(&mut latesterror, error);
-                    if bit.is_some()
+                    if let Some(node) = bit
                     {
-                        let node = bit.unwrap();
                         nodes.push(node);
                         totalconsumed += consumed;
                     }
@@ -372,9 +372,8 @@ impl Parser {
                     {
                         return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
-                    while bit.is_some()
+                    while let Some(node) = bit
                     {
-                        let node = bit.unwrap();
                         nodes.push(node);
                         totalconsumed += consumed;
                         
@@ -394,9 +393,8 @@ impl Parser {
                     }
                     let (bit, consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
                     build_best_error(&mut latesterror, error);
-                    if bit.is_some()
+                    if let Some(node) = bit
                     {
-                        let node = bit.unwrap();
                         nodes.push(node);
                         totalconsumed += consumed;
                     }
@@ -409,9 +407,8 @@ impl Parser {
                     }
                     let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
                     build_best_error(&mut latesterror, error);
-                    while bit.is_some()
+                    while let Some(node) = bit
                     {
-                        let node = bit.unwrap();
                         nodes.push(node);
                         totalconsumed += consumed;
                         
@@ -435,9 +432,8 @@ impl Parser {
                     {
                         return (defaultreturn.0, defaultreturn.1, latesterror);
                     }
-                    while bit.is_some()
+                    while let Some(node) = bit
                     {
-                        let node = bit.unwrap();
                         nodes.push(node);
                         totalconsumed += consumed;
                         

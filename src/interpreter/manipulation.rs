@@ -119,7 +119,7 @@ impl Interpreter
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        return (name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location() } );
+        return (name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location(), impassable : true } );
     }
     
     pub(super) fn read_lambda(&mut self) -> (HashMap<String, Value>, FuncSpec)
@@ -170,7 +170,7 @@ impl Interpreter
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        return (captures, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location() } );
+        return (captures, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location(), impassable : true } );
     }
     
     pub(super) fn stack_pop_number(&mut self) -> Result<f64, i32>

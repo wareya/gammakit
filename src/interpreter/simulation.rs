@@ -159,13 +159,6 @@ impl Interpreter
             panic!("internal error: tried to declare instance variable with non-var-name type name");
         }
     }
-    /*
-    def sim_DECLFAR():
-        if string in instances[instancestack[-1]].variables:
-            print(f"error: redeclared identifier {string}")
-            exit()
-        instances[instancestack[-1]].variables[string] = 0
-    */
     
     #[allow(non_snake_case)]
     pub(super) fn sim_INDIRECTION(&mut self, global : &mut GlobalState)
@@ -420,7 +413,8 @@ impl Interpreter
             {
                 panic!("error: redeclared identifier {}", funcname)
             }
-            scope.insert(funcname, Value::Func(Box::new(FuncVal { internal : false, internalname : None, predefined : None, userdefdata : Some(myfuncspec) })));
+            //scope.insert(funcname.clone(), Value::Func(Box::new(FuncVal { internal : false, name : Some(funcname), predefined : None, userdefdata : Some(myfuncspec) })));
+            scope.insert(funcname.clone(), Value::new_funcval(false, Some(funcname), None, Some(myfuncspec)));
         }
         else
         {
@@ -575,7 +569,7 @@ impl Interpreter
     pub(super) fn sim_LAMBDA(&mut self, _global : &mut GlobalState)
     {
         let (captures, myfuncspec) = self.read_lambda();
-        self.top_frame.stack.push(Value::Func(Box::new(FuncVal{internal : false, internalname : None, predefined : Some(captures), userdefdata : Some(myfuncspec)})));
+        self.top_frame.stack.push(Value::new_funcval(false, Some("lambda_self".to_string()), Some(captures), Some(myfuncspec)));
     }
     #[allow(non_snake_case)]
     pub(super) fn sim_OBJDEF(&mut self, global : &mut GlobalState)
