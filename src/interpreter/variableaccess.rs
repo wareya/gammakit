@@ -264,91 +264,17 @@ fn access_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &
 }
 impl Interpreter
 {
-    // if value is None, finds and returns appropriate value; otherwise, stores value and returns None
-    pub(super) fn evaluate_or_store(&mut self, global : &mut GlobalState, variable : &Variable, value : Option<Value>) -> Option<Value>
+    fn evaluate_or_store_of_array(&mut self, global : &mut GlobalState, arrayvar : &ArrayVar, value : Option<Value>) -> Option<Value>
     {
-        match &variable
+        match &arrayvar.location
         {
-            Variable::Array(ref arrayvar) =>
+            NonArrayVariable::Indirect(ref indirvar) =>
             {
-                match &arrayvar.location
-                {
-                    NonArrayVariable::Indirect(ref indirvar) =>
-                    {
-                        // TODO: deduplicate with macros? (vs. non-array code below)
-                        if let Some(instance) = global.instances.get_mut(&indirvar.ident)
-                        {
-                            if let Some(mut var) = instance.variables.get_mut(&indirvar.name)
-                            {
-                                return assign_or_return_indexed(value, &mut var, &arrayvar.indexes[..], false);
-                            }
-                            else
-                            {
-                                panic!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident);
-                            }
-                        }
-                        else
-                        {
-                            panic!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, indirvar.ident);
-                        }
-                    }
-                    NonArrayVariable::Direct(ref dirvar) =>
-                    {
-                        if check_frame_dirvar_indexed(global, &mut self.top_frame, dirvar)
-                        {
-                            return access_frame_dirvar_indexed(global, &mut self.top_frame, dirvar, value, &arrayvar.indexes[..]);
-                        }
-                        for mut frame in self.frames.iter_mut().rev()
-                        {
-                            if check_frame_dirvar_indexed(global, &mut frame, dirvar)
-                            {
-                                return access_frame_dirvar_indexed(global, &mut frame, dirvar, value, &arrayvar.indexes[..]);
-                            }
-                        }
-                        if global.objectnames.get(&dirvar.name).is_some()
-                        {
-                            panic!("error: tried to index into object name as though it was an array");
-                        }
-                        if self.get_internal_function(&dirvar.name).is_some()
-                        {
-                            panic!("error: tried to index into internal function name as though it was an array");
-                        }
-                        panic!("error: unknown variable `{}`", dirvar.name);
-                    }
-                    NonArrayVariable::ActualArray(ref array) =>
-                    {
-                        return assign_or_return_indexed(value, &mut Value::Array(array.clone()), &arrayvar.indexes[..], true);
-                    }
-                }
-            }
-            Variable::Indirect(ref indirvar) =>
-            {
-                // TODO: deduplicate with macros? (vs. array code above)
                 if let Some(instance) = global.instances.get_mut(&indirvar.ident)
                 {
-                    if let Some(var) = instance.variables.get_mut(&indirvar.name)
+                    if let Some(mut var) = instance.variables.get_mut(&indirvar.name)
                     {
-                        return assign_or_return(value, var);
-                    }
-                    else if let Some(objspec) = global.objects.get(&instance.objtype)
-                    {
-                        if let Some(funcdat) = objspec.functions.get(&indirvar.name)
-                        {
-                            if let Some(_value) = value
-                            {
-                                panic!("error: tried to assign to function `{}` in instance of object type `{}`", indirvar.name, objspec.name);
-                            }
-                            else
-                            {
-                                let mut mydata = funcdat.clone();
-                                mydata.forcecontext = indirvar.ident;
-                                return Some(Value::new_funcval(false, None, None, Some(mydata)));
-                            }
-                        }
-                        else
-                        {
-                            panic!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident);
-                        }
+                        return assign_or_return_indexed(value, &mut var, &arrayvar.indexes[..], false);
                     }
                     else
                     {
@@ -360,37 +286,121 @@ impl Interpreter
                     panic!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, indirvar.ident);
                 }
             }
-            Variable::Direct(ref dirvar) =>
+            NonArrayVariable::Direct(ref dirvar) =>
             {
-                if check_frame_dirvar(global, &mut self.top_frame, dirvar)
+                if check_frame_dirvar_indexed(global, &mut self.top_frame, dirvar)
                 {
-                    return access_frame_dirvar(global, &mut self.top_frame, dirvar, value);
+                    return access_frame_dirvar_indexed(global, &mut self.top_frame, dirvar, value, &arrayvar.indexes[..]);
                 }
                 for mut frame in self.frames.iter_mut().rev()
                 {
-                    if check_frame_dirvar(global, &mut frame, dirvar)
+                    if check_frame_dirvar_indexed(global, &mut frame, dirvar)
                     {
-                        return access_frame_dirvar(global, &mut frame, dirvar, value);
+                        return access_frame_dirvar_indexed(global, &mut frame, dirvar, value, &arrayvar.indexes[..]);
                     }
                 }
-                if let Some(var) = global.objectnames.get(&dirvar.name)
+                if global.objectnames.get(&dirvar.name).is_some()
+                {
+                    panic!("error: tried to index into object name as though it was an array");
+                }
+                if self.get_internal_function(&dirvar.name).is_some()
+                {
+                    panic!("error: tried to index into internal function name as though it was an array");
+                }
+                panic!("error: unknown variable `{}`", dirvar.name);
+            }
+            NonArrayVariable::ActualArray(ref array) =>
+            {
+                return assign_or_return_indexed(value, &mut Value::Array(array.clone()), &arrayvar.indexes[..], true);
+            }
+        }
+    }
+    fn evaluate_or_store_of_indirect(&mut self, global : &mut GlobalState, indirvar : &IndirectVar, value : Option<Value>) -> Option<Value>
+    {
+        if let Some(instance) = global.instances.get_mut(&indirvar.ident)
+        {
+            if let Some(var) = instance.variables.get_mut(&indirvar.name)
+            {
+                return assign_or_return(value, var);
+            }
+            else if let Some(objspec) = global.objects.get(&instance.objtype)
+            {
+                if let Some(funcdat) = objspec.functions.get(&indirvar.name)
                 {
                     if let Some(_value) = value
                     {
-                        panic!("error: tried to assign to read-only object name `{}`", dirvar.name);
+                        panic!("error: tried to assign to function `{}` in instance of object type `{}`", indirvar.name, objspec.name);
                     }
                     else
                     {
-                        return Some(Value::Number(*var as f64));
+                        let mut mydata = funcdat.clone();
+                        mydata.forcecontext = indirvar.ident;
+                        return Some(Value::new_funcval(false, None, None, Some(mydata)));
                     }
                 }
-                // TODO: Store actual function pointer instead?
-                if let Some(_internal_func) = self.get_internal_function(&dirvar.name)
+                else
                 {
-                    return Some(Value::new_funcval(true, Some(dirvar.name.clone()), None, None ));
+                    panic!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident);
                 }
-                
-                panic!("error: unknown identifier `{}`", dirvar.name);
+            }
+            else
+            {
+                panic!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident);
+            }
+        }
+        else
+        {
+            panic!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, indirvar.ident);
+        }
+    }
+    fn evaluate_or_store_of_direct(&mut self, global : &mut GlobalState, dirvar : &DirectVar, value : Option<Value>) -> Option<Value>
+    {
+        if check_frame_dirvar(global, &mut self.top_frame, dirvar)
+        {
+            return access_frame_dirvar(global, &mut self.top_frame, dirvar, value);
+        }
+        for mut frame in self.frames.iter_mut().rev()
+        {
+            if check_frame_dirvar(global, &mut frame, dirvar)
+            {
+                return access_frame_dirvar(global, &mut frame, dirvar, value);
+            }
+        }
+        if let Some(var) = global.objectnames.get(&dirvar.name)
+        {
+            if let Some(_value) = value
+            {
+                panic!("error: tried to assign to read-only object name `{}`", dirvar.name);
+            }
+            else
+            {
+                return Some(Value::Number(*var as f64));
+            }
+        }
+        // TODO: Store actual function pointer instead?
+        if let Some(_internal_func) = self.get_internal_function(&dirvar.name)
+        {
+            return Some(Value::new_funcval(true, Some(dirvar.name.clone()), None, None ));
+        }
+        
+        panic!("error: unknown identifier `{}`", dirvar.name);
+    }
+    // if value is None, finds and returns appropriate value; otherwise, stores value and returns None
+    pub(super) fn evaluate_or_store(&mut self, global : &mut GlobalState, variable : &Variable, value : Option<Value>) -> Option<Value>
+    {
+        match &variable
+        {
+            Variable::Array(ref arrayvar) =>
+            {
+                return self.evaluate_or_store_of_array(global, arrayvar, value);
+            }
+            Variable::Indirect(ref indirvar) =>
+            {
+                return self.evaluate_or_store_of_indirect(global, indirvar, value);
+            }
+            Variable::Direct(ref dirvar) =>
+            {
+                return self.evaluate_or_store_of_direct(global, dirvar, value);
             }
         }
     }
