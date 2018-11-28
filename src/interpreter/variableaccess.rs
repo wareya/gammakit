@@ -146,76 +146,127 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
         }
     }
 }
+// FIXME: find a way to check and access without duplicating work and also while satisfying the borrow checker
+fn check_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar) -> bool
+{
+    // FIXME: do I even want to search up instance stacks rather than just accessing the main one?
+    for scope in frame.scopes.iter_mut().rev()
+    {
+        if scope.contains_key(&dirvar.name)
+        {
+            return true;
+        }
+    }
+    for id in frame.instancestack.iter_mut().rev()
+    {
+        if let Some(inst) = global.instances.get_mut(id)
+        {
+            if inst.variables.contains_key(&dirvar.name)
+            {
+                return true;
+            }
+            // no need to check for instance function names because they can't be indexed
+        }
+    }
+    return false;
+}
+fn access_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, value : Option<Value>, indexes : &[Value]) -> Option<Value>
+{
+    // FIXME: do I even want to search up instance stacks rather than just accessing the main one?
+    for scope in frame.scopes.iter_mut().rev()
+    {
+        if let Some(var) = scope.get_mut(&dirvar.name)
+        {
+            return assign_or_return_indexed(value, var, indexes, false);
+        }
+    }
+    for id in frame.instancestack.iter_mut().rev()
+    {
+        if let Some(inst) = global.instances.get_mut(id)
+        {
+            if let Some(var) = inst.variables.get_mut(&dirvar.name)
+            {
+                return assign_or_return_indexed(value, var, indexes, false);
+            }
+            // no need to check for instance function names because they can't be indexed - it will either skip them and look for something else, or fail with a generic error
+            // FIXME is this good behavior?
+        }
+    }
+    return None; // FIXME should this be a panic?
+}
+fn check_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar) -> bool
+{
+    for scope in frame.scopes.iter_mut().rev()
+    {
+        if scope.contains_key(&dirvar.name)
+        {
+            return true;
+        }
+    }
+    // FIXME: do I even want to search up instance stacks rather than just accessing the main one?
+    for id in frame.instancestack.iter_mut().rev()
+    {
+        if let Some(inst) = global.instances.get_mut(id)
+        {
+            if inst.variables.contains_key(&dirvar.name)
+            {
+                return true;
+            }
+            else if let Some(objspec) = global.objects.get(&inst.objtype)
+            {
+                if objspec.functions.get(&dirvar.name).is_some()
+                {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
+}
+fn access_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, value : Option<Value>) -> Option<Value>
+{
+    for scope in frame.scopes.iter_mut().rev()
+    {
+        if let Some(var) = scope.get_mut(&dirvar.name)
+        {
+            return assign_or_return(value, var);
+        }
+    }
+    // FIXME: do I even want to search up instance stacks rather than just accessing the main one?
+    for id in frame.instancestack.iter_mut().rev()
+    {
+        if let Some(inst) = global.instances.get_mut(id)
+        {
+            if let Some(var) = inst.variables.get_mut(&dirvar.name)
+            {
+                return assign_or_return(value, var);
+            }
+            else if let Some(objspec) = global.objects.get(&inst.objtype)
+            {
+                if let Some(funcdat) = objspec.functions.get(&dirvar.name)
+                {
+                    if value.is_some()
+                    {
+                        panic!("error: tried to assign to function `{}` in instance of object type `{}`", dirvar.name, objspec.name);
+                        // FIXME is this good behavior?
+                    }
+                    else
+                    {
+                        let mut mydata = funcdat.clone();
+                        mydata.forcecontext = inst.ident;
+                        return Some(Value::new_funcval(false, None, None, Some(mydata)));
+                    }
+                }
+            }
+        }
+    }
+    return None; // FIXME should this be a panic?
+}
 impl Interpreter
 {
     // if value is None, finds and returns appropriate value; otherwise, stores value and returns None
     pub(super) fn evaluate_or_store(&mut self, global : &mut GlobalState, variable : &Variable, value : Option<Value>) -> Option<Value>
     {
-        macro_rules! check_frame_dirvar_arrayed {
-            ( $frame:expr, $dirvar:expr, $value:expr, $indexes:expr ) =>
-            {
-                // FIXME: do I even want to search up instance stacks rather than just accessing the main one?
-                for scope in $frame.scopes.iter_mut().rev()
-                {
-                    if let Some(var) = scope.get_mut(&$dirvar.name)
-                    {
-                        return assign_or_return_indexed($value, var, $indexes, false);
-                    }
-                }
-                for id in $frame.instancestack.iter_mut().rev()
-                {
-                    if let Some(inst) = global.instances.get_mut(id)
-                    {
-                        if let Some(var) = inst.variables.get_mut(&$dirvar.name)
-                        {
-                            return assign_or_return_indexed($value, var, $indexes, false);
-                        }
-                        // no need to check for instance function names because they can't be indexed
-                    }
-                }
-            }
-        }
-        
-        macro_rules! check_frame_dirvar {
-            ( $frame:expr, $dirvar:expr, $value:expr ) =>
-            {
-                // FIXME: do I even want to search up instance stacks rather than just accessing the main one?
-                for scope in $frame.scopes.iter_mut().rev()
-                {
-                    if let Some(var) = scope.get_mut(&$dirvar.name)
-                    {
-                        return assign_or_return($value, var);
-                    }
-                }
-                for id in $frame.instancestack.iter_mut().rev()
-                {
-                    if let Some(inst) = global.instances.get_mut(id)
-                    {
-                        if let Some(var) = inst.variables.get_mut(&$dirvar.name)
-                        {
-                            return assign_or_return($value, var);
-                        }
-                        else if let Some(objspec) = global.objects.get(&inst.objtype)
-                        {
-                            if let Some(funcdat) = objspec.functions.get(&$dirvar.name)
-                            {
-                                if let Some(_value) = $value
-                                {
-                                    panic!("error: tried to assign to function `{}` in instance of object type `{}`", $dirvar.name, objspec.name);
-                                }
-                                else
-                                {
-                                    let mut mydata = funcdat.clone();
-                                    mydata.forcecontext = inst.ident;
-                                    return Some(Value::new_funcval(false, None, None, Some(mydata)));
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
         match &variable
         {
             Variable::Array(ref arrayvar) =>
@@ -243,16 +294,22 @@ impl Interpreter
                     }
                     NonArrayVariable::Direct(ref dirvar) =>
                     {
-                        check_frame_dirvar_arrayed!(self.top_frame, dirvar, value, &arrayvar.indexes[..]);
-                        for frame in self.frames.iter_mut().rev()
+                        if check_frame_dirvar_indexed(global, &mut self.top_frame, dirvar)
                         {
-                            check_frame_dirvar_arrayed!(frame, dirvar, value, &arrayvar.indexes[..]);
+                            return access_frame_dirvar_indexed(global, &mut self.top_frame, dirvar, value, &arrayvar.indexes[..]);
                         }
-                        if let Some(_var) = global.objectnames.get(&dirvar.name)
+                        for mut frame in self.frames.iter_mut().rev()
+                        {
+                            if check_frame_dirvar_indexed(global, &mut frame, dirvar)
+                            {
+                                return access_frame_dirvar_indexed(global, &mut frame, dirvar, value, &arrayvar.indexes[..]);
+                            }
+                        }
+                        if global.objectnames.get(&dirvar.name).is_some()
                         {
                             panic!("error: tried to index into object name as though it was an array");
                         }
-                        if let Some(_internal_func) = self.get_internal_function(&dirvar.name)
+                        if self.get_internal_function(&dirvar.name).is_some()
                         {
                             panic!("error: tried to index into internal function name as though it was an array");
                         }
@@ -305,10 +362,16 @@ impl Interpreter
             }
             Variable::Direct(ref dirvar) =>
             {
-                check_frame_dirvar!(self.top_frame, dirvar, value);
-                for frame in self.frames.iter_mut().rev()
+                if check_frame_dirvar(global, &mut self.top_frame, dirvar)
                 {
-                    check_frame_dirvar!(frame, dirvar, value);
+                    return access_frame_dirvar(global, &mut self.top_frame, dirvar, value);
+                }
+                for mut frame in self.frames.iter_mut().rev()
+                {
+                    if check_frame_dirvar(global, &mut frame, dirvar)
+                    {
+                        return access_frame_dirvar(global, &mut frame, dirvar, value);
+                    }
                 }
                 if let Some(var) = global.objectnames.get(&dirvar.name)
                 {
