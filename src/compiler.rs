@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use std::hint::unreachable_unchecked;
 
 use super::strings::*;
@@ -8,31 +6,6 @@ use super::bytecode::*;
 
 pub fn compile_astnode(ast : &ASTNode, mut scopedepth : usize) -> Vec<u8>
 {
-    // only used during compilation
-    #[allow(non_snake_case)]
-    let BINOP_TYPES : HashMap<&str, u8> = hashmap!
-    { "and"=> 0x10,
-      "&&" => 0x10,
-      "or" => 0x11,
-      "||" => 0x11,
-      "==" => 0x20,
-      "!=" => 0x21,
-      ">=" => 0x22,
-      "<=" => 0x23,
-      ">"  => 0x24,
-      "<"  => 0x25,
-      "+"  => 0x30,
-      "-"  => 0x31,
-      "*"  => 0x40,
-      "/"  => 0x41,
-      "%"  => 0x42,
-    };
-    #[allow(non_snake_case)]
-    let UNOP_TYPES : HashMap<&str, u8> = hashmap!
-    { "-" => 0x10,
-      "+" => 0x11,
-      "!" => 0x20,
-    };
     
     if !ast.isparent
     {
@@ -44,8 +17,6 @@ pub fn compile_astnode(ast : &ASTNode, mut scopedepth : usize) -> Vec<u8>
     else
     {
         let mut code = Vec::<u8>::new();
-        
-        //println!("compiling a {} node", ast.text);
         
         if ast.text == "program"
         {
@@ -83,13 +54,13 @@ pub fn compile_astnode(ast : &ASTNode, mut scopedepth : usize) -> Vec<u8>
                 {
                     code.push(0x00);
                 }
-                else if match operator.as_str() { "+=" | "-=" | "*=" | "/=" => true, _ => false }
+                else if let Some(op) = get_assignment_type(operator)
                 {
-                    code.push(BINOP_TYPES[slice(operator, 0, 1).as_str()]);
+                    code.push(op);
                 }
                 else
                 {
-                    println!("internal error: unhandled type of binary statement");
+                    println!("internal error: unhandled or unsupported type of binary statement {}", operator);
                     print_ast(ast);
                     assert!(false);
                 }
@@ -187,7 +158,16 @@ pub fn compile_astnode(ast : &ASTNode, mut scopedepth : usize) -> Vec<u8>
             code.extend(compile_astnode(&ast.children[0], scopedepth));
             code.extend(compile_astnode(&ast.children[2], scopedepth));
             code.push(BINOP);
-            code.push(BINOP_TYPES[ast.children[1].children[0].text.as_str()]);
+            if let Some(op) = get_binop_type(ast.children[1].children[0].text.as_str())
+            {
+                code.push(op);
+            }
+            else
+            {
+                println!("internal error: unhandled type of binary expression");
+                print_ast(ast);
+                assert!(false);
+            }
         }
         else if ast.text == "declaration"
         {
@@ -721,9 +701,9 @@ pub fn compile_astnode(ast : &ASTNode, mut scopedepth : usize) -> Vec<u8>
                 code.extend(compile_astnode(&ast.children[1], scopedepth));
                 code.push(UNOP);
                 
-                if let Some(op) = UNOP_TYPES.get(slice(&operator, 0, 1).as_str())
+                if let Some(op) = get_unop_type(slice(&operator, 0, 1).as_str())
                 {
-                    code.push(*op);
+                    code.push(op);
                 }
                 else
                 {

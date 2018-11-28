@@ -148,8 +148,8 @@ impl Parser {
                         GrammarToken::Name(text) |
                         GrammarToken::NameList(text) |
                         GrammarToken::OptionalName(text) |
-                        GrammarToken::OptionalNameList(text) => {text.clone()}
-                        GrammarToken::SeparatorNameList{text: name, ..} => {name.clone()}
+                        GrammarToken::OptionalNameList(text) |
+                        GrammarToken::SeparatorNameList{text, ..} => {text.clone()}
                         _ => {"".to_string()}
                     };
                     if name != ""

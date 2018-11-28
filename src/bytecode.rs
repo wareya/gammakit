@@ -1,14 +1,4 @@
 /*
-Q: u64
-q: i64
-l/i: 32
-h: 16
-b/c: 8
-f: f32
-d: f64
-*/
-
-/*
 fn pack_u8(num : u8) -> Vec<u8>
 {
     return vec!(num);
@@ -41,7 +31,6 @@ fn unpack_u32(vec : &Vec<u8>) -> u32
     return (vec[0] as u32) | ((vec[1] as u32)<<8) | ((vec[2] as u32)<<16) | ((vec[3] as u32)<<24);
 }
 */
-
 
 
 pub fn pack_u64(num : u64) -> Vec<u8>
@@ -111,3 +100,44 @@ pub const OBJDEF : u8 = 0xB2;
 pub const EXIT : u8 = 0xF0;
 pub const RETURN : u8 = 0xF1;
 pub const LINENUM : u8 = 0xF8;
+
+pub fn get_assignment_type(optext : &str) -> Option<u8>
+{
+    match optext
+    { "+="   => Some(0x30),
+      "-="   => Some(0x31),
+      "*="   => Some(0x40),
+      "/="   => Some(0x41),
+      _ => None
+    }
+}
+pub fn get_binop_type(optext : &str) -> Option<u8>
+{
+    match optext
+    { "and" => Some(0x10),
+      "&&"  => Some(0x10),
+      "or"  => Some(0x11),
+      "||"  => Some(0x11),
+      "=="  => Some(0x20),
+      "!="  => Some(0x21),
+      ">="  => Some(0x22),
+      "<="  => Some(0x23),
+      ">"   => Some(0x24),
+      "<"   => Some(0x25),
+      "+"   => Some(0x30),
+      "-"   => Some(0x31),
+      "*"   => Some(0x40),
+      "/"   => Some(0x41),
+      "%"   => Some(0x42),
+      _ => None
+    }
+}
+pub fn get_unop_type(optext : &str) -> Option<u8>
+{
+    match optext
+    { "-" => Some(0x10),
+      "+" => Some(0x11),
+      "!" => Some(0x20),
+      _ => None
+    }
+}

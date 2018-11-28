@@ -27,7 +27,6 @@ impl GrammarForm
         let mut ret = GrammarForm { tokens : Vec::new() };
         let tokens : Vec<&str> = line.split(' ').collect();
         let tokenslen = tokens.len();
-        let mut handle_operator_spec = false;
         for token in &tokens
         {
             if *token == ""
@@ -86,12 +85,31 @@ impl GrammarForm
             {
                 if ret.tokens.len() == 1
                 {
-                    if tokenslen != 3
+                    if tokenslen == 3
+                    {
+                        if let Ok(precedence) = tokens[2].parse::<i32>()
+                        {
+                            let optext : String;
+                            if let GrammarToken::Plain(ref left) = ret.tokens[0]
+                            {
+                                optext = left.to_string();
+                            }
+                            else
+                            {
+                                panic!("error: operator associativity sigil's leftwards token is not a plain text token");
+                            }
+                            ret.tokens[0] = GrammarToken::Op{text: optext, assoc: if tokens[1] == r"\l" {1} else {0}, precedence};
+                            return ret;
+                        }
+                        else
+                        {
+                            panic!("error: operator precedence is not an integer\n{}", line);
+                        }
+                    }
+                    else
                     {
                         panic!("error: operator description line consists of not exactly three tokens");
                     }
-                    handle_operator_spec = true;
-                    break;
                 }
                 else
                 {
@@ -125,27 +143,6 @@ impl GrammarForm
                 {
                     panic!("error: literal symbol `{}` does not follow the forms [a-zA-Z_][a-zA-Z_0-9]* || [^a-zA-Z0-9_]+\n{}", token, line);
                 }
-            }
-        }
-        if handle_operator_spec
-        {
-            assert!(tokens.len() == 3);
-            let optext : String;
-            if let GrammarToken::Plain(ref left) = ret.tokens[0]
-            {
-                optext = left.to_string();
-            }
-            else
-            {
-                panic!("error: operator associativity sigil's leftwards token is not a plain text token");
-            }
-            if let Ok(precedence) = tokens[2].parse::<i32>()
-            {
-                ret.tokens[0] = GrammarToken::Op{text: optext, assoc: if tokens[1] == r"\l" {1} else {0}, precedence};
-            }
-            else
-            {
-                panic!("error: operator precedence is not an integer\n{}", line);
             }
         }
         return ret;
