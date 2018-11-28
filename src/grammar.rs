@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use super::strings::*;
 use super::parser::Parser;
 
@@ -21,8 +19,9 @@ pub struct GrammarForm {
     pub tokens : Vec<GrammarToken>
 }
 
-impl GrammarForm {
-    pub fn new(line : &str, parser : &mut Parser, regex_set : &mut HashSet<String>, symbol_set : &mut HashSet<String>, text_set : &mut HashSet<String>, intoken : bool) -> GrammarForm
+impl GrammarForm
+{
+    pub fn new(line : &str, parser : &mut Parser, intoken : bool) -> GrammarForm
     {
         let re = &mut parser.internal_regexes;
         let mut ret = GrammarForm { tokens : Vec::new() };
@@ -33,7 +32,7 @@ impl GrammarForm {
         {
             if *token == ""
             {
-                continue
+                continue;
             }
             if *token == ">>?"
             {
@@ -42,10 +41,10 @@ impl GrammarForm {
             else if re.is_exact(r"%.+%$", token)
             {
                 let bare = slice(token, 1, -1);
-                if intoken && !regex_set.contains(&bare)
+                if intoken && !parser.regex_set.contains(&bare)
                 {
-                    regex_set.insert(bare.clone());
-                    parser.regexes.push(bare.clone());
+                    parser.regex_set.insert(bare.clone());
+                    parser.regex_list.push(bare.clone());
                 }
                 ret.tokens.push(GrammarToken::Regex(bare));
             }
@@ -56,10 +55,10 @@ impl GrammarForm {
                 
                 if re.is_exact(r"[^a-zA-Z0-9_ \t]+", &separator)
                 {
-                    if !symbol_set.contains(&separator)
+                    if !parser.symbol_set.contains(&separator)
                     {
-                        symbol_set.insert(separator.clone());
-                        parser.symbols.push(separator.clone());
+                        parser.symbol_set.insert(separator.clone());
+                        parser.symbol_list.push(separator.clone());
                     }
                 }
                 else
@@ -108,19 +107,18 @@ impl GrammarForm {
                 ret.tokens.push(GrammarToken::Plain(token.to_string()));
                 if re.is_exact(r"[a-zA-Z_][a-zA-Z_0-9]*", token)
                 {
-                    if !text_set.contains(*token)
+                    if !parser.text_set.contains(*token)
                     {
-                        text_set.insert(token.to_string());
-                        parser.texts.push(token.to_string());
+                        parser.text_set.insert(token.to_string());
+                        parser.text_list.push(token.to_string());
                     }
-                    text_set.insert(token.to_string());
                 }
                 else if re.is_exact(r"[^a-zA-Z0-9_]+", token)
                 {
-                    if !symbol_set.contains(*token)
+                    if !parser.symbol_set.contains(*token)
                     {
-                        symbol_set.insert(token.to_string());
-                        parser.symbols.push(token.to_string());
+                        parser.symbol_set.insert(token.to_string());
+                        parser.symbol_list.push(token.to_string());
                     }
                 }
                 else

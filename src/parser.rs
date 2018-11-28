@@ -57,9 +57,14 @@ pub fn build_best_error(myself : &mut Option<ParseError>, other : Option<ParseEr
 }
 #[derive(Clone)]
 pub struct Parser {
-    pub regexes: Vec<String>,
-    pub symbols: Vec<String>,
-    pub texts: Vec<String>,
+    pub regex_list : Vec<String>,
+    pub symbol_list : Vec<String>,
+    pub text_list : Vec<String>,
+    // token matchers are inserted into both sets and vectors, sets to quickly check for duplicate insertion and vectors are for order
+    pub regex_set : HashSet<String>,
+    pub symbol_set : HashSet<String>,
+    pub text_set : HashSet<String>,
+    
     pub nodetypemap: HashMap<String, GrammarPoint>,
     pub internal_regexes: RegexHolder,
     inited: bool,
@@ -68,7 +73,16 @@ pub struct Parser {
 impl Parser {
     pub fn new() -> Parser
     {
-        Parser { regexes: Vec::new(), symbols: Vec::new(), texts: Vec::new(), nodetypemap: HashMap::new(), internal_regexes: RegexHolder::new(), inited: false }
+        Parser {
+            regex_list: Vec::new(),
+            symbol_list: Vec::new(),
+            text_list: Vec::new(),
+            regex_set: HashSet::new(),
+            symbol_set: HashSet::new(),
+            text_set: HashSet::new(),
+            nodetypemap: HashMap::new(),
+            internal_regexes: RegexHolder::new(),
+            inited: false }
     }
     
     pub fn init(&mut self, text: &str)
@@ -78,11 +92,6 @@ impl Parser {
         let mut lines : VecDeque<String> = text.lines().map(|x| x.to_string()).collect();
         // guarantee the last line is ""
         lines.push_back("".to_string());
-        
-        // token matchers are inserted into both sets and vectors, sets to quickly check for duplicate insertion
-        let mut regex_set : HashSet<String> = HashSet::new();
-        let mut symbol_set : HashSet<String> = HashSet::new();
-        let mut text_set : HashSet<String> = HashSet::new();
     
         while lines.len() > 0
         {
@@ -104,7 +113,7 @@ impl Parser {
                 line = pop!();
                 while line != ""
                 {
-                    nodetype.forms.push(GrammarForm::new(&line, self, &mut regex_set, &mut symbol_set, &mut text_set, istoken));
+                    nodetype.forms.push(GrammarForm::new(&line, self, istoken));
                     line = pop!();
                 }
                 if !self.nodetypemap.contains_key(&nodetype.name)
@@ -122,14 +131,10 @@ impl Parser {
             }
         }
         
-        for regex in &regex_set
+        for regex in &self.regex_set
         {
             self.internal_regexes.prepare_exact(&regex);
         }
-        
-        drop(regex_set);
-        drop(symbol_set);
-        drop(text_set);
         
         for tuple in &self.nodetypemap
         {
@@ -197,8 +202,8 @@ impl Parser {
             panic!("error: grammar does not define name \"program\"");
         }
         
-        self.symbols.sort_by_key(|text| -(text.len() as i64));
-        self.texts  .sort_by_key(|text| -(text.len() as i64));
+        self.symbol_list.sort_by_key(|text| -(text.len() as i64));
+        self.text_list  .sort_by_key(|text| -(text.len() as i64));
         
         self.inited = true;
         
@@ -260,7 +265,7 @@ impl Parser {
                 }
                 
                 let mut continue_the_while = false;
-                for rule in &self.regexes
+                for rule in &self.regex_list
                 {
                     if let Some(text) = self.internal_regexes.match_at(&rule, &line, offset)
                     {
@@ -272,7 +277,7 @@ impl Parser {
                     }
                 }
                 if continue_the_while { continue; }
-                for text in &self.symbols
+                for text in &self.symbol_list
                 {
                     if offset + text.len() > line.len() { continue; }
                     if line[offset..offset+text.len()] == *text.as_str()
@@ -284,7 +289,7 @@ impl Parser {
                     }
                 }
                 if continue_the_while { continue; }
-                for text in &self.texts
+                for text in &self.text_list
                 {
                     if offset + text.len() > line.len() { continue; }
                     if line[offset..offset+text.len()] == *text.as_str()
