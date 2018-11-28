@@ -16,6 +16,7 @@ mod simulation;
 mod manipulation;
 mod jumping;
 mod types;
+mod variableaccess;
 
 use self::types::*;
 
