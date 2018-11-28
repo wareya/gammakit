@@ -612,90 +612,99 @@ impl Parser {
                 std::mem::swap(&mut temp, &mut ast.children);
                 std::mem::swap(ast, &mut temp[0]);
             }
-            if ast.text == "funcargs"
+            match ast.text.as_str()
             {
-                if ast.children.len() >= 2
-                && ast.children.first().unwrap().text == "(" && !ast.children.first().unwrap().isparent
-                && ast.children.last().unwrap().text == ")" && !ast.children.last().unwrap().isparent
+                "funcargs" =>
                 {
-                    ast.children.pop();
-                    ast.children.remove(0);
-                }
-            }
-            if ast.text == "funccall"
-            {
-                if ast.children.len() == 1
-                {
-                    self.parse_tweak_ast(&mut ast.children[0]);
-                    if ast.children[0].text == "arrayexpr"
+                    if ast.children.len() >= 2
+                    && ast.children.first().unwrap().text == "(" && !ast.children.first().unwrap().isparent
+                    && ast.children.last().unwrap().text == ")" && !ast.children.last().unwrap().isparent
                     {
-                        panic!("error: tried to use array indexing expression as statement");
+                        ast.children.pop();
+                        ast.children.remove(0);
                     }
-                    if ast.children[0].text == "indirection"
+                }
+                "funccall" =>
+                {
+                    if ast.children.len() == 1
                     {
-                        panic!("error: tried to use indirection expression as statement");
+                        self.parse_tweak_ast(&mut ast.children[0]);
+                        if ast.children[0].text == "arrayexpr"
+                        {
+                            panic!("error: tried to use array indexing expression as statement");
+                        }
+                        if ast.children[0].text == "indirection"
+                        {
+                            panic!("error: tried to use indirection expression as statement");
+                        }
+                        if ast.children[0].text != "funcexpr"
+                        {
+                            panic!("error: tried to use unknown expression as statement");
+                        }
+                        let mut temp = Vec::new();
+                        std::mem::swap(&mut temp, &mut ast.children[0].children);
+                        std::mem::swap(&mut temp, &mut ast.children);
                     }
-                    if ast.children[0].text != "funcexpr"
+                    while ast.children.len() > 2
                     {
-                        panic!("error: tried to use unknown expression as statement");
+                        let left = ASTNode{text: "funcexpr".to_string(), line: ast.children[0].line, position: ast.children[0].position, isparent: true, children: ast.children.drain(0..2).collect(), opdata: dummy_opdata()};
+                        ast.children.insert(0, left);
                     }
-                    let mut temp = Vec::new();
-                    std::mem::swap(&mut temp, &mut ast.children[0].children);
-                    std::mem::swap(&mut temp, &mut ast.children);
                 }
-                while ast.children.len() > 2
+                "arrayref" =>
                 {
-                    let left = ASTNode{text: "funcexpr".to_string(), line: ast.children[0].line, position: ast.children[0].position, isparent: true, children: ast.children.drain(0..2).collect(), opdata: dummy_opdata()};
-                    ast.children.insert(0, left);
+                    while ast.children.len() > 2
+                    {
+                        let left = ASTNode{text: ast.text.clone(), line: ast.children[0].line, position: ast.children[0].position, isparent: true, children: ast.children.drain(0..2).collect(), opdata: dummy_opdata()};
+                        ast.children.insert(0, left);
+                    }
                 }
-                //return;
-            }
-            if match ast.text.as_str() {"rhunexpr" | "arrayref" | "funccall" => true, _ => false }
-            {
-                while ast.children.len() > 2
+                "rhunexpr" =>
                 {
-                    let left = ASTNode{text: ast.text.clone(), line: ast.children[0].line, position: ast.children[0].position, isparent: true, children: ast.children.drain(0..2).collect(), opdata: dummy_opdata()};
-                    ast.children.insert(0, left);
+                    while ast.children.len() > 2
+                    {
+                        let left = ASTNode{text: ast.text.clone(), line: ast.children[0].line, position: ast.children[0].position, isparent: true, children: ast.children.drain(0..2).collect(), opdata: dummy_opdata()};
+                        ast.children.insert(0, left);
+                    }
+                    
+                    assert!(ast.children.len() == 2);
+                    
+                    if ast.children[1].children[0].text == "funcargs"
+                    {
+                        ast.text = "funcexpr".to_string();
+                        let mut temp = dummy_astnode();
+                        assert!(ast.children[1].children.len() == 1);
+                        std::mem::swap(&mut temp, &mut ast.children[1].children[0]);
+                        std::mem::swap(&mut temp, &mut ast.children[1]);
+                    }
+                    else if ast.children[1].children[0].text == "arrayindex"
+                    {
+                        ast.text = "arrayexpr".to_string();
+                        let mut temp = dummy_astnode();
+                        assert!(ast.children[1].children.len() == 1);
+                        std::mem::swap(&mut temp, &mut ast.children[1].children[0]);
+                        std::mem::swap(&mut temp, &mut ast.children[1]);
+                    }
+                    else if ast.children[1].children[0].text == "indirection"
+                    {
+                        ast.text = "indirection".to_string();
+                        let mut temp = dummy_astnode();
+                        assert!(ast.children[1].children.len() == 1);
+                        std::mem::swap(&mut temp, &mut ast.children[1].children[0].children[1]);
+                        std::mem::swap(&mut temp, &mut ast.children[1]);
+                    }
+                    else
+                    {
+                        panic!("error: rhunexpr doesn't contain funcargs | arrayindex | indirection");
+                    }
                 }
-            }
-            
-            if ast.text == "rhunexpr"
-            {
-                assert!(ast.children.len() >= 2);
-                if ast.children[1].children[0].text == "funcargs"
+                "ifcondition" | "whilecondition" | "withstatement" =>
                 {
-                    ast.text = "funcexpr".to_string();
-                    let mut temp = dummy_astnode();
-                    assert!(ast.children[1].children.len() == 1);
-                    std::mem::swap(&mut temp, &mut ast.children[1].children[0]);
-                    std::mem::swap(&mut temp, &mut ast.children[1]);
+                    assert!(ast.children.len() >= 4);
+                    ast.children.remove(3);
+                    ast.children.remove(1);
                 }
-                else if ast.children[1].children[0].text == "arrayindex"
-                {
-                    ast.text = "arrayexpr".to_string();
-                    let mut temp = dummy_astnode();
-                    assert!(ast.children[1].children.len() == 1);
-                    std::mem::swap(&mut temp, &mut ast.children[1].children[0]);
-                    std::mem::swap(&mut temp, &mut ast.children[1]);
-                }
-                else if ast.children[1].children[0].text == "indirection"
-                {
-                    ast.text = "indirection".to_string();
-                    let mut temp = dummy_astnode();
-                    assert!(ast.children[1].children.len() == 1);
-                    std::mem::swap(&mut temp, &mut ast.children[1].children[0].children[1]);
-                    std::mem::swap(&mut temp, &mut ast.children[1]);
-                }
-                else
-                {
-                    panic!("error: rhunexpr doesn't contain funcargs | arrayindex | indirection");
-                }
-            }
-            if match ast.text.as_str() {"ifcondition" | "whilecondition" | "withstatement" => true, _ => false }
-            {
-                assert!(ast.children.len() >= 4);
-                ast.children.remove(3);
-                ast.children.remove(1);
+                _ => {}
             }
             
             for mut child in &mut ast.children
