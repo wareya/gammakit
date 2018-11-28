@@ -14,148 +14,143 @@ fn assign_or_return(value : Option<Value>, var : &mut Value) -> Option<Value>
     }
 }
 
+fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &[Value], isconst : bool) -> Option<Value>
+{
+    let num_indexes = indexes.len();
+    if num_indexes == 0
+    {
+        if let Some(value) = value
+        {
+            if isconst
+            {
+                panic!("error: tried to assign to non-variable or read-only value");
+            }
+            else
+            {
+                *var = value;
+            }
+            return None;
+        }
+        else
+        {
+            return Some(var.clone());
+        }
+    }
+    else
+    {
+        let index = &indexes[0];
+        match var
+        {
+            Value::Array(ref mut var) =>
+            {
+                if let Value::Number(indexnum) = index
+                {
+                    if let Some(mut newvar) = var.get_mut(indexnum.round() as usize)
+                    {
+                        return assign_or_return_indexed(value, &mut newvar, &indexes[1..], isconst);
+                    }
+                    else
+                    {
+                        panic!("error: tried to access non-extant index {} of an array", indexnum);
+                    }
+                }
+                else
+                {
+                    panic!("error: tried to use a non-number as an array index");
+                }
+            }
+            Value::Dict(ref mut var) =>
+            {
+                if let Value::Number(indexnum) = index
+                {
+                    if let Some(mut newvar) = var.get_mut(&HashableValue::Number(*indexnum))
+                    {
+                        return assign_or_return_indexed(value, &mut newvar, &indexes[1..], isconst);
+                    }
+                    else
+                    {
+                        panic!("error: tried to access non-extant index {} of a dict", indexnum);
+                    }
+                }
+                else if let Value::Text(indexstr) = index
+                {
+                    if let Some(mut newvar) = var.get_mut(&HashableValue::Text(indexstr.clone()))
+                    {
+                        return assign_or_return_indexed(value, &mut newvar, &indexes[1..], isconst);
+                    }
+                    else
+                    {
+                        panic!("error: tried to access non-extant index {} of a dict", indexstr);
+                    }
+                }
+                else
+                {
+                    panic!("error: tried to use a non-number, non-string as a dict index");
+                }
+            }
+            Value::Text(ref mut text) =>
+            {
+                if num_indexes != 1
+                {
+                    // FIXME should we just treat further indexes as 0? that's what they would do if they were indexes into the substring at that index anyway, so...
+                    panic!("error: tried to index into the value at another index in a string (i.e. tried to do something like \"asdf\"[0][0])");
+                }
+                else
+                {
+                    if let Value::Number(indexnum) = index
+                    {
+                        let mut realindex = ((indexnum.round() as i64) % text.len() as i64) as usize;
+                        
+                        if let Some(value) = value
+                        {
+                            if let Value::Text(mychar) = value
+                            {
+                                if mychar.len() == 1
+                                {
+                                    // turn into array of codepoints, then modify
+                                    let mut codepoints = text.chars().collect::<Vec<char>>();
+                                    codepoints[realindex] = mychar.chars().next().unwrap();
+                                    // turn array of codepoints back into string
+                                    let newstr : String = codepoints.iter().collect();
+                                    *text = newstr;
+                                    return None;
+                                }
+                                else
+                                {
+                                    panic!("error: tried to assign to an index into a string with a string that was not exactly one character long (was {} characters long)", mychar.len());
+                                }
+                            }
+                            else
+                            {
+                                panic!("error: tried to assign non-string to an index into a string (assigning by codepoint is not supported yet)");
+                            }
+                        }
+                        else
+                        {
+                            let mychar = text.chars().collect::<Vec<char>>()[realindex];
+                            let mut newstr = String::new();
+                            newstr.push(mychar);
+                            return Some(Value::Text(newstr));
+                        }
+                    }
+                    else
+                    {
+                        panic!("error: tried to use a non-number as an index into a string");
+                    }
+                }
+            }
+            _ =>
+            {
+                panic!("error: tried to index into a non-array, non-dict value");
+            }
+        }
+    }
+}
 impl Interpreter
 {
     // if value is None, finds and returns appropriate value; otherwise, stores value and returns None
     pub(super) fn evaluate_or_store(&mut self, global : &mut GlobalState, variable : &Variable, value : Option<Value>) -> Option<Value>
     {
-        macro_rules! assign_or_return_indexed {
-            ( $value:expr, $var:expr, $indexes:expr, $isconst:expr ) =>
-            {
-                unsafe
-                {
-                    let mut ptr = $var as *mut Value;
-                    
-                    let num_indexes = $indexes.len();
-                    
-                    for (current_index, ref index) in $indexes.iter().enumerate()
-                    {
-                        if let Value::Array(ref mut newvar) = *ptr
-                        {
-                            if let Value::Number(indexnum) = index
-                            {
-                                if let Some(newvar2) = newvar.get_mut(indexnum.round() as usize)
-                                {
-                                    ptr = newvar2 as *mut Value;
-                                }
-                                else
-                                {
-                                    panic!("error: tried to access non-extant index {} of an array", indexnum);
-                                }
-                            }
-                            else
-                            {
-                                panic!("error: tried to use a non-number as an array index");
-                            }
-                        }
-                        else if let Value::Dict(ref mut newvar) = *ptr
-                        {
-                            if let Value::Number(indexnum) = index
-                            {
-                                if let Some(newvar2) = newvar.get_mut(&HashableValue::Number(*indexnum))
-                                {
-                                    ptr = newvar2 as *mut Value;
-                                }
-                                else
-                                {
-                                    panic!("error: tried to access non-extant index {} of a dict", indexnum);
-                                }
-                            }
-                            else if let Value::Text(indexstr) = index
-                            {
-                                if let Some(newvar2) = newvar.get_mut(&HashableValue::Text(indexstr.clone()))
-                                {
-                                    ptr = newvar2 as *mut Value;
-                                }
-                                else
-                                {
-                                    panic!("error: tried to access non-extant index {} of a dict", indexstr);
-                                }
-                            }
-                            else
-                            {
-                                panic!("error: tried to use a non-number, non-string as a dict index");
-                            }
-                        }
-                        else if let Value::Text(ref mut text) = *ptr
-                        {
-                            if current_index+1 != num_indexes
-                            {
-                                // FIXME should we just treat further indexes as 0? that's what they would do if they were indexes into the substring at that index anyway, so...
-                                panic!("error: tried to index into the value at another index in a string (i.e. tried to do something like \"asdf\"[0][0])");
-                            }
-                            else
-                            {
-                                if let Value::Number(indexnum) = index
-                                {
-                                    let mut realindex = ((indexnum.round() as i64) % text.len() as i64) as usize;
-                                    
-                                    
-                                    if let Some(value) = $value
-                                    {
-                                        if let Value::Text(mychar) = value
-                                        {
-                                            if mychar.len() == 1
-                                            {
-                                                let mut codepoints = text.chars().collect::<Vec<char>>();
-                                                codepoints[realindex] = mychar.chars().next().unwrap();
-                                                /*
-                                                // turn array of codepoints back into string
-                                                */
-                                                let newstr : String = codepoints.iter().collect();
-                                                *ptr = Value::Text(newstr);
-                                                return None;
-                                            }
-                                            else
-                                            {
-                                                panic!("error: tried to assign to an index into a string with a string that was not exactly one character long (was {} characters long)", mychar.len());
-                                            }
-                                        }
-                                        else
-                                        {
-                                            panic!("error: tried to assign non-string to an index into a string (assigning by codepoint is not supported yet)");
-                                        }
-                                    }
-                                    else
-                                    {
-                                        let mychar = text.chars().collect::<Vec<char>>()[realindex];
-                                        let mut newstr = String::new();
-                                        newstr.push(mychar);
-                                        return Some(Value::Text(newstr));
-                                    }
-                                }
-                                else
-                                {
-                                    panic!("error: tried to use a non-number as an index into a string");
-                                }
-                            }
-                        }
-                        else
-                        {
-                            panic!("error: tried to index into a non-array, non-dict value");
-                        }
-                    }
-                    
-                    if let Some(value) = $value
-                    {
-                        if $isconst
-                        {
-                            panic!("error: tried to assign to non-variable or read-only value");
-                        }
-                        else
-                        {
-                            *ptr = value.clone();
-                        }
-                        
-                        return None;
-                    }
-                    else
-                    {
-                        return Some((*ptr).clone());
-                    }
-                }
-            }
-        }
         macro_rules! check_frame_dirvar_arrayed {
             ( $frame:expr, $dirvar:expr, $value:expr, $indexes:expr ) =>
             {
@@ -164,7 +159,7 @@ impl Interpreter
                 {
                     if let Some(var) = scope.get_mut(&$dirvar.name)
                     {
-                        assign_or_return_indexed!($value, var, $indexes, false);
+                        return assign_or_return_indexed($value, var, $indexes, false);
                     }
                 }
                 for id in $frame.instancestack.iter_mut().rev()
@@ -173,7 +168,7 @@ impl Interpreter
                     {
                         if let Some(var) = inst.variables.get_mut(&$dirvar.name)
                         {
-                            assign_or_return_indexed!($value, var, $indexes, false);
+                            return assign_or_return_indexed($value, var, $indexes, false);
                         }
                         // no need to check for instance function names because they can't be indexed
                     }
@@ -220,6 +215,7 @@ impl Interpreter
                 }
             }
         }
+        
         match &variable
         {
             Variable::Array(ref arrayvar) =>
@@ -233,7 +229,7 @@ impl Interpreter
                         {
                             if let Some(mut var) = instance.variables.get_mut(&indirvar.name)
                             {
-                                assign_or_return_indexed!(value, var, arrayvar.indexes, false);
+                                return assign_or_return_indexed(value, &mut var, &arrayvar.indexes[..], false);
                             }
                             else
                             {
@@ -247,10 +243,10 @@ impl Interpreter
                     }
                     NonArrayVariable::Direct(ref dirvar) =>
                     {
-                        check_frame_dirvar_arrayed!(self.top_frame, dirvar, value, arrayvar.indexes);
+                        check_frame_dirvar_arrayed!(self.top_frame, dirvar, value, &arrayvar.indexes[..]);
                         for frame in self.frames.iter_mut().rev()
                         {
-                            check_frame_dirvar_arrayed!(frame, dirvar, value, arrayvar.indexes);
+                            check_frame_dirvar_arrayed!(frame, dirvar, value, &arrayvar.indexes[..]);
                         }
                         if let Some(_var) = global.objectnames.get(&dirvar.name)
                         {
@@ -264,7 +260,7 @@ impl Interpreter
                     }
                     NonArrayVariable::ActualArray(ref array) =>
                     {
-                        assign_or_return_indexed!(value, &mut Value::Array(array.clone()), arrayvar.indexes, true);
+                        return assign_or_return_indexed(value, &mut Value::Array(array.clone()), &arrayvar.indexes[..], true);
                     }
                 }
             }

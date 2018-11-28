@@ -88,7 +88,7 @@ pub(super) struct Instance {
 #[derive(Clone)]
 pub(super) struct ArrayVar { // for x[y]
     pub location: NonArrayVariable,
-    pub indexes: VecDeque<Value>
+    pub indexes: Vec<Value>
 }
 #[derive(Debug)]
 #[derive(Clone)]

@@ -697,7 +697,7 @@ impl Interpreter
                 {
                     Value::Var(Variable::Array(mut arrayvar)) =>
                     {
-                        arrayvar.indexes.push_back(index);
+                        arrayvar.indexes.push(index);
                         self.top_frame.stack.push(Value::Var(Variable::Array(arrayvar)));
                     }
                     Value::Var(Variable::Direct(mut dirvar)) =>
