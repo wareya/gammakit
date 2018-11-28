@@ -82,4 +82,4 @@ TODO:
 
 
 As of writing, clippy processes gammakit with no complaints after giving the following invocation:
-cargo clippy -- -A clippy::type_complexity -A clippy::cyclomatic_complexity -A clippy::len_zero -A clippy::cast_lossless -A clippy::needless_return -A clippy::map_entry -A clippy::collapsible_if
+cargo clippy -- -A clippy::type_complexity -A clippy::len_zero -A clippy::cast_lossless -A clippy::needless_return -A clippy::map_entry -A clippy::collapsible_if
