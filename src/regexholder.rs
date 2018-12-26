@@ -22,7 +22,7 @@ impl RegexHolder {
         let regex = Regex::new(&format!("^{}$", regex_text));
         self.exact_regexes.insert(regex_text.to_string(), regex);
     }
-    #[cfg_attr(feature = "cargo-clippy", allow(wrong_self_convention))]
+    #[allow(clippy::wrong_self_convention)]
     pub fn is_exact(&mut self, regex_text : &str, text : &str) -> bool
     {
         if let Some(regex) = self.exact_regexes.get(regex_text)

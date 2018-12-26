@@ -52,7 +52,7 @@ impl Interpreter {
     {
         Interpreter { top_frame : Frame::new_root(Rc::new(code)), frames : vec!() , doexit : false, suppress_for_expr_end : false }
     }
-    #[cfg_attr(feature = "cargo-clippy", allow(cyclomatic_complexity))]
+    #[allow(clippy::cyclomatic_complexity)]
     fn handle_flow_control(&mut self)
     {
         if let Some(mut controller) = self.top_frame.controlstack.pop()

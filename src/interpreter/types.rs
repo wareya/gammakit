@@ -374,7 +374,7 @@ pub(super) fn value_op_equal(left : &Value, right : &Value) -> Result<Value, Str
     {
         (Value::Number(left), Value::Number(right)) =>
         {
-            #[cfg_attr(feature = "cargo-clippy", allow(float_cmp))]
+            #[allow(clippy::float_cmp)]
             Ok(Value::Number(bool_floaty(left==right)))
         }
         (Value::Text(left), Value::Text(right)) =>
@@ -393,7 +393,7 @@ pub(super) fn value_op_not_equal(left : &Value, right : &Value) -> Result<Value,
     {
         (Value::Number(left), Value::Number(right)) =>
         {
-            #[cfg_attr(feature = "cargo-clippy", allow(float_cmp))]
+            #[allow(clippy::float_cmp)]
             Ok(Value::Number(bool_floaty(left!=right)))
         }
         (Value::Text(left), Value::Text(right)) =>
@@ -657,9 +657,9 @@ pub(super) fn ast_to_dict(ast : &ASTNode) -> Value
     */
     
     opdata.insert(to_key!("isop"), Value::Number(bool_floaty(ast.opdata.isop)));
-    #[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
+    #[allow(clippy::cast_lossless)]
     opdata.insert(to_key!("assoc"), Value::Number(ast.opdata.assoc as f64));
-    #[cfg_attr(feature = "cargo-clippy", allow(cast_lossless))]
+    #[allow(clippy::cast_lossless)]
     opdata.insert(to_key!("precedence"), Value::Number(ast.opdata.precedence as f64));
     
     astdict.insert(to_key!("opdata"), Value::Dict(opdata));
