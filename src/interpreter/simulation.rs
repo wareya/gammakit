@@ -64,7 +64,6 @@ impl Interpreter
     pub(super) fn sim_PUSHSHORT(&mut self, _global : &mut GlobalState)
     {
         let value = unpack_u16(&self.pull_from_code(2));
-        #[allow(clippy::cast_lossless)]
         self.top_frame.stack.push(Value::Number(value as f64));
     }
     #[allow(non_snake_case)]

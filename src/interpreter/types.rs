@@ -657,9 +657,7 @@ pub(super) fn ast_to_dict(ast : &ASTNode) -> Value
     */
     
     opdata.insert(to_key!("isop"), Value::Number(bool_floaty(ast.opdata.isop)));
-    #[allow(clippy::cast_lossless)]
     opdata.insert(to_key!("assoc"), Value::Number(ast.opdata.assoc as f64));
-    #[allow(clippy::cast_lossless)]
     opdata.insert(to_key!("precedence"), Value::Number(ast.opdata.precedence as f64));
     
     astdict.insert(to_key!("opdata"), Value::Dict(opdata));
