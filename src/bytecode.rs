@@ -1,3 +1,5 @@
+#![allow(clippy::cast_lossless)]
+
 /*
 fn pack_u8(num : u8) -> Vec<u8>
 {

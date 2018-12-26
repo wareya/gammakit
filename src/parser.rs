@@ -1,3 +1,5 @@
+#![allow(clippy::len_zero)]
+
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::collections::VecDeque;

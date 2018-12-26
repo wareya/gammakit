@@ -1,3 +1,6 @@
+#![allow(clippy::cast_lossless)]
+#![allow(clippy::map_entry)]
+
 use crate::interpreter::*;
 
 impl Interpreter
@@ -133,7 +136,6 @@ impl Interpreter
             {
                 if let Some(instance) = global.instances.get_mut(instance_id)
                 {
-                    // work around clippy false positive
                     if !instance.variables.contains_key(&name)
                     {
                         instance.variables.insert(name, Value::Number(0.0));

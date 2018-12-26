@@ -1,3 +1,7 @@
+#![allow(clippy::cast_lossless)]
+#![allow(clippy::float_cmp)]
+#![allow(clippy::type_complexity)]
+
 use crate::interpreter::*;
 
 // internal types
@@ -374,7 +378,6 @@ pub(super) fn value_op_equal(left : &Value, right : &Value) -> Result<Value, Str
     {
         (Value::Number(left), Value::Number(right)) =>
         {
-            #[allow(clippy::float_cmp)]
             Ok(Value::Number(bool_floaty(left==right)))
         }
         (Value::Text(left), Value::Text(right)) =>
@@ -393,7 +396,6 @@ pub(super) fn value_op_not_equal(left : &Value, right : &Value) -> Result<Value,
     {
         (Value::Number(left), Value::Number(right)) =>
         {
-            #[allow(clippy::float_cmp)]
             Ok(Value::Number(bool_floaty(left!=right)))
         }
         (Value::Text(left), Value::Text(right)) =>

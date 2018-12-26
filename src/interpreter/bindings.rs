@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use crate::interpreter::*;
 
 // last argument is isexpr - as of the time of writing this comment, it's used exclusively by instance_execute
