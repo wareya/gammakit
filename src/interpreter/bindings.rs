@@ -1,4 +1,4 @@
-use interpreter::*;
+use crate::interpreter::*;
 
 // last argument is isexpr - as of the time of writing this comment, it's used exclusively by instance_execute
 // second return value is whether the frame was moved - necessary for weird functions like instance_create that implicly call user defined functions, because moving the frame to call user defined functions also moves the original stack

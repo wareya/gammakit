@@ -1,4 +1,4 @@
-use interpreter::*;
+use crate::interpreter::*;
 
 fn assign_or_return(value : Option<Value>, var : &mut Value) -> Option<Value>
 {

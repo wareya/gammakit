@@ -15,10 +15,10 @@ mod compiler;
 mod disassembler;
 mod interpreter;
 
-use parser::*;
-use compiler::*;
-use disassembler::*;
-use interpreter::*;
+use crate::parser::*;
+use crate::compiler::*;
+use crate::disassembler::*;
+use crate::interpreter::*;
 
 fn main() -> std::io::Result<()>
 {

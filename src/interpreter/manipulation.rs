@@ -1,4 +1,4 @@
-use interpreter::*;
+use crate::interpreter::*;
 
 macro_rules! list_pop_generic {
     ( $list:expr, $x:ident ) =>

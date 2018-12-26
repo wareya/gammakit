@@ -1,4 +1,4 @@
-use interpreter::*;
+use crate::interpreter::*;
 
 impl Interpreter
 {
