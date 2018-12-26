@@ -391,7 +391,7 @@ impl Parser {
                     {
                         panic!("internal error: failed to find node type {} used by some grammar form", text);
                     }
-                    let (bit, consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
+                    let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
                     build_best_error(&mut latesterror, error);
                     if let Some(node) = bit
                     {

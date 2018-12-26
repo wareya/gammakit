@@ -186,7 +186,7 @@ impl Interpreter
                 {
                     panic!("error: tried to create a variable with an invalid identifier `{}`\n(note: must exactly match the regex [a-zA-Z_][a-zA-Z_0-9]*)", name, )
                 }
-                let mut value : Value;
+                let value : Value;
                 if args.len() == 1
                 {
                     if let Some(set_value) = args.pop()

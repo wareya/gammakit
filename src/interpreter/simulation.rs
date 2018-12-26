@@ -694,15 +694,15 @@ impl Interpreter
                         arrayvar.indexes.push(index);
                         self.top_frame.stack.push(Value::Var(Variable::Array(arrayvar)));
                     }
-                    Value::Var(Variable::Direct(mut dirvar)) =>
+                    Value::Var(Variable::Direct(dirvar)) =>
                     {
                         self.top_frame.stack.push(Value::Var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(index).into_iter().collect() } )));
                     }
-                    Value::Var(Variable::Indirect(mut indirvar)) =>
+                    Value::Var(Variable::Indirect(indirvar)) =>
                     {
                         self.top_frame.stack.push(Value::Var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(index).into_iter().collect() } )));
                     }
-                    Value::Array(mut array) =>
+                    Value::Array(array) =>
                     {
                         self.top_frame.stack.push(Value::Var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualArray(array), indexes : vec!(index).into_iter().collect() } )));
                     }

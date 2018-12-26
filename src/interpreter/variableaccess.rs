@@ -83,7 +83,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                 {
                     if let Value::Number(indexnum) = index
                     {
-                        let mut realindex = ((indexnum.round() as i64) % text.len() as i64) as usize;
+                        let realindex = ((indexnum.round() as i64) % text.len() as i64) as usize;
                         
                         if let Some(value) = value
                         {
