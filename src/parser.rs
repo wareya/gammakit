@@ -22,7 +22,7 @@ pub struct ParseError {
 impl ParseError {
     pub fn new(token : usize, text : &str) -> ParseError
     {
-        return ParseError{token, expected : vec!(text.to_string()).into_iter().collect()}
+        ParseError{token, expected : vec!(text.to_string()).into_iter().collect()}
     }
 }
 
@@ -155,49 +155,11 @@ impl Parser {
                         GrammarToken::SeparatorNameList{text, ..} => {text.clone()}
                         _ => {"".to_string()}
                     };
-                    if name != ""
+                    if name != "" && !self.nodetypemap.contains_key(&name)
                     {
-                        if !self.nodetypemap.contains_key(&name)
-                        {
-                            panic!("error: node name {} is used without actually defined", name);
-                        }
+                        panic!("error: node name {} is used without actually defined", name);
                     }
                 }
-            }
-            let name = &tuple.1.name;
-            let point = &self.nodetypemap[name];
-            //if point.name == "declname"
-            if false
-            {
-                println!("info: grammar point {} has {} forms", point.name, point.forms.len());
-                for form in &point.forms
-                {
-                    for token in &form.tokens
-                    {
-                        match token
-                        {
-                            GrammarToken::Name(text) =>
-                            { print!("n:{} ", text); }
-                            GrammarToken::NameList(text) =>
-                            { print!("nl:{} ", text); }
-                            GrammarToken::OptionalName(text) =>
-                            { print!("on:{} ", text); }
-                            GrammarToken::OptionalNameList(text) =>
-                            { print!("onl:{} ", text); }
-                            GrammarToken::SeparatorNameList{text, separator} =>
-                            { print!("snl:{}...{} ", text, separator); }
-                            GrammarToken::Plain(text) =>
-                            { print!("{} ", text); }
-                            GrammarToken::Regex(text) =>
-                            { print!("r:{} ", text); }
-                            GrammarToken::Op{text, ..} =>
-                            { print!("op:{} ", text); }
-                            GrammarToken::RestIsOptional => { print!(">>? "); }
-                        }
-                    }
-                    println!();
-                }
-                println!();
             }
         }
         if !self.nodetypemap.contains_key("program")
@@ -232,27 +194,21 @@ impl Parser {
                 if offset+1 < line.len()
                 {
                     let signal = &line[offset..offset+2];
-                    if in_multiline_comment
+                    if signal == "*/" && in_multiline_comment
                     {
-                        if signal == "*/"
-                        {
-                            in_multiline_comment = false;
-                            offset += 2;
-                            continue;
-                        }
+                        in_multiline_comment = false;
+                        offset += 2;
+                        continue;
                     }
-                    else // not currently in a multiline comment
+                    else if signal == "/*"
                     {
-                        if signal == "/*"
-                        {
-                            in_multiline_comment = true;
-                            offset += 2;
-                            continue;
-                        }
-                        else if signal == "//"
-                        {
-                            break;
-                        }
+                        in_multiline_comment = true;
+                        offset += 2;
+                        continue;
+                    }
+                    else if signal == "//"
+                    {
+                        break;
                     }
                 }
                 if in_multiline_comment
@@ -299,11 +255,9 @@ impl Parser {
                     {
                         // don't tokenize the beginnings of names as actual names
                         if offset + text.len() + 1 > line.len()
+                           && self.internal_regexes.is_exact(r"[a-zA-Z0-9_]", &slice(&line, (offset+text.len()) as i64, (offset+text.len()+1) as i64))
                         {
-                            if self.internal_regexes.is_exact(r"[a-zA-Z0-9_]", &slice(&line, (offset+text.len()) as i64, (offset+text.len()+1) as i64))
-                            {
-                                continue;
-                            }
+                            continue;
                         }
                         ret.push_back(LexToken{text : text.clone(), line : linecount, position : offset});
                         offset += text.len();
@@ -322,7 +276,7 @@ impl Parser {
             println!("lex took {:?}", Instant::now().duration_since(start_time));
         }
         
-        return ret;
+        ret
     }
 
     // attempts to parse a token list as a particular form of a grammar point
@@ -529,7 +483,7 @@ impl Parser {
             }
         }
         
-        return (Some(nodes), totalconsumed, latesterror);
+        (Some(nodes), totalconsumed, latesterror)
     }
 
     // attempts to parse a token list as each form of a grammar point in order and uses the first valid one
@@ -551,7 +505,7 @@ impl Parser {
                 return (Some(ASTNode{text : nodetype.name.clone(), line : tokens[index].line, position : tokens[index].position, isparent : true, children : nodes, opdata : dummy_opdata()}), consumed, latesterror);
             }
         }
-        return (None, 0, latesterror);
+        (None, 0, latesterror)
     }
     fn rotate(ast : &mut ASTNode)
     {
@@ -566,22 +520,26 @@ impl Parser {
     {
         fn is_rotatable_binexpr(a : &ASTNode) -> bool
         {
-            return a.isparent && a.children.len() == 3 && a.text.starts_with("binexpr_");
+            a.isparent && a.children.len() == 3 && a.text.starts_with("binexpr_")
         }
         fn compatible_associativity(a : &ASTNode, b : &ASTNode) -> bool
         {
-            return a.isparent && b.isparent
-                && a.children[0].opdata.isop && b.children[0].opdata.isop
-                && a.children[0].opdata.assoc == 1
-                && b.children[0].opdata.assoc == 1
-                && a.children[0].opdata.precedence == b.children[0].opdata.precedence;
+            a.isparent && b.isparent
+            && a.children[0].opdata.isop
+            && b.children[0].opdata.isop
+            && a.children[0].opdata.assoc == 1
+            && b.children[0].opdata.assoc == 1
+            && a.children[0].opdata.precedence == b.children[0].opdata.precedence
         }
         if is_rotatable_binexpr(ast) && is_rotatable_binexpr(&ast.children[2]) && compatible_associativity(&ast.children[1], &ast.children[2].children[1])
         {
             Parser::rotate(ast);
-            return true;
+            true
         }
-        return false;
+        else
+        {
+            false
+        }
     }
     fn parse_fix_associativity(&self, ast : &mut ASTNode)
     {
@@ -726,26 +684,37 @@ impl Parser {
                 assert!(ast.children.len() >= 3);
                 for child in ast.children[3..ast.children.len()-1].iter()
                 {
-                    if match child.children[1].children[0].text.as_str() {"create" | "destroy" => true, _ => false }
+                    match child.children[1].children[0].text.as_str()
                     {
-                        if child.children[3].isparent || child.children[3].text != ")"
+                        "create" | "destroy" =>
                         {
-                            panic!("error: `{}` function of object must not have any arguments", child.children[1].children[0].text);
+                            if child.children[3].isparent || child.children[3].text != ")"
+                            {
+                                panic!("error: `{}` function of object must not have any arguments", child.children[1].children[0].text);
+                            }
                         }
+                        _ => {}
                     }
                 }
             }
-            if match ast.text.as_str() {"funccall" | "funcexpr" | "arrayref" => true, _ => false }
+            
+            // What I write right now
+            match ast.text.as_str()
             {
-                if ast.children.len() != 2
+                "funccall" | "funcexpr" | "arrayref" =>
                 {
-                    println!("broken ast node");
-                    println!("-----");
-                    print_ast_node(ast, 0);
-                    println!("-----");
-                    assert!(false);
+                    if ast.children.len() != 2
+                    {
+                        println!("broken ast node");
+                        println!("-----");
+                        print_ast_node(ast, 0);
+                        println!("-----");
+                        assert!(false);
+                    }
                 }
+                _ => {}
             }
+            
             for child in &ast.children
             {
                 self.verify_ast(&child);
@@ -824,6 +793,6 @@ impl Parser {
             println!("all good!");
         }
         
-        return Some(ast);
+        Some(ast)
     }
 }

@@ -31,13 +31,20 @@ impl RegexHolder {
         }
         let regex = Regex::new(&format!("^{}$", regex_text));
         self.exact_regexes.insert(regex_text.to_string(), regex);
-        return self.is_exact(regex_text, text);
+        self.is_exact(regex_text, text)
     }
     pub fn is_exact_immut(& self, regex_text : &str, text : &str) -> bool
     {
         if let Some(regex) = self.exact_regexes.get(regex_text)
         {
-            return match regex { Ok(regex) => regex.is_match(text), Err(_) => false } ;
+            if let Ok(regex) = regex
+            {
+                return regex.is_match(text);
+            }
+            else
+            {
+                return false;
+            }
         }
         else
         {
@@ -56,7 +63,7 @@ impl RegexHolder {
     {
         if let Some(regex) = self.regexes.get(regex_text)
         {
-            return if let Ok(regex) = regex
+            if let Ok(regex) = regex
             {
                 if let Some(my_match) = regex.find_at(text, start)
                 {
@@ -70,8 +77,11 @@ impl RegexHolder {
             }
             else { None }
         }
-        let regex = Regex::new(regex_text);
-        self.regexes.insert(regex_text.to_string(), regex);
-        return self.match_at(regex_text, text, start);
+        else
+        {
+            let regex = Regex::new(regex_text);
+            self.regexes.insert(regex_text.to_string(), regex);
+            self.match_at(regex_text, text, start)
+        }
     }
 }

@@ -664,7 +664,7 @@ pub(super) fn ast_to_dict(ast : &ASTNode) -> Value
     
     astdict.insert(to_key!("opdata"), Value::Dict(opdata));
     
-    return Value::Dict(astdict);
+    Value::Dict(astdict)
 }
 
 pub(super) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> ASTNode
@@ -756,5 +756,5 @@ pub(super) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> ASTNode
         panic!("error: tried to turn a dict into an ast but dict lacked \"opdata\" field or the \"opdata\" field was not a dictionary");
     }
     
-    return ast;
+    ast
 }

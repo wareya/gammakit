@@ -145,6 +145,6 @@ impl GrammarForm
                 }
             }
         }
-        return ret;
+        ret
     }
 }

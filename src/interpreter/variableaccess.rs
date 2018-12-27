@@ -5,11 +5,11 @@ fn assign_or_return(value : Option<Value>, var : &mut Value) -> Option<Value>
     if let Some(value) = value
     {
         *var = value;
-        return None;
+        None
     }
     else
     {
-        return Some(var.clone());
+        Some(var.clone())
     }
 }
 
@@ -18,7 +18,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
     let num_indexes = indexes.len();
     if num_indexes == 0
     {
-        return assign_or_return(value, var);
+        assign_or_return(value, var)
     }
     else
     {
@@ -31,7 +31,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                 {
                     if let Some(mut newvar) = var.get_mut(indexnum.round() as usize)
                     {
-                        return assign_or_return_indexed(value, &mut newvar, &indexes[1..]);
+                        assign_or_return_indexed(value, &mut newvar, &indexes[1..])
                     }
                     else
                     {
@@ -49,7 +49,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                 {
                     if let Some(mut newvar) = var.get_mut(&HashableValue::Number(*indexnum))
                     {
-                        return assign_or_return_indexed(value, &mut newvar, &indexes[1..]);
+                        assign_or_return_indexed(value, &mut newvar, &indexes[1..])
                     }
                     else
                     {
@@ -60,7 +60,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                 {
                     if let Some(mut newvar) = var.get_mut(&HashableValue::Text(indexstr.clone()))
                     {
-                        return assign_or_return_indexed(value, &mut newvar, &indexes[1..]);
+                        assign_or_return_indexed(value, &mut newvar, &indexes[1..])
                     }
                     else
                     {
@@ -79,48 +79,45 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                     // FIXME should we just treat further indexes as 0? that's what they would do if they were indexes into the substring at that index anyway, so...
                     panic!("error: tried to index into the value at another index in a string (i.e. tried to do something like \"asdf\"[0][0])");
                 }
-                else
+                else if let Value::Number(indexnum) = index
                 {
-                    if let Value::Number(indexnum) = index
+                    let realindex = ((indexnum.round() as i64) % text.len() as i64) as usize;
+                    
+                    if let Some(value) = value
                     {
-                        let realindex = ((indexnum.round() as i64) % text.len() as i64) as usize;
-                        
-                        if let Some(value) = value
+                        if let Value::Text(mychar) = value
                         {
-                            if let Value::Text(mychar) = value
+                            if mychar.len() == 1
                             {
-                                if mychar.len() == 1
-                                {
-                                    // turn into array of codepoints, then modify
-                                    let mut codepoints = text.chars().collect::<Vec<char>>();
-                                    codepoints[realindex] = mychar.chars().next().unwrap();
-                                    // turn array of codepoints back into string
-                                    let newstr : String = codepoints.iter().collect();
-                                    *text = newstr;
-                                    return None;
-                                }
-                                else
-                                {
-                                    panic!("error: tried to assign to an index into a string with a string that was not exactly one character long (was {} characters long)", mychar.len());
-                                }
+                                // turn into array of codepoints, then modify
+                                let mut codepoints = text.chars().collect::<Vec<char>>();
+                                codepoints[realindex] = mychar.chars().next().unwrap();
+                                // turn array of codepoints back into string
+                                let newstr : String = codepoints.iter().collect();
+                                *text = newstr;
+                                None
                             }
                             else
                             {
-                                panic!("error: tried to assign non-string to an index into a string (assigning by codepoint is not supported yet)");
+                                panic!("error: tried to assign to an index into a string with a string that was not exactly one character long (was {} characters long)", mychar.len());
                             }
                         }
                         else
                         {
-                            let mychar = text.chars().collect::<Vec<char>>()[realindex];
-                            let mut newstr = String::new();
-                            newstr.push(mychar);
-                            return Some(Value::Text(newstr));
+                            panic!("error: tried to assign non-string to an index into a string (assigning by codepoint is not supported yet)");
                         }
                     }
                     else
                     {
-                        panic!("error: tried to use a non-number as an index into a string");
+                        let mychar = text.chars().collect::<Vec<char>>()[realindex];
+                        let mut newstr = String::new();
+                        newstr.push(mychar);
+                        Some(Value::Text(newstr))
                     }
+                }
+                else
+                {
+                    panic!("error: tried to use a non-number as an index into a string");
                 }
             }
             _ =>
@@ -152,7 +149,7 @@ fn check_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, dir
             // no need to check for instance function names because they can't be indexed
         }
     }
-    return false;
+    false
 }
 fn access_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, value : Option<Value>, indexes : &[Value]) -> Option<Value>
 {
@@ -205,7 +202,7 @@ fn check_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &D
             }
         }
     }
-    return false;
+    false
 }
 fn access_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, value : Option<Value>) -> Option<Value>
 {
@@ -299,13 +296,13 @@ impl Interpreter
             }
             NonArrayVariable::ActualArray(ref array) =>
             {
-                if value.is_some()
+                if value.is_none()
                 {
-                    panic!("error: tried to assign to a non-variable array value");
+                    assign_or_return_indexed(None, &mut Value::Array(array.clone()), &arrayvar.indexes[..])
                 }
                 else
                 {
-                    return assign_or_return_indexed(None, &mut Value::Array(array.clone()), &arrayvar.indexes[..]);
+                    panic!("error: tried to assign to a non-variable array value");
                 }
             }
         }
@@ -391,15 +388,15 @@ impl Interpreter
         {
             Variable::Array(ref arrayvar) =>
             {
-                return self.evaluate_or_store_of_array(global, arrayvar, value);
+                self.evaluate_or_store_of_array(global, arrayvar, value)
             }
             Variable::Indirect(ref indirvar) =>
             {
-                return self.evaluate_or_store_of_indirect(global, indirvar, value);
+                self.evaluate_or_store_of_indirect(global, indirvar, value)
             }
             Variable::Direct(ref dirvar) =>
             {
-                return self.evaluate_or_store_of_direct(global, dirvar, value);
+                self.evaluate_or_store_of_direct(global, dirvar, value)
             }
         }
     }

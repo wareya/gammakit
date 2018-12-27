@@ -7,6 +7,7 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
+    // FIXME make this use a hashmap so that functions can be added at runtime (e.g. with gammakit functioning as a library)
     pub(super) fn get_internal_function(&mut self, name : &str) -> Option<Box<Fn(&mut Interpreter, &mut GlobalState, Vec<Value>, bool) -> (Value, bool)>>
     {
         macro_rules! enbox {
@@ -50,7 +51,7 @@ impl Interpreter
                 panic!("error: tried to print unprintable value");
             }
         }
-        return (Value::Number(0.0), false);
+        (Value::Number(0.0), false)
     }
     pub(super) fn sim_func_len(&mut self, _global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
@@ -64,15 +65,15 @@ impl Interpreter
             {
                 Value::Text(string) =>
                 {
-                    return (Value::Number(string.chars().count() as f64), false);
+                    (Value::Number(string.chars().count() as f64), false)
                 }
                 Value::Array(array) =>
                 {
-                    return (Value::Number(array.len() as f64), false);
+                    (Value::Number(array.len() as f64), false)
                 }
                 Value::Dict(dict) =>
                 {
-                    return (Value::Number(dict.keys().len() as f64), false);
+                    (Value::Number(dict.keys().len() as f64), false)
                 }
                 _ =>
                 {
@@ -226,7 +227,7 @@ impl Interpreter
         {
             panic!("error: first argument to instance_add_variable() must be a number");
         }
-        return (Value::Number(0.0), false);
+        (Value::Number(0.0), false)
     }
     pub(super) fn sim_func_instance_execute(&mut self, global : &mut GlobalState, mut args : Vec<Value>, isexpr : bool) -> (Value, bool)
     {
@@ -269,7 +270,7 @@ impl Interpreter
         {
             panic!("error: first argument to instance_execute() must be a number");
         }
-        return (Value::Number(0.0), true);
+        (Value::Number(0.0), true)
     }
     pub(super) fn sim_func_parse_text(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
@@ -283,7 +284,7 @@ impl Interpreter
             let tokens = global.parser.tokenize(&program_lines, true);
             if let Some(ref ast) = global.parser.parse_program(&tokens, &program_lines, true)
             {
-                return (ast_to_dict(ast), false);
+                (ast_to_dict(ast), false)
             }
             else
             {

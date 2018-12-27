@@ -8,11 +8,11 @@ pub fn slice(text : &str, start : i64, end : i64) -> String
     
     if u_start >= chars.len()
     {
-        return "".to_string();
+        "".to_string()
     }
     else
     {
-        return chars[u_start..u_end].into_iter().collect();
+        chars[u_start..u_end].into_iter().collect()
     }
 }
 
@@ -26,23 +26,20 @@ pub fn unescape(text: &str) -> String
         {
             ret.push(c);
         }
-        else
+        else if let Some(c2) = chars.pop_front()
         {
-            if let Some(c2) = chars.pop_front()
+            match c2
             {
-                match c2
-                {
-                    '\\' => {ret.push(c);}
-                    'n' => {ret.push('\n');}
-                    'r' => {ret.push('\r');}
-                    't' => {ret.push('\t');}
-                    '"' => {ret.push('"');}
-                    _ => {ret.push(c); ret.push(c2);}
-                }
+                '\\' => {ret.push(c);}
+                'n' => {ret.push('\n');}
+                'r' => {ret.push('\r');}
+                't' => {ret.push('\t');}
+                '"' => {ret.push('"');}
+                _ => {ret.push(c); ret.push(c2);}
             }
         }
     }
-    return ret;
+    ret
 }
 
 pub fn escape(text: &str) -> String
@@ -61,5 +58,5 @@ pub fn escape(text: &str) -> String
             _ => {ret.push(c);}
         }
     }
-    return ret;
+    ret
 }

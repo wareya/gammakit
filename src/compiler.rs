@@ -806,11 +806,11 @@ pub fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Vec<u8>
                 }
             }
         }
-        return code;
+        code
     }
 }
 
 pub fn compile_bytecode(ast : &ASTNode) -> Vec<u8>
 {
-    return compile_astnode(ast, 0);
+    compile_astnode(ast, 0)
 }

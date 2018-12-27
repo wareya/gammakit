@@ -23,7 +23,7 @@ pub struct OpData {
 
 pub fn dummy_opdata() -> OpData
 {
-    return OpData{isop: false, assoc: 0, precedence: 0};
+    OpData{isop: false, assoc: 0, precedence: 0}
 }
 
 #[derive(Clone)]
@@ -38,7 +38,7 @@ pub struct ASTNode {
 
 pub fn dummy_astnode() -> ASTNode
 {
-    return ASTNode{text: "".to_string(), line: 0, position: 0, isparent: false, children: Vec::new(), opdata: dummy_opdata()};
+    ASTNode{text: "".to_string(), line: 0, position: 0, isparent: false, children: Vec::new(), opdata: dummy_opdata()}
 }
 
 pub fn print_ast_node(ast : &ASTNode, depth : usize)

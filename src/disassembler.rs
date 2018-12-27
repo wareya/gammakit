@@ -463,7 +463,7 @@ fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>)
             put_lit!("<unknown>");
         }
     }
-    return pc;
+    pc
 }
 
 pub fn disassemble_bytecode(code : &[u8], mut pc : usize, mut end : usize) -> Vec<String>
@@ -487,5 +487,5 @@ pub fn disassemble_bytecode(code : &[u8], mut pc : usize, mut end : usize) -> Ve
         pc = disassemble_op(op, code, pc, &mut ret);
     }
     
-    return ret;
+    ret
 }

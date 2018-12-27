@@ -14,12 +14,12 @@ fn unpack_u8(vec : &[u8]) -> u8
 
 pub fn pack_u16(num : u16) -> Vec<u8>
 {
-    return vec!(((num>>8)&0xFF) as u8, (num&0xFF) as u8);
+    vec!(((num>>8)&0xFF) as u8, (num&0xFF) as u8)
 }
 pub fn unpack_u16(vec : &[u8]) -> u16
 {
     assert!(vec.len() == 2);
-    return (vec[1] as u16) | ((vec[0] as u16)<<8);
+    (vec[1] as u16) | ((vec[0] as u16)<<8)
 }
 
 /*
@@ -37,34 +37,31 @@ fn unpack_u32(vec : &Vec<u8>) -> u32
 
 pub fn pack_u64(num : u64) -> Vec<u8>
 {
-    return vec!(((num>>56)&0xFF) as u8, ((num>>48)&0xFF) as u8, ((num>>40)&0xFF) as u8, ((num>>32)&0xFF) as u8,
-                ((num>>24)&0xFF) as u8, ((num>>16)&0xFF) as u8, ((num>> 8)&0xFF) as u8, ((num    )&0xFF) as u8,
-    );
+    vec!(((num>>56)&0xFF) as u8, ((num>>48)&0xFF) as u8, ((num>>40)&0xFF) as u8, ((num>>32)&0xFF) as u8,
+         ((num>>24)&0xFF) as u8, ((num>>16)&0xFF) as u8, ((num>> 8)&0xFF) as u8, ((num    )&0xFF) as u8)
 }
 pub fn unpack_u64(vec : &[u8]) -> u64
 {
     assert!(vec.len() == 8);
-    return ( vec[7] as u64) | ((vec[6] as u64)<<8) | ((vec[5] as u64)<<16) | ((vec[4] as u64)<<24)
-     | ((vec[3] as u64)<<32) | ((vec[2] as u64)<<40) | ((vec[1] as u64)<<48) | ((vec[0] as u64)<<56);
+    (   vec[7] as u64)      | ((vec[6] as u64)<< 8) | ((vec[5] as u64)<<16) | ((vec[4] as u64)<<24)
+    | ((vec[3] as u64)<<32) | ((vec[2] as u64)<<40) | ((vec[1] as u64)<<48) | ((vec[0] as u64)<<56)
+}
+
+pub fn pun_f64_as_u64(num : f64) -> u64
+{
+    unsafe { std::mem::transmute(num) }
 }
 
 pub fn pack_f64(num : f64) -> Vec<u8>
 {
-    let as_u64 : u64 = unsafe { std::mem::transmute(num) };
-    return pack_u64(as_u64);
+    pack_u64(pun_f64_as_u64(num))
 }
 
 pub fn unpack_f64(vec : &[u8]) -> f64
 {
     assert!(vec.len() == 8);
     let num = unpack_u64(vec);
-    let as_f64 = f64::from_bits(num);
-    return as_f64;
-}
-
-pub fn pun_f64_as_u64(num : f64) -> u64
-{
-    unsafe { std::mem::transmute(num) }
+    f64::from_bits(num)
 }
 
 

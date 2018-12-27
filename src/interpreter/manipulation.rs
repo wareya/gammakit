@@ -25,7 +25,7 @@ impl Interpreter
 {
     pub(super) fn get_code(&self) -> Rc<Vec<u8>>
     {
-        return Rc::clone(&self.top_frame.code);
+        Rc::clone(&self.top_frame.code)
     }
     pub(super) fn get_pc(&self) -> usize
     {
@@ -44,13 +44,13 @@ impl Interpreter
     {
         let vec = self.get_code()[self.get_pc()..self.get_pc()+n].to_vec();
         self.add_pc(n);
-        return vec;
+        vec
     }
     pub(super) fn pull_single_from_code(&mut self) -> u8
     {
         let vec = self.get_code()[self.get_pc()];
         self.add_pc(1);
-        return vec;
+        vec
     }
     
     pub(super) fn list_pop_number(&mut self, args : &mut Vec<Value>) -> Result<f64, i32> // second val: 0: no value on stack; 1: value on stack was of the wrong type
@@ -93,11 +93,11 @@ impl Interpreter
         
         if let Ok(res) = std::str::from_utf8(&bytes)
         {
-            return res.to_string();
+            res.to_string()
         }
         else
         {
-            return "".to_string();
+            "".to_string()
         }
     }
     pub(super) fn read_function(&mut self) -> (String, FuncSpec)
@@ -119,7 +119,7 @@ impl Interpreter
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        return (name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location(), impassable : true } );
+        (name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location(), impassable : true } )
     }
     
     pub(super) fn read_lambda(&mut self) -> (HashMap<String, Value>, FuncSpec)
@@ -170,7 +170,7 @@ impl Interpreter
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        return (captures, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location(), impassable : true } );
+        (captures, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location(), impassable : true } )
     }
     
     pub(super) fn stack_pop_number(&mut self) -> Result<f64, i32>
