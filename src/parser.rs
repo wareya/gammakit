@@ -14,19 +14,19 @@ use crate::strings::*;
     
 #[derive(Clone)]
 #[derive(Debug)]
-pub struct ParseError {
+pub (crate) struct ParseError {
     token : usize, // location of the token that caused the error
     expected : HashSet<String>,
 }
 
 impl ParseError {
-    pub fn new(token : usize, text : &str) -> ParseError
+    pub (crate) fn new(token : usize, text : &str) -> ParseError
     {
         ParseError{token, expected : vec!(text.to_string()).into_iter().collect()}
     }
 }
 
-pub fn build_best_error(myself : &mut Option<ParseError>, other : Option<ParseError>)
+pub (crate) fn build_best_error(myself : &mut Option<ParseError>, other : Option<ParseError>)
 {
     if let Some(other) = other
     {
@@ -60,16 +60,16 @@ pub fn build_best_error(myself : &mut Option<ParseError>, other : Option<ParseEr
 }
 #[derive(Clone)]
 pub struct Parser {
-    pub regex_list : Vec<String>,
-    pub symbol_list : Vec<String>,
-    pub text_list : Vec<String>,
+    pub (crate) regex_list : Vec<String>,
+    pub (crate) symbol_list : Vec<String>,
+    pub (crate) text_list : Vec<String>,
     // token matchers are inserted into both sets and vectors, sets to quickly check for duplicate insertion and vectors are for order
-    pub regex_set : HashSet<String>,
-    pub symbol_set : HashSet<String>,
-    pub text_set : HashSet<String>,
+    pub (crate) regex_set : HashSet<String>,
+    pub (crate) symbol_set : HashSet<String>,
+    pub (crate) text_set : HashSet<String>,
     
-    pub nodetypemap: HashMap<String, GrammarPoint>,
-    pub internal_regexes: RegexHolder,
+    pub (crate) nodetypemap: HashMap<String, GrammarPoint>,
+    pub (crate) internal_regexes: RegexHolder,
     inited: bool,
 }
 
@@ -176,7 +176,7 @@ impl Parser {
     }
     
     // FIXME: change it to not be line-based; seek to the next newline instead. necessary for things like strings containing newline literals, which should definitely be supported.
-    pub fn tokenize(&mut self, lines : &[String], silent: bool) -> VecDeque<LexToken>
+    pub (crate) fn tokenize(&mut self, lines : &[String], silent: bool) -> VecDeque<LexToken>
     {
         let start_time = Instant::now();
         

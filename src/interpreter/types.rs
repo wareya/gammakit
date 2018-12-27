@@ -7,25 +7,25 @@ use crate::interpreter::*;
 // internal types
 #[derive(Debug)]
 #[derive(Clone)]
-pub struct ControlData {
-    pub controltype: u8,
-    pub controlpoints: Vec<usize>,
-    pub scopes: u16,
-    pub other: Option<VecDeque<usize>> // in with(), a list of instance IDs
+pub (crate) struct ControlData {
+    pub (crate) controltype: u8,
+    pub (crate) controlpoints: Vec<usize>,
+    pub (crate) scopes: u16,
+    pub (crate) other: Option<VecDeque<usize>> // in with(), a list of instance IDs
 }
-pub struct Frame {
-    pub code: Rc<Vec<u8>>,
-    pub startpc: usize,
-    pub pc: usize,
-    pub endpc: usize,
-    pub scopes: Vec<HashMap<String, Value>>,
-    pub scopestarts: Vec<usize>,
-    pub instancestack: Vec<usize>,
-    pub controlstack: Vec<ControlData>,
-    pub stack: Vec<Value>,
-    pub isexpr: bool,
-    pub currline: usize,
-    pub impassable: bool,
+pub (crate) struct Frame {
+    pub (crate) code: Rc<Vec<u8>>,
+    pub (crate) startpc: usize,
+    pub (crate) pc: usize,
+    pub (crate) endpc: usize,
+    pub (crate) scopes: Vec<HashMap<String, Value>>,
+    pub (crate) scopestarts: Vec<usize>,
+    pub (crate) instancestack: Vec<usize>,
+    pub (crate) controlstack: Vec<ControlData>,
+    pub (crate) stack: Vec<Value>,
+    pub (crate) isexpr: bool,
+    pub (crate) currline: usize,
+    pub (crate) impassable: bool,
 }
 impl Frame {
     pub (crate) fn new_root(code : Rc<Vec<u8>>) -> Frame
@@ -41,11 +41,11 @@ impl Frame {
 
 #[derive(Clone)]
 #[derive(Debug)]
-pub struct FrameIdentity {
-    pub code: Weak<Vec<u8>>,
-    pub startpc: usize,
-    pub endpc: usize,
-    pub scopestarts: Vec<usize>,
+pub (crate) struct FrameIdentity {
+    pub (crate) code: Weak<Vec<u8>>,
+    pub (crate) startpc: usize,
+    pub (crate) endpc: usize,
+    pub (crate) scopestarts: Vec<usize>,
 }
 
 impl FrameIdentity {
@@ -57,55 +57,63 @@ impl FrameIdentity {
 
 #[derive(Clone)]
 #[derive(Debug)]
-pub struct FuncSpecLocation {
-    pub outer_frames : Vec<FrameIdentity>,
-    pub top_frame : FrameIdentity,
+pub (crate) struct FuncSpecLocation {
+    pub (crate) outer_frames : Vec<FrameIdentity>,
+    pub (crate) top_frame : FrameIdentity,
 }
-
 
 // inaccessible types
 #[derive(Debug)]
 #[derive(Clone)]
-pub struct FuncSpec {
-    pub varnames: Vec<String>,
-    pub code: Rc<Vec<u8>>,
-    pub startaddr: usize,
-    pub endaddr: usize,
-    pub fromobj: bool,
-    pub parentobj: usize,
-    pub forcecontext: usize,
-    pub location: FuncSpecLocation,
-    pub impassable: bool,
+pub (crate) struct FuncSpec {
+    pub (crate) varnames: Vec<String>,
+    pub (crate) code: Rc<Vec<u8>>,
+    pub (crate) startaddr: usize,
+    pub (crate) endaddr: usize,
+    pub (crate) fromobj: bool,
+    pub (crate) parentobj: usize,
+    pub (crate) forcecontext: usize,
+    pub (crate) location: FuncSpecLocation,
+    pub (crate) impassable: bool,
 }
-pub struct ObjSpec {
+pub (crate) struct ObjSpec {
     #[allow(unused)]
-    pub ident: usize,
-    pub name: String,
-    pub functions: HashMap<String, FuncSpec>
+    pub (crate) ident: usize,
+    pub (crate) name: String,
+    pub (crate) functions: HashMap<String, FuncSpec>
 }
-pub struct Instance {
-    pub objtype: usize,
-    pub ident: usize,
-    pub variables: HashMap<String, Value>
+pub (crate) struct Instance {
+    pub (crate) objtype: usize,
+    pub (crate) ident: usize,
+    pub (crate) variables: HashMap<String, Value>
+}
+
+// internal to ArrayVar
+#[derive(Debug)]
+#[derive(Clone)]
+pub (crate) enum NonArrayVariable {
+    Indirect(IndirectVar), // x.y.z evaluates x.y before storing it as the instance identity under which to find y
+    Direct(DirectVar),
+    ActualArray(VecDeque<Value>) // for situations where the compiler doesn't know that EVALUATE is unnecessary, like func()[0]
 }
 
 // variable types (i.e. how to access a variable as an lvalue)
 #[derive(Debug)]
 #[derive(Clone)]
 pub struct ArrayVar { // for x[y]
-    pub location: NonArrayVariable,
-    pub indexes: Vec<Value>
+    pub (crate) location: NonArrayVariable,
+    pub (crate) indexes: Vec<Value>
 }
 #[derive(Debug)]
 #[derive(Clone)]
 pub struct IndirectVar { // for x.y
-    pub ident: usize, // id of an instance
-    pub name: String
+    pub (crate) ident: usize, // id of an instance
+    pub (crate) name: String
 }
 #[derive(Debug)]
 #[derive(Clone)]
 pub struct DirectVar { // for x
-    pub name: String
+    pub (crate) name: String
 }
 #[derive(Debug)]
 #[derive(Clone)]
@@ -114,22 +122,15 @@ pub enum Variable {
     Indirect(IndirectVar),
     Direct(DirectVar)
 }
-#[derive(Debug)]
-#[derive(Clone)]
-pub enum NonArrayVariable {
-    Indirect(IndirectVar), // x.y.z evaluates x.y before storing it as the instance identity under which to find y
-    Direct(DirectVar),
-    ActualArray(VecDeque<Value>) // for situations where the compiler doesn't know that EVALUATE is unnecessary, like func()[0]
-}
 
 // value types
 #[derive(Debug)]
 #[derive(Clone)]
 pub struct FuncVal {
-    pub internal: bool,
-    pub name: Option<String>,
-    pub predefined: Option<HashMap<String, Value>>,
-    pub userdefdata: Option<FuncSpec>
+    pub (crate) internal: bool,
+    pub (crate) name: Option<String>,
+    pub (crate) predefined: Option<HashMap<String, Value>>,
+    pub (crate) userdefdata: Option<FuncSpec>
 }
 #[derive(Debug)]
 #[derive(Clone)]

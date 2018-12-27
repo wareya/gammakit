@@ -3,17 +3,17 @@ use std::collections::HashMap;
 use regex::Regex;
 
 #[derive(Clone)]
-pub struct RegexHolder {
+pub (crate) struct RegexHolder {
     exact_regexes : HashMap<String, Result<Regex, regex::Error>>,
     regexes : HashMap<String, Result<Regex, regex::Error>>
 }
 
 impl RegexHolder {
-    pub fn new() -> RegexHolder
+    pub (crate) fn new() -> RegexHolder
     {
         RegexHolder { exact_regexes: HashMap::new(), regexes : HashMap::new() }
     }
-    pub fn prepare_exact(&mut self, regex_text : &str)
+    pub (crate) fn prepare_exact(&mut self, regex_text : &str)
     {
         if self.exact_regexes.contains_key(regex_text)
         {
@@ -23,7 +23,7 @@ impl RegexHolder {
         self.exact_regexes.insert(regex_text.to_string(), regex);
     }
     #[allow(clippy::wrong_self_convention)]
-    pub fn is_exact(&mut self, regex_text : &str, text : &str) -> bool
+    pub (crate) fn is_exact(&mut self, regex_text : &str, text : &str) -> bool
     {
         if let Some(regex) = self.exact_regexes.get(regex_text)
         {
@@ -33,7 +33,7 @@ impl RegexHolder {
         self.exact_regexes.insert(regex_text.to_string(), regex);
         self.is_exact(regex_text, text)
     }
-    pub fn is_exact_immut(& self, regex_text : &str, text : &str) -> bool
+    pub (crate) fn is_exact_immut(& self, regex_text : &str, text : &str) -> bool
     {
         if let Some(regex) = self.exact_regexes.get(regex_text)
         {
@@ -59,7 +59,7 @@ impl RegexHolder {
     assert!(re.find_at(mystr, 0).unwrap().start() == 0);
     assert!(re.find_at(mystr, 3).unwrap().start() == 3);
     */
-    pub fn match_at(&mut self, regex_text : &str, text : &str, start : usize) -> Option<String>
+    pub (crate) fn match_at(&mut self, regex_text : &str, text : &str, start : usize) -> Option<String>
     {
         if let Some(regex) = self.regexes.get(regex_text)
         {

@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-pub fn slice(text : &str, start : i64, end : i64) -> String
+pub (crate) fn slice(text : &str, start : i64, end : i64) -> String
 {
     let chars : Vec<char> = text.chars().collect();
     let u_start = if start < 0 {chars.len() - (-start as usize)} else {start as usize};
@@ -16,7 +16,7 @@ pub fn slice(text : &str, start : i64, end : i64) -> String
     }
 }
 
-pub fn unescape(text: &str) -> String
+pub (crate) fn unescape(text: &str) -> String
 {
     let mut ret = String::with_capacity(text.len());
     let mut chars : VecDeque<char> = text.chars().collect();
@@ -42,7 +42,7 @@ pub fn unescape(text: &str) -> String
     ret
 }
 
-pub fn escape(text: &str) -> String
+pub (crate) fn escape(text: &str) -> String
 {
     let mut ret = String::with_capacity(text.len());
     let mut chars : VecDeque<char> = text.chars().collect();

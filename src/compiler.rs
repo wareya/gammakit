@@ -6,7 +6,7 @@ use super::strings::*;
 use super::ast::*;
 use super::bytecode::*;
 
-pub fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize)
+fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize)
 {
     code.push(LINENUM);
     code.extend(pack_u64(ast.line as u64));
@@ -672,7 +672,7 @@ fn compile_lhunop(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize)
         }
     }
 }
-pub fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Vec<u8>
+fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Vec<u8>
 {
     if !ast.isparent
     {
@@ -810,7 +810,7 @@ pub fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Vec<u8>
     }
 }
 
-pub fn compile_bytecode(ast : &ASTNode) -> Vec<u8>
+pub (crate) fn compile_bytecode(ast : &ASTNode) -> Vec<u8>
 {
     compile_astnode(ast, 0)
 }
