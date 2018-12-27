@@ -2,7 +2,7 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
-    pub(super) fn build_funcspec_location(&self) -> FuncSpecLocation
+    pub (crate) fn build_funcspec_location(&self) -> FuncSpecLocation
     {
         let mut outer_frames = Vec::<FrameIdentity>::new();
         for frame in &self.frames
@@ -12,7 +12,7 @@ impl Interpreter
         FuncSpecLocation { outer_frames, top_frame : FrameIdentity::new(&self.top_frame) }
     }
     
-    pub(super) fn handle_func_call_or_expr(&mut self, global : &mut GlobalState, isexpr : bool)
+    pub (crate) fn handle_func_call_or_expr(&mut self, global : &mut GlobalState, isexpr : bool)
     {
         if let Some(funcdata) = self.top_frame.stack.pop()
         {

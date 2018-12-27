@@ -23,45 +23,45 @@ macro_rules! list_pop_generic {
 
 impl Interpreter
 {
-    pub(super) fn get_code(&self) -> Rc<Vec<u8>>
+    pub (crate) fn get_code(&self) -> Rc<Vec<u8>>
     {
         Rc::clone(&self.top_frame.code)
     }
-    pub(super) fn get_pc(&self) -> usize
+    pub (crate) fn get_pc(&self) -> usize
     {
         self.top_frame.pc
     }
-    pub(super) fn set_pc(&mut self, new : usize)
+    pub (crate) fn set_pc(&mut self, new : usize)
     {
         self.top_frame.pc = new;
     }
-    pub(super) fn add_pc(&mut self, new : usize)
+    pub (crate) fn add_pc(&mut self, new : usize)
     {
         self.top_frame.pc += new;
     }
     
-    pub(super) fn pull_from_code(&mut self, n : usize) -> Vec<u8>
+    pub (crate) fn pull_from_code(&mut self, n : usize) -> Vec<u8>
     {
         let vec = self.get_code()[self.get_pc()..self.get_pc()+n].to_vec();
         self.add_pc(n);
         vec
     }
-    pub(super) fn pull_single_from_code(&mut self) -> u8
+    pub (crate) fn pull_single_from_code(&mut self) -> u8
     {
         let vec = self.get_code()[self.get_pc()];
         self.add_pc(1);
         vec
     }
     
-    pub(super) fn list_pop_number(&mut self, args : &mut Vec<Value>) -> Result<f64, i32> // second val: 0: no value on stack; 1: value on stack was of the wrong type
+    pub (crate) fn list_pop_number(&mut self, args : &mut Vec<Value>) -> Result<f64, i32> // second val: 0: no value on stack; 1: value on stack was of the wrong type
     {
         list_pop_generic!(args, Number)
     }
-    pub(super) fn list_pop_text(&mut self, args : &mut Vec<Value>) -> Result<String, i32>
+    pub (crate) fn list_pop_text(&mut self, args : &mut Vec<Value>) -> Result<String, i32>
     {
         list_pop_generic!(args, Text)
     }
-    pub(super) fn list_pop_func(&mut self, args : &mut Vec<Value>) -> Result<FuncVal, i32>
+    pub (crate) fn list_pop_func(&mut self, args : &mut Vec<Value>) -> Result<FuncVal, i32>
     {
         match list_pop_generic!(args, Func)
         {
@@ -69,12 +69,12 @@ impl Interpreter
             Err(e) => Err(e)
         }
     }
-    pub(super) fn list_pop_dict(&mut self, args : &mut Vec<Value>) -> Result<HashMap<HashableValue, Value>, i32>
+    pub (crate) fn list_pop_dict(&mut self, args : &mut Vec<Value>) -> Result<HashMap<HashableValue, Value>, i32>
     {
         list_pop_generic!(args, Dict)
     }
     
-    pub(super) fn read_string(&mut self) -> String
+    pub (crate) fn read_string(&mut self) -> String
     {
         let code = self.get_code();
         if self.get_pc() >= code.len()
@@ -100,7 +100,7 @@ impl Interpreter
             "".to_string()
         }
     }
-    pub(super) fn read_function(&mut self) -> (String, FuncSpec)
+    pub (crate) fn read_function(&mut self) -> (String, FuncSpec)
     {
         let code = self.get_code();
         
@@ -122,7 +122,7 @@ impl Interpreter
         (name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location(), impassable : true } )
     }
     
-    pub(super) fn read_lambda(&mut self) -> (HashMap<String, Value>, FuncSpec)
+    pub (crate) fn read_lambda(&mut self) -> (HashMap<String, Value>, FuncSpec)
     {
         let code = self.get_code();
         
@@ -173,11 +173,11 @@ impl Interpreter
         (captures, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location(), impassable : true } )
     }
     
-    pub(super) fn stack_pop_number(&mut self) -> Result<f64, i32>
+    pub (crate) fn stack_pop_number(&mut self) -> Result<f64, i32>
     {
         list_pop_generic!(self.top_frame.stack, Number)
     }
-    pub(super) fn stack_pop_text(&mut self) -> Result<String, i32>
+    pub (crate) fn stack_pop_text(&mut self) -> Result<String, i32>
     {
         list_pop_generic!(self.top_frame.stack, Text)
     }
@@ -187,7 +187,7 @@ impl Interpreter
         list_pop_generic!(self.top_frame.stack, Var)
     }
     */
-    pub(super) fn stack_pop_name(&mut self) -> Result<String, i32>
+    pub (crate) fn stack_pop_name(&mut self) -> Result<String, i32>
     {
         let var = list_pop_generic!(self.top_frame.stack, Var)?;
         if let Variable::Direct(DirectVar{name:text}) = var
@@ -199,7 +199,7 @@ impl Interpreter
             Err(1)
         }
     }
-    pub(super) fn stack_pop_any(&mut self) -> Result<Value, i32>
+    pub (crate) fn stack_pop_any(&mut self) -> Result<Value, i32>
     {
         if let Some(val) = self.top_frame.stack.pop()
         {
@@ -211,7 +211,7 @@ impl Interpreter
         }
     }
     
-    pub(super) fn drain_scopes(&mut self, desired_depth : u16)
+    pub (crate) fn drain_scopes(&mut self, desired_depth : u16)
     {
         while self.top_frame.scopes.len() > desired_depth as usize
         {
@@ -219,7 +219,7 @@ impl Interpreter
             self.top_frame.scopestarts.pop();
         }
     }
-    pub(super) fn pop_controlstack_until_loop(&mut self)
+    pub (crate) fn pop_controlstack_until_loop(&mut self)
     {
         let mut foundloop = false;
         

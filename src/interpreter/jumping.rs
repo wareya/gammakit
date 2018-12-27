@@ -2,7 +2,7 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
-    pub(super) fn jump_to_function(&mut self, function : &FuncSpec, mut args : Vec<Value>, isexpr : bool, funcdata : &FuncVal)
+    pub (crate) fn jump_to_function(&mut self, function : &FuncSpec, mut args : Vec<Value>, isexpr : bool, funcdata : &FuncVal)
     {
         if function.varnames.len() > args.len()
         {
@@ -47,7 +47,7 @@ impl Interpreter
             panic!("internal error: no scope in top frame despite just making it in jump_to_function (this error should be unreachable!)");
         }
     }
-    pub(super) fn call_function(&mut self, global : &mut GlobalState, funcdata : FuncVal, args : Vec<Value>, isexpr : bool)
+    pub (crate) fn call_function(&mut self, global : &mut GlobalState, funcdata : FuncVal, args : Vec<Value>, isexpr : bool)
     {
         if funcdata.internal
         {

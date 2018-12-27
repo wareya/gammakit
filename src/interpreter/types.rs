@@ -28,12 +28,12 @@ pub struct Frame {
     pub impassable: bool,
 }
 impl Frame {
-    pub(crate) fn new_root(code : Rc<Vec<u8>>) -> Frame
+    pub (crate) fn new_root(code : Rc<Vec<u8>>) -> Frame
     {
         let codelen = code.len();
         Frame { code, startpc : 0, pc : 0, endpc : codelen, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0, impassable: true }
     }
-    pub(crate) fn new_from_call(code : Rc<Vec<u8>>, startpc : usize, endpc : usize, isexpr : bool, impassable : bool) -> Frame
+    pub (crate) fn new_from_call(code : Rc<Vec<u8>>, startpc : usize, endpc : usize, isexpr : bool, impassable : bool) -> Frame
     {
         Frame { code, startpc, pc : startpc, endpc, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, impassable }
     }
@@ -49,7 +49,7 @@ pub struct FrameIdentity {
 }
 
 impl FrameIdentity {
-    pub(crate) fn new(frame : &Frame) -> FrameIdentity
+    pub (crate) fn new(frame : &Frame) -> FrameIdentity
     {
         FrameIdentity { code : Rc::downgrade(&frame.code), startpc : frame.startpc, endpc : frame.endpc, scopestarts : frame.scopestarts.clone() }
     }
@@ -144,7 +144,7 @@ pub enum Value {
 
 impl Value
 {
-    pub(super) fn new_funcval(internal : bool, name : Option<String>, predefined : Option<HashMap<String, Value>>, userdefdata : Option<FuncSpec>) -> Value
+    pub (crate) fn new_funcval(internal : bool, name : Option<String>, predefined : Option<HashMap<String, Value>>, userdefdata : Option<FuncSpec>) -> Value
     {
         Value::Func(Box::new(FuncVal{internal, name, predefined, userdefdata}))
     }
@@ -157,7 +157,7 @@ pub enum HashableValue {
     Text(String),
 }
 
-pub(super) fn hashval_to_val(hashval : &HashableValue) -> Value
+pub (crate) fn hashval_to_val(hashval : &HashableValue) -> Value
 {
     match hashval
     {
@@ -202,7 +202,7 @@ impl std::cmp::PartialEq for HashableValue {
 
 impl std::cmp::Eq for HashableValue { }
 
-pub(super) fn format_val(val : &Value) -> Option<String>
+pub (crate) fn format_val(val : &Value) -> Option<String>
 {
     match val
     {
@@ -285,7 +285,7 @@ pub(super) fn format_val(val : &Value) -> Option<String>
     }
 }
 
-pub(super) fn value_op_add(left : &Value, right : &Value) -> Result<Value, String>
+pub (crate) fn value_op_add(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -300,7 +300,7 @@ pub(super) fn value_op_add(left : &Value, right : &Value) -> Result<Value, Strin
         }
     }
 }
-pub(super) fn value_op_subtract(left : &Value, right : &Value) -> Result<Value, String>
+pub (crate) fn value_op_subtract(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -314,7 +314,7 @@ pub(super) fn value_op_subtract(left : &Value, right : &Value) -> Result<Value, 
         }
     }
 }
-pub(super) fn value_op_multiply(left : &Value, right : &Value) -> Result<Value, String>
+pub (crate) fn value_op_multiply(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -328,7 +328,7 @@ pub(super) fn value_op_multiply(left : &Value, right : &Value) -> Result<Value, 
         }
     }
 }
-pub(super) fn value_op_divide(left : &Value, right : &Value) -> Result<Value, String>
+pub (crate) fn value_op_divide(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -342,7 +342,7 @@ pub(super) fn value_op_divide(left : &Value, right : &Value) -> Result<Value, St
         }
     }
 }
-pub(super) fn value_op_modulo(left : &Value, right : &Value) -> Result<Value, String>
+pub (crate) fn value_op_modulo(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -364,15 +364,15 @@ pub(super) fn value_op_modulo(left : &Value, right : &Value) -> Result<Value, St
         }
     }
 }
-pub(super) fn float_booly(f : f64) -> bool
+pub (crate) fn float_booly(f : f64) -> bool
 {
     f >= 0.5 // FIXME do we want to replicate this or can we get away with using f.round() != 0.0 instead?
 }
-pub(super) fn bool_floaty(b : bool) -> f64
+pub (crate) fn bool_floaty(b : bool) -> f64
 {
     if b {1.0} else {0.0}
 }
-pub(super) fn value_op_equal(left : &Value, right : &Value) -> Result<Value, String>
+pub (crate) fn value_op_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -390,7 +390,7 @@ pub(super) fn value_op_equal(left : &Value, right : &Value) -> Result<Value, Str
         }
     }
 }
-pub(super) fn value_op_not_equal(left : &Value, right : &Value) -> Result<Value, String>
+pub (crate) fn value_op_not_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -409,7 +409,7 @@ pub(super) fn value_op_not_equal(left : &Value, right : &Value) -> Result<Value,
         }
     }
 }
-pub(super) fn value_op_greater_or_equal(left : &Value, right : &Value) -> Result<Value, String>
+pub (crate) fn value_op_greater_or_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -424,7 +424,7 @@ pub(super) fn value_op_greater_or_equal(left : &Value, right : &Value) -> Result
         }
     }
 }
-pub(super) fn value_op_less_or_equal(left : &Value, right : &Value) -> Result<Value, String>
+pub (crate) fn value_op_less_or_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -439,7 +439,7 @@ pub(super) fn value_op_less_or_equal(left : &Value, right : &Value) -> Result<Va
         }
     }
 }
-pub(super) fn value_op_greater(left : &Value, right : &Value) -> Result<Value, String>
+pub (crate) fn value_op_greater(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -454,7 +454,7 @@ pub(super) fn value_op_greater(left : &Value, right : &Value) -> Result<Value, S
         }
     }
 }
-pub(super) fn value_op_less(left : &Value, right : &Value) -> Result<Value, String>
+pub (crate) fn value_op_less(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -469,7 +469,7 @@ pub(super) fn value_op_less(left : &Value, right : &Value) -> Result<Value, Stri
         }
     }
 }
-pub(super) fn value_op_and(left : &Value, right : &Value) -> Result<Value, String>
+pub (crate) fn value_op_and(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -484,7 +484,7 @@ pub(super) fn value_op_and(left : &Value, right : &Value) -> Result<Value, Strin
         }
     }
 }
-pub(super) fn value_op_or(left : &Value, right : &Value) -> Result<Value, String>
+pub (crate) fn value_op_or(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -519,7 +519,7 @@ BINOP_TYPES = \
 }
 */
 
-pub(super) fn get_binop_function(op : u8) -> Option<Box<Fn(&Value, &Value) -> Result<Value, String>>>
+pub (crate) fn get_binop_function(op : u8) -> Option<Box<Fn(&Value, &Value) -> Result<Value, String>>>
 {
     macro_rules! enbox {
         ( $x:ident ) =>
@@ -546,7 +546,7 @@ pub(super) fn get_binop_function(op : u8) -> Option<Box<Fn(&Value, &Value) -> Re
     }
 }
 
-pub(super) fn value_op_negative(value : &Value) -> Result<Value, String>
+pub (crate) fn value_op_negative(value : &Value) -> Result<Value, String>
 {
     match value
     {
@@ -560,7 +560,7 @@ pub(super) fn value_op_negative(value : &Value) -> Result<Value, String>
         }
     }
 }
-pub(super) fn value_op_positive(value : &Value) -> Result<Value, String>
+pub (crate) fn value_op_positive(value : &Value) -> Result<Value, String>
 {
     match value
     {
@@ -574,7 +574,7 @@ pub(super) fn value_op_positive(value : &Value) -> Result<Value, String>
         }
     }
 }
-pub(super) fn value_op_not(value : &Value) -> Result<Value, String>
+pub (crate) fn value_op_not(value : &Value) -> Result<Value, String>
 {
     match value
     {
@@ -589,7 +589,7 @@ pub(super) fn value_op_not(value : &Value) -> Result<Value, String>
     }
 }
 
-pub(super) fn get_unop_function(op : u8) -> Option<Box<Fn(&Value) -> Result<Value, String>>>
+pub (crate) fn get_unop_function(op : u8) -> Option<Box<Fn(&Value) -> Result<Value, String>>>
 {
     macro_rules! enbox {
         ( $x:ident ) =>
@@ -607,7 +607,7 @@ pub(super) fn get_unop_function(op : u8) -> Option<Box<Fn(&Value) -> Result<Valu
     }
 }
 
-pub(super) fn value_truthy(imm : &Value) -> bool
+pub (crate) fn value_truthy(imm : &Value) -> bool
 {
     match imm
     {
@@ -622,7 +622,7 @@ pub(super) fn value_truthy(imm : &Value) -> bool
     }
 }
 
-pub(super) fn ast_to_dict(ast : &ASTNode) -> Value
+pub (crate) fn ast_to_dict(ast : &ASTNode) -> Value
 {
     let mut astdict = HashMap::<HashableValue, Value>::new();
     
@@ -666,7 +666,7 @@ pub(super) fn ast_to_dict(ast : &ASTNode) -> Value
     Value::Dict(astdict)
 }
 
-pub(super) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> ASTNode
+pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> ASTNode
 {
     let mut ast = dummy_astnode();
     

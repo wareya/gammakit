@@ -399,7 +399,7 @@ impl Interpreter
         panic!("error: unknown identifier `{}`", dirvar.name);
     }
     // if value is None, finds and returns appropriate value; otherwise, stores value and returns None
-    pub(super) fn evaluate_or_store(&mut self, global : &mut GlobalState, variable : &Variable, value : Option<Value>) -> Option<Value>
+    pub (crate) fn evaluate_or_store(&mut self, global : &mut GlobalState, variable : &Variable, value : Option<Value>) -> Option<Value>
     {
         match &variable
         {

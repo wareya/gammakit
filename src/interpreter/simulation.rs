@@ -5,7 +5,7 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
-    pub(super) fn get_opfunc(&mut self, op : u8) -> Option<Box<Fn(&mut Interpreter, &mut GlobalState)>>
+    pub (crate) fn get_opfunc(&mut self, op : u8) -> Option<Box<Fn(&mut Interpreter, &mut GlobalState)>>
     {
         macro_rules! enbox {
             ( $x:ident ) =>
@@ -53,36 +53,36 @@ impl Interpreter
     }
     
     #[allow(non_snake_case)] 
-    pub(super) fn sim_NOP(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_NOP(&mut self, _global : &mut GlobalState)
     {
         
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_PUSHFLT(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_PUSHFLT(&mut self, _global : &mut GlobalState)
     {
         let value = unpack_f64(&self.pull_from_code(8));
         self.top_frame.stack.push(Value::Number(value));
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_PUSHSHORT(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_PUSHSHORT(&mut self, _global : &mut GlobalState)
     {
         let value = unpack_u16(&self.pull_from_code(2));
         self.top_frame.stack.push(Value::Number(value as f64));
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_PUSHSTR(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_PUSHSTR(&mut self, _global : &mut GlobalState)
     {
         let text = self.read_string();
         self.top_frame.stack.push(Value::Text(text));
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_PUSHNAME(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_PUSHNAME(&mut self, _global : &mut GlobalState)
     {
         let text = self.read_string();
         self.top_frame.stack.push(Value::Var(Variable::Direct(DirectVar{name:text})));
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_PUSHVAR(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_PUSHVAR(&mut self, global : &mut GlobalState)
     {
         let name = self.read_string();
         let dirvar = Variable::Direct(DirectVar{name : name.clone()}); // FIXME suboptimal but helps error message
@@ -96,7 +96,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_DECLVAR(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_DECLVAR(&mut self, _global : &mut GlobalState)
     {
         if self.top_frame.stack.is_empty()
         {
@@ -124,7 +124,7 @@ impl Interpreter
     }
     
     #[allow(non_snake_case)]
-    pub(super) fn sim_DECLFAR(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_DECLFAR(&mut self, global : &mut GlobalState)
     {
         if self.top_frame.stack.is_empty()
         {
@@ -162,7 +162,7 @@ impl Interpreter
     }
     
     #[allow(non_snake_case)]
-    pub(super) fn sim_INDIRECTION(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_INDIRECTION(&mut self, global : &mut GlobalState)
     {
         if self.top_frame.stack.len() < 2
         {
@@ -194,7 +194,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_EVALUATION(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_EVALUATION(&mut self, global : &mut GlobalState)
     {
         if let Some(val) = self.top_frame.stack.pop()
         {
@@ -234,18 +234,18 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_FUNCCALL(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_FUNCCALL(&mut self, global : &mut GlobalState)
     {
         self.handle_func_call_or_expr(global, false);
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_FUNCEXPR(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_FUNCEXPR(&mut self, global : &mut GlobalState)
     {
         self.handle_func_call_or_expr(global, true);
     }
     
     #[allow(non_snake_case)]
-    pub(super) fn sim_SCOPE(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_SCOPE(&mut self, _global : &mut GlobalState)
     {
         self.top_frame.scopes.push(HashMap::new());
         let here = self.get_pc();
@@ -256,14 +256,14 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_UNSCOPE(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_UNSCOPE(&mut self, _global : &mut GlobalState)
     {
         let immediate = unpack_u16(&self.pull_from_code(2)) as usize;
         
         self.drain_scopes((immediate+1) as u16);
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_BREAK(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_BREAK(&mut self, _global : &mut GlobalState)
     {
         self.pop_controlstack_until_loop();
         
@@ -292,7 +292,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_CONTINUE(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_CONTINUE(&mut self, _global : &mut GlobalState)
     {
         self.pop_controlstack_until_loop();
         
@@ -320,7 +320,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_IF(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_IF(&mut self, _global : &mut GlobalState)
     {
         let exprlen = unpack_u64(&self.pull_from_code(8)) as usize;
         let codelen = unpack_u64(&self.pull_from_code(8)) as usize;
@@ -329,7 +329,7 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : IF, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen), scopes : scopelen, other : None});
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_IFELSE(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_IFELSE(&mut self, _global : &mut GlobalState)
     {
         let exprlen = unpack_u64(&self.pull_from_code(8)) as usize;
         let codelen1 = unpack_u64(&self.pull_from_code(8)) as usize;
@@ -339,7 +339,7 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : IFELSE, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen1, current_pc+exprlen+codelen1+codelen2), scopes : scopelen, other : None});
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_WHILE(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_WHILE(&mut self, _global : &mut GlobalState)
     {
         let exprlen = unpack_u64(&self.pull_from_code(8)) as usize;
         let codelen = unpack_u64(&self.pull_from_code(8)) as usize;
@@ -348,7 +348,7 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : WHILE, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+codelen), scopes : scopelen, other : None});
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_FOR(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_FOR(&mut self, _global : &mut GlobalState)
     {
         let exprlen = unpack_u64(&self.pull_from_code(8)) as usize;
         let postlen = unpack_u64(&self.pull_from_code(8)) as usize;
@@ -358,7 +358,7 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : FOR, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+postlen, current_pc+exprlen+postlen+codelen), scopes : scopelen, other : None});
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_WITH(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_WITH(&mut self, global : &mut GlobalState)
     {
         if self.top_frame.stack.is_empty()
         {
@@ -405,7 +405,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_FUNCDEF(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_FUNCDEF(&mut self, _global : &mut GlobalState)
     {
         let (funcname, myfuncspec) = self.read_function();
         if let Some(scope) = self.top_frame.scopes.last_mut()
@@ -424,7 +424,7 @@ impl Interpreter
     }
     
     #[allow(non_snake_case)]
-    pub(super) fn sim_BINSTATE(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_BINSTATE(&mut self, global : &mut GlobalState)
     {
         if self.top_frame.stack.len() < 2
         {
@@ -487,7 +487,7 @@ impl Interpreter
     }
     
     #[allow(non_snake_case)]
-    pub(super) fn sim_BINOP(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_BINOP(&mut self, _global : &mut GlobalState)
     {
         if self.top_frame.stack.len() < 2
         {
@@ -531,7 +531,7 @@ impl Interpreter
     }
     
     #[allow(non_snake_case)]
-    pub(super) fn sim_UNOP(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_UNOP(&mut self, _global : &mut GlobalState)
     {
         if self.top_frame.stack.is_empty()
         {
@@ -567,13 +567,13 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_LAMBDA(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_LAMBDA(&mut self, _global : &mut GlobalState)
     {
         let (captures, myfuncspec) = self.read_lambda();
         self.top_frame.stack.push(Value::new_funcval(false, Some("lambda_self".to_string()), Some(captures), Some(myfuncspec)));
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_OBJDEF(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_OBJDEF(&mut self, global : &mut GlobalState)
     {
         let name = self.read_string();
         if global.objectnames.contains_key(&name)
@@ -604,7 +604,7 @@ impl Interpreter
         global.object_id += 1;
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_COLLECTARRAY(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_COLLECTARRAY(&mut self, _global : &mut GlobalState)
     {
         let numvals = unpack_u16(&self.pull_from_code(2)) as usize;
         if self.top_frame.stack.len() < numvals
@@ -626,7 +626,7 @@ impl Interpreter
         self.top_frame.stack.push(Value::Array(myarray));
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_COLLECTDICT(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_COLLECTDICT(&mut self, _global : &mut GlobalState)
     {
         let numvals = unpack_u16(&self.pull_from_code(2)) as usize;
         if self.top_frame.stack.len() < numvals*2
@@ -678,7 +678,7 @@ impl Interpreter
         self.top_frame.stack.push(Value::Dict(mydict));
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_ARRAYEXPR(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_ARRAYEXPR(&mut self, _global : &mut GlobalState)
     {
         if self.top_frame.stack.len() < 2
         {
@@ -725,7 +725,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_EXIT(&mut self, _global : &mut GlobalState) // an exit is a return with no value
+    pub (crate) fn sim_EXIT(&mut self, _global : &mut GlobalState) // an exit is a return with no value
     {
         if let Some(top_frame) = self.frames.pop()
         {
@@ -743,7 +743,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_RETURN(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_RETURN(&mut self, _global : &mut GlobalState)
     {
         if let Some(old_frame) = self.frames.pop()
         {
@@ -770,7 +770,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub(super) fn sim_LINENUM(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_LINENUM(&mut self, _global : &mut GlobalState)
     {
         self.top_frame.currline = unpack_u64(&self.pull_from_code(8)) as usize;
     }

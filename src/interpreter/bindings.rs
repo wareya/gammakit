@@ -17,7 +17,7 @@ impl Interpreter
         self.internal_functions.insert(funcname, func);
     }
     
-    pub(crate) fn insert_default_internal_functions(&mut self)
+    pub (crate) fn insert_default_internal_functions(&mut self)
     {
         macro_rules! enrc {
             ( $y:ident ) =>
@@ -48,7 +48,7 @@ impl Interpreter
         
         insert_noreturn!("instance_execute", sim_func_instance_execute);
     }
-    pub(crate) fn get_internal_function(&self, name : &str) -> Option<Rc<InternalFunction>>
+    pub (crate) fn get_internal_function(&self, name : &str) -> Option<Rc<InternalFunction>>
     {
         match self.internal_functions.get(name)
         {
@@ -56,11 +56,11 @@ impl Interpreter
             None => None
         }
     }
-    pub(crate) fn internal_function_is_noreturn(&mut self, name : &str) -> bool
+    pub (crate) fn internal_function_is_noreturn(&mut self, name : &str) -> bool
     {
         self.internal_functions_noreturn.contains(name)
     }
-    pub(crate) fn sim_func_print(&mut self, _global : &mut GlobalState, args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_print(&mut self, _global : &mut GlobalState, args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         for arg in args
         {
@@ -75,7 +75,7 @@ impl Interpreter
         }
         (Value::Number(0.0), false)
     }
-    pub(crate) fn sim_func_len(&mut self, _global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_len(&mut self, _global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() != 1
         {
@@ -108,7 +108,7 @@ impl Interpreter
             panic!("internal error: failed to read argument for len() despite having the right number of arguments (this error should be unreachable!)");
         }
     }
-    pub(crate) fn sim_func_keys(&mut self, _global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_keys(&mut self, _global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() != 1
         {
@@ -147,7 +147,7 @@ impl Interpreter
             panic!("internal error: failed to read argument for keys() despite having the right number of arguments (this error should be unreachable!)");
         }
     }
-    pub(crate) fn sim_func_instance_create(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_instance_create(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() != 1
         {
@@ -196,7 +196,7 @@ impl Interpreter
             panic!("error: tried to use a non-number as an object id");
         }
     }
-    pub(crate) fn sim_func_instance_add_variable(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_instance_add_variable(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() < 2
         {
@@ -251,7 +251,7 @@ impl Interpreter
         }
         (Value::Number(0.0), false)
     }
-    pub(crate) fn sim_func_instance_execute(&mut self, global : &mut GlobalState, mut args : Vec<Value>, isexpr : bool) -> (Value, bool)
+    pub (crate) fn sim_func_instance_execute(&mut self, global : &mut GlobalState, mut args : Vec<Value>, isexpr : bool) -> (Value, bool)
     {
         if args.len() < 2
         {
@@ -294,7 +294,7 @@ impl Interpreter
         }
         (Value::Number(0.0), true)
     }
-    pub(crate) fn sim_func_parse_text(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_parse_text(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() != 1
         {
@@ -319,7 +319,7 @@ impl Interpreter
         }
     }
 
-    pub(crate) fn sim_func_compile_ast(&mut self, _global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_compile_ast(&mut self, _global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() != 1
         {
@@ -356,7 +356,7 @@ impl Interpreter
         }
     }
 
-    pub(crate) fn sim_func_compile_text(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_compile_text(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() != 1
         {
