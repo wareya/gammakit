@@ -81,5 +81,4 @@ TODO:
 - investigate feasibility of grammar, parser, compiler, and interpreter hooks (limited to child interpreters)
 
 
-As of writing, clippy processes gammakit with no complaints after giving the following invocation:
-cargo clippy -- -A clippy::type_complexity -A clippy::len_zero -A clippy::cast_lossless -A clippy::needless_return -A clippy::map_entry -A clippy::collapsible_if
+As of writing, clippy processes gammakit with no complaints. Certain lints are disabled in certain files where they are inappropriate, unhelpful, or generate false positives.
