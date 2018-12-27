@@ -8,6 +8,8 @@ use std::vec::Vec;
 mod strings;
 mod regexholder;
 mod ast;
+#[macro_use]
+mod matches;
 mod parser;
 mod bytecode;
 mod grammar;

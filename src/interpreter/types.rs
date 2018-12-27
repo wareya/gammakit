@@ -615,7 +615,6 @@ pub(super) fn value_truthy(imm : &Value) -> bool
         {
             float_booly(*value)
         }
-        // TODO: string and array concatenation
         _ =>
         {
             true

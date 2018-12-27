@@ -70,7 +70,7 @@ pub fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize
                 code.extend(block);
             }   
         }
-        else if match ast.children[0].text.as_str() {"declaration" | "funccall" | "funcexpr" | "funcdef" | "objdef" => true , _ => false}
+        else if matches!(ast.children[0].text.as_str(), "declaration" | "funccall" | "funcexpr" | "funcdef" | "objdef")
         {
             code.extend(compile_astnode(&ast.children[0], scopedepth));
         }
@@ -454,7 +454,7 @@ fn compile_rvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize)
         else
         {
             code.extend(compile_astnode(&ast.children[0], scopedepth));;
-            if ast.children[0].isparent && match ast.children[0].text.as_str() { "indirection" | "arrayexpr" => true, _ => false }
+            if ast.children[0].isparent && matches!(ast.children[0].text.as_str(), "indirection" | "arrayexpr")
             {
                 code.push(EVALUATION);
             }

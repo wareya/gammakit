@@ -32,11 +32,7 @@ impl Interpreter
     }
     pub(super) fn internal_function_is_noreturn(&mut self, name : &str) -> bool
     {
-        match name
-        {
-            "instance_execute" => true,
-            _ => false
-        }
+        matches!(name, "instance_execute")
     }
     pub(super) fn sim_func_print(&mut self, _global : &mut GlobalState, args : Vec<Value>, _ : bool) -> (Value, bool)
     {

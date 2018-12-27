@@ -7,10 +7,10 @@ use std::time::Instant;
 
 use std::hint::unreachable_unchecked;
 
-use super::ast::*;
-use super::grammar::*;
-use super::regexholder::RegexHolder;
-use super::strings::*;
+use crate::ast::*;
+use crate::grammar::*;
+use crate::regexholder::RegexHolder;
+use crate::strings::*;
     
 #[derive(Clone)]
 #[derive(Debug)]
@@ -684,35 +684,22 @@ impl Parser {
                 assert!(ast.children.len() >= 3);
                 for child in ast.children[3..ast.children.len()-1].iter()
                 {
-                    match child.children[1].children[0].text.as_str()
+                    if matches!(child.children[1].children[0].text.as_str(), "create" | "destroy")
+                       && (child.children[3].isparent || child.children[3].text != ")")
                     {
-                        "create" | "destroy" =>
-                        {
-                            if child.children[3].isparent || child.children[3].text != ")"
-                            {
-                                panic!("error: `{}` function of object must not have any arguments", child.children[1].children[0].text);
-                            }
-                        }
-                        _ => {}
+                        panic!("error: `{}` function of object must not have any arguments", child.children[1].children[0].text);
                     }
                 }
             }
             
-            // What I write right now
-            match ast.text.as_str()
+            if matches!(ast.text.as_str(), "funccall" | "funcexpr" | "arrayref")
+               && ast.children.len() != 2
             {
-                "funccall" | "funcexpr" | "arrayref" =>
-                {
-                    if ast.children.len() != 2
-                    {
-                        println!("broken ast node");
-                        println!("-----");
-                        print_ast_node(ast, 0);
-                        println!("-----");
-                        assert!(false);
-                    }
-                }
-                _ => {}
+                println!("broken ast node");
+                println!("-----");
+                print_ast_node(ast, 0);
+                println!("-----");
+                assert!(false);
             }
             
             for child in &ast.children

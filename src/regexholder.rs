@@ -69,19 +69,18 @@ impl RegexHolder {
                 {
                     if my_match.start() == start
                     {
-                        Some(my_match.as_str().to_string())
+                        return Some(my_match.as_str().to_string());
                     }
-                    else { None }
                 }
-                else { None }
             }
-            else { None }
         }
         else
         {
             let regex = Regex::new(regex_text);
             self.regexes.insert(regex_text.to_string(), regex);
-            self.match_at(regex_text, text, start)
+            return self.match_at(regex_text, text, start);
         }
+        
+        None
     }
 }
