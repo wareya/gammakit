@@ -7,34 +7,60 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
-    // FIXME make this use a hashmap so that functions can be added at runtime (e.g. with gammakit functioning as a library)
-    pub(super) fn get_internal_function(&mut self, name : &str) -> Option<Box<Fn(&mut Interpreter, &mut GlobalState, Vec<Value>, bool) -> (Value, bool)>>
+    fn insert_normal_internal_func(&mut self, funcname : String, func : Rc<InternalFunction>)
     {
-        macro_rules! enbox {
-            ( $x:ident ) =>
+        self.internal_functions.insert(funcname, func);
+    }
+    fn insert_noreturn_internal_func(&mut self, funcname : String, func : Rc<InternalFunction>)
+    {
+        self.internal_functions_noreturn.insert(funcname.clone());
+        self.internal_functions.insert(funcname, func);
+    }
+    
+    pub(crate) fn insert_default_internal_functions(&mut self)
+    {
+        macro_rules! enrc {
+            ( $y:ident ) =>
             {
-                Some(Box::new(Interpreter::$x))
+                Rc::new(Interpreter::$y)
             }
         }
-        match name
+        macro_rules! insert {
+            ( $x:expr, $y:ident ) =>
+            {
+                self.insert_normal_internal_func($x.to_string(), enrc!($y));
+            }
+        }
+        macro_rules! insert_noreturn {
+            ( $x:expr, $y:ident ) =>
+            {
+                self.insert_noreturn_internal_func($x.to_string(), enrc!($y));
+            }
+        }
+        insert!("print"                 , sim_func_print                );
+        insert!("len"                   , sim_func_len                  );
+        insert!("keys"                  , sim_func_keys                 );
+        insert!("parse_text"            , sim_func_parse_text           );
+        insert!("compile_text"          , sim_func_compile_text         );
+        insert!("compile_ast"           , sim_func_compile_ast          );
+        insert!("instance_create"       , sim_func_instance_create      );
+        insert!("instance_add_variable" , sim_func_instance_add_variable);
+        
+        insert_noreturn!("instance_execute", sim_func_instance_execute);
+    }
+    pub(crate) fn get_internal_function(&self, name : &str) -> Option<Rc<InternalFunction>>
+    {
+        match self.internal_functions.get(name)
         {
-            "print"                 => enbox!(sim_func_print),
-            "len"                   => enbox!(sim_func_len),
-            "keys"                  => enbox!(sim_func_keys),
-            "parse_text"            => enbox!(sim_func_parse_text),
-            "compile_text"          => enbox!(sim_func_compile_text),
-            "compile_ast"           => enbox!(sim_func_compile_ast),
-            "instance_execute"      => enbox!(sim_func_instance_execute),
-            "instance_create"       => enbox!(sim_func_instance_create),
-            "instance_add_variable" => enbox!(sim_func_instance_add_variable),
-            _ => None
+            Some(f) => Some(Rc::clone(f)),
+            None => None
         }
     }
-    pub(super) fn internal_function_is_noreturn(&mut self, name : &str) -> bool
+    pub(crate) fn internal_function_is_noreturn(&mut self, name : &str) -> bool
     {
-        matches!(name, "instance_execute")
+        self.internal_functions_noreturn.contains(name)
     }
-    pub(super) fn sim_func_print(&mut self, _global : &mut GlobalState, args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub(crate) fn sim_func_print(&mut self, _global : &mut GlobalState, args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         for arg in args
         {
@@ -49,7 +75,7 @@ impl Interpreter
         }
         (Value::Number(0.0), false)
     }
-    pub(super) fn sim_func_len(&mut self, _global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub(crate) fn sim_func_len(&mut self, _global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() != 1
         {
@@ -82,7 +108,7 @@ impl Interpreter
             panic!("internal error: failed to read argument for len() despite having the right number of arguments (this error should be unreachable!)");
         }
     }
-    pub(super) fn sim_func_keys(&mut self, _global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub(crate) fn sim_func_keys(&mut self, _global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() != 1
         {
@@ -121,7 +147,7 @@ impl Interpreter
             panic!("internal error: failed to read argument for keys() despite having the right number of arguments (this error should be unreachable!)");
         }
     }
-    pub(super) fn sim_func_instance_create(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub(crate) fn sim_func_instance_create(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() != 1
         {
@@ -170,7 +196,7 @@ impl Interpreter
             panic!("error: tried to use a non-number as an object id");
         }
     }
-    pub(super) fn sim_func_instance_add_variable(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub(crate) fn sim_func_instance_add_variable(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() < 2
         {
@@ -225,7 +251,7 @@ impl Interpreter
         }
         (Value::Number(0.0), false)
     }
-    pub(super) fn sim_func_instance_execute(&mut self, global : &mut GlobalState, mut args : Vec<Value>, isexpr : bool) -> (Value, bool)
+    pub(crate) fn sim_func_instance_execute(&mut self, global : &mut GlobalState, mut args : Vec<Value>, isexpr : bool) -> (Value, bool)
     {
         if args.len() < 2
         {
@@ -268,7 +294,7 @@ impl Interpreter
         }
         (Value::Number(0.0), true)
     }
-    pub(super) fn sim_func_parse_text(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub(crate) fn sim_func_parse_text(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() != 1
         {
@@ -293,7 +319,7 @@ impl Interpreter
         }
     }
 
-    pub(super) fn sim_func_compile_ast(&mut self, _global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub(crate) fn sim_func_compile_ast(&mut self, _global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() != 1
         {
@@ -330,7 +356,7 @@ impl Interpreter
         }
     }
 
-    pub(super) fn sim_func_compile_text(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub(crate) fn sim_func_compile_text(&mut self, global : &mut GlobalState, mut args : Vec<Value>, _ : bool) -> (Value, bool)
     {
         if args.len() != 1
         {

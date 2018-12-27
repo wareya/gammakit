@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::rc::Rc;
 use std::rc::Weak;
 
@@ -39,18 +40,29 @@ impl GlobalState {
     }
 }
 
+pub type InternalFunction = Fn(&mut Interpreter, &mut GlobalState, Vec<Value>, bool) -> (Value, bool);
+
 // interpreter state
 pub struct Interpreter {
     top_frame: Frame,
     frames: Vec<Frame>,
     doexit: bool,
-    suppress_for_expr_end: bool
+    suppress_for_expr_end: bool,
+    internal_functions: HashMap<String, Rc<InternalFunction>>,
+    internal_functions_noreturn: HashSet<String>
 }
 
 impl Interpreter {
     pub fn new(code : Vec<u8>) -> Interpreter
     {
-        Interpreter { top_frame : Frame::new_root(Rc::new(code)), frames : vec!() , doexit : false, suppress_for_expr_end : false }
+        Interpreter {
+            top_frame : Frame::new_root(Rc::new(code)),
+            frames : vec!(),
+            doexit : false,
+            suppress_for_expr_end : false,
+            internal_functions : HashMap::new(),
+            internal_functions_noreturn : HashSet::new()
+        }
     }
     #[allow(clippy::cyclomatic_complexity)]
     fn handle_flow_control(&mut self)

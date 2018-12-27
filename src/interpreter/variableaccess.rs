@@ -1,5 +1,22 @@
 use crate::interpreter::*;
 
+// "Indirect" variables store an instance id and a variable name.
+// mychar.player.inputs evaluates from left to right:
+// (characterid).player.inputs
+// (playerid).inputs
+// This is done because gammakit doesn't have any kind of concept of "references" in the sense of a binding to a variable somewhere else or in the GC.
+// The only "references" that exist anywhere in gammakit are instance ids, which are manually managed with instance_kill.
+// When you assign to an "indirect" variable, the language needs to hold on to what instance that variable belongs to.
+
+// Arrays and dictionaries are handled differently. Because they're moved by value, not id, they can't be partially evaluated.
+// Arrays-of-arrays are stored, literally, as arrays of arrays. Not as arrays of references or pointers.
+// So the entire list of indexes (e.g. myarray["stats"][35][23], for a dictionary of arrays of arrays) needs to be stored.
+// Each index can be evaluated individually. These are then stored in a list.
+// When the expression is accessed, the language searches for the variable name in the current scope,
+//  then uses assign_or_return_indexed to get at and work with the relevant value.
+
+// Before you ask: Things like x += y work by evaluating x and storing the evaluation temporarily, so variableaccess.rs only handles evaluation and storage.
+
 fn assign_or_return(value : Option<Value>, var : &mut Value) -> Option<Value>
 {
     if let Some(value) = value

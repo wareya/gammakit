@@ -43,15 +43,6 @@ fn main() -> std::io::Result<()>
     {
         let code = compile_bytecode(ast);
         
-        /*
-        print_ast(ast);
-        for byte in &code
-        {
-            print!("{:02X} ", byte);
-        }
-        println!();
-        */
-        
         if false
         {
             let disassembly = disassemble_bytecode(&code, 0, 0);
@@ -64,6 +55,7 @@ fn main() -> std::io::Result<()>
         let mut global = GlobalState::new(parser.clone());
         
         let mut interpreter = Interpreter::new(code);
+        interpreter.insert_default_internal_functions();
         
         while interpreter.step(&mut global){}
     }

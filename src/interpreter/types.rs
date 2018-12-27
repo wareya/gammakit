@@ -7,13 +7,13 @@ use crate::interpreter::*;
 // internal types
 #[derive(Debug)]
 #[derive(Clone)]
-pub(super) struct ControlData {
+pub struct ControlData {
     pub controltype: u8,
     pub controlpoints: Vec<usize>,
     pub scopes: u16,
     pub other: Option<VecDeque<usize>> // in with(), a list of instance IDs
 }
-pub(super) struct Frame {
+pub struct Frame {
     pub code: Rc<Vec<u8>>,
     pub startpc: usize,
     pub pc: usize,
@@ -28,12 +28,12 @@ pub(super) struct Frame {
     pub impassable: bool,
 }
 impl Frame {
-    pub(super) fn new_root(code : Rc<Vec<u8>>) -> Frame
+    pub(crate) fn new_root(code : Rc<Vec<u8>>) -> Frame
     {
         let codelen = code.len();
         Frame { code, startpc : 0, pc : 0, endpc : codelen, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0, impassable: true }
     }
-    pub(super) fn new_from_call(code : Rc<Vec<u8>>, startpc : usize, endpc : usize, isexpr : bool, impassable : bool) -> Frame
+    pub(crate) fn new_from_call(code : Rc<Vec<u8>>, startpc : usize, endpc : usize, isexpr : bool, impassable : bool) -> Frame
     {
         Frame { code, startpc, pc : startpc, endpc, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, impassable }
     }
@@ -41,7 +41,7 @@ impl Frame {
 
 #[derive(Clone)]
 #[derive(Debug)]
-pub(super) struct FrameIdentity {
+pub struct FrameIdentity {
     pub code: Weak<Vec<u8>>,
     pub startpc: usize,
     pub endpc: usize,
@@ -49,7 +49,7 @@ pub(super) struct FrameIdentity {
 }
 
 impl FrameIdentity {
-    pub(super) fn new(frame : &Frame) -> FrameIdentity
+    pub(crate) fn new(frame : &Frame) -> FrameIdentity
     {
         FrameIdentity { code : Rc::downgrade(&frame.code), startpc : frame.startpc, endpc : frame.endpc, scopestarts : frame.scopestarts.clone() }
     }
@@ -57,7 +57,7 @@ impl FrameIdentity {
 
 #[derive(Clone)]
 #[derive(Debug)]
-pub(super) struct FuncSpecLocation {
+pub struct FuncSpecLocation {
     pub outer_frames : Vec<FrameIdentity>,
     pub top_frame : FrameIdentity,
 }
@@ -66,7 +66,7 @@ pub(super) struct FuncSpecLocation {
 // inaccessible types
 #[derive(Debug)]
 #[derive(Clone)]
-pub(super) struct FuncSpec {
+pub struct FuncSpec {
     pub varnames: Vec<String>,
     pub code: Rc<Vec<u8>>,
     pub startaddr: usize,
@@ -77,13 +77,13 @@ pub(super) struct FuncSpec {
     pub location: FuncSpecLocation,
     pub impassable: bool,
 }
-pub(super) struct ObjSpec {
+pub struct ObjSpec {
     #[allow(unused)]
     pub ident: usize,
     pub name: String,
     pub functions: HashMap<String, FuncSpec>
 }
-pub(super) struct Instance {
+pub struct Instance {
     pub objtype: usize,
     pub ident: usize,
     pub variables: HashMap<String, Value>
@@ -92,31 +92,31 @@ pub(super) struct Instance {
 // variable types (i.e. how to access a variable as an lvalue)
 #[derive(Debug)]
 #[derive(Clone)]
-pub(super) struct ArrayVar { // for x[y]
+pub struct ArrayVar { // for x[y]
     pub location: NonArrayVariable,
     pub indexes: Vec<Value>
 }
 #[derive(Debug)]
 #[derive(Clone)]
-pub(super) struct IndirectVar { // for x.y
+pub struct IndirectVar { // for x.y
     pub ident: usize, // id of an instance
     pub name: String
 }
 #[derive(Debug)]
 #[derive(Clone)]
-pub(super) struct DirectVar { // for x
+pub struct DirectVar { // for x
     pub name: String
 }
 #[derive(Debug)]
 #[derive(Clone)]
-pub(super) enum Variable {
+pub enum Variable {
     Array(ArrayVar),
     Indirect(IndirectVar),
     Direct(DirectVar)
 }
 #[derive(Debug)]
 #[derive(Clone)]
-pub(super) enum NonArrayVariable {
+pub enum NonArrayVariable {
     Indirect(IndirectVar), // x.y.z evaluates x.y before storing it as the instance identity under which to find y
     Direct(DirectVar),
     ActualArray(VecDeque<Value>) // for situations where the compiler doesn't know that EVALUATE is unnecessary, like func()[0]
@@ -125,7 +125,7 @@ pub(super) enum NonArrayVariable {
 // value types
 #[derive(Debug)]
 #[derive(Clone)]
-pub(super) struct FuncVal {
+pub struct FuncVal {
     pub internal: bool,
     pub name: Option<String>,
     pub predefined: Option<HashMap<String, Value>>,
@@ -133,7 +133,7 @@ pub(super) struct FuncVal {
 }
 #[derive(Debug)]
 #[derive(Clone)]
-pub(super) enum Value {
+pub enum Value {
     Number(f64),
     Text(String),
     Array(VecDeque<Value>),
@@ -152,7 +152,7 @@ impl Value
 
 #[derive(Debug)]
 #[derive(Clone)]
-pub(super) enum HashableValue {
+pub enum HashableValue {
     Number(f64),
     Text(String),
 }
