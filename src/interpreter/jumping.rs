@@ -61,11 +61,11 @@ impl Interpreter
                         let frames_len = self.frames.len(); // for the panic down there (non-lexical borrow lifetimes pls happen soon)
                         if !moved_frame
                         {
-                            self.top_frame.stack.push(ret);
+                            self.stack_push_val(ret);
                         }
                         else if let Some(frame) = self.frames.last_mut()
                         {
-                            frame.stack.push(ret);
+                            frame.push_val(ret);
                         }
                         else
                         {

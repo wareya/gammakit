@@ -53,7 +53,8 @@ impl Interpreter
         vec
     }
     
-    pub (crate) fn list_pop_number(&mut self, args : &mut Vec<Value>) -> Result<f64, i32> // second val: 0: no value on stack; 1: value on stack was of the wrong type
+    // second val: 0: no value on stack; 1: value on stack was of the wrong type
+    pub (crate) fn list_pop_number(&mut self, args : &mut Vec<Value>) -> Result<f64, i32>
     {
         list_pop_generic!(args, Number)
     }
@@ -136,9 +137,9 @@ impl Interpreter
         let mut captures = HashMap::<String, Value>::new();
         for _i in 0..capturecount
         {
-            if let Ok(val) = self.stack_pop_any()
+            if let Some(val) = self.stack_pop_val()
             {
-                if let Ok(name) = self.stack_pop_text()
+                if let Some(name) = self.stack_pop_text()
                 {
                     if captures.contains_key(&name)
                     {
@@ -173,42 +174,29 @@ impl Interpreter
         (captures, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location(), impassable : true } )
     }
     
-    pub (crate) fn stack_pop_number(&mut self) -> Result<f64, i32>
+    pub (crate) fn stack_pop_number(&mut self) -> Option<f64>
     {
-        list_pop_generic!(self.top_frame.stack, Number)
-    }
-    pub (crate) fn stack_pop_text(&mut self) -> Result<String, i32>
-    {
-        list_pop_generic!(self.top_frame.stack, Text)
-    }
-    /*
-    fn stack_pop_var(&mut self) -> Result<Variable, i32>
-    {
-        list_pop_generic!(self.top_frame.stack, Var)
-    }
-    */
-    pub (crate) fn stack_pop_name(&mut self) -> Result<String, i32>
-    {
-        let var = list_pop_generic!(self.top_frame.stack, Var)?;
-        if let Variable::Direct(DirectVar{name:text}) = var
+        if let Some(Value::Number(val)) = self.stack_pop_val()
         {
-            Ok(text)
+            return Some(val);
         }
-        else
-        {
-            Err(1)
-        }
+        None
     }
-    pub (crate) fn stack_pop_any(&mut self) -> Result<Value, i32>
+    pub (crate) fn stack_pop_text(&mut self) -> Option<String>
     {
-        if let Some(val) = self.top_frame.stack.pop()
+        if let Some(Value::Text(val)) = self.stack_pop_val()
         {
-            Ok(val)
+            return Some(val);
         }
-        else
+        None
+    }
+    pub (crate) fn stack_pop_name(&mut self) -> Option<String>
+    {
+        if let Some(Variable::Direct(DirectVar{name:text})) = self.stack_pop_var()
         {
-            Err(0)
+            return Some(text);
         }
+        None
     }
     
     pub (crate) fn drain_scopes(&mut self, desired_depth : u16)

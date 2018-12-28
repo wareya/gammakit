@@ -27,7 +27,7 @@ pub (crate) struct Frame {
     pub (super) scopestarts: Vec<usize>,
     pub (super) instancestack: Vec<usize>,
     pub (super) controlstack: Vec<ControlData>,
-    pub (super) stack: Vec<Value>,
+    pub (super) stack: Vec<StackValue>,
     pub (super) isexpr: bool,
     pub (super) currline: usize,
     pub (super) impassable: bool,
@@ -130,6 +130,11 @@ pub enum Value {
     Array(VecDeque<Value>),
     Dict(HashMap<HashableValue, Value>),
     Func(Box<FuncVal>),
+}
+#[derive(Debug)]
+#[derive(Clone)]
+pub (super) enum StackValue {
+    Val(Value),
     Var(Variable),
 }
 
@@ -151,6 +156,42 @@ impl Frame {
     pub (super) fn new_from_call(code : Rc<Vec<u8>>, startpc : usize, endpc : usize, isexpr : bool, impassable : bool) -> Frame
     {
         Frame { code, startpc, pc : startpc, endpc, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, impassable }
+    }
+    pub (super) fn len(&mut self) -> usize
+    {
+        self.stack.len()
+    }
+    pub (super) fn pop_val(&mut self) -> Option<Value>
+    {
+        if let Some(StackValue::Val(r)) = self.stack.pop()
+        {
+            return Some(r);
+        }
+        None
+    }
+    pub (super) fn pop_var(&mut self) -> Option<Variable>
+    {
+        if let Some(StackValue::Var(r)) = self.stack.pop()
+        {
+            return Some(r);
+        }
+        None
+    }
+    pub (super) fn pop(&mut self) -> Option<StackValue>
+    {
+        self.stack.pop()
+    }
+    pub (super) fn push_val(&mut self, value : Value)
+    {
+        self.stack.push(StackValue::Val(value))
+    }
+    pub (super) fn push_var(&mut self, variable : Variable)
+    {
+        self.stack.push(StackValue::Var(variable))
+    }
+    pub (super) fn push(&mut self, stackvalue : StackValue)
+    {
+        self.stack.push(stackvalue)
     }
 }
 

@@ -2,6 +2,34 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
+    pub (super) fn stack_len(&mut self) -> usize
+    {
+        self.top_frame.len()
+    }
+    pub (super) fn stack_pop_val(&mut self) -> Option<Value>
+    {
+        self.top_frame.pop_val()
+    }
+    pub (super) fn stack_pop_var(&mut self) -> Option<Variable>
+    {
+        self.top_frame.pop_var()
+    }
+    pub (super) fn stack_pop(&mut self) -> Option<StackValue>
+    {
+        self.top_frame.pop()
+    }
+    pub (super) fn stack_push_val(&mut self, value : Value)
+    {
+        self.top_frame.push_val(value)
+    }
+    pub (super) fn stack_push_var(&mut self, variable : Variable)
+    {
+        self.top_frame.push_var(variable)
+    }
+    pub (super) fn stack_push(&mut self, stackvalue : StackValue)
+    {
+        self.top_frame.push(stackvalue)
+    }
     pub (super) fn build_funcspec_location(&self) -> FuncSpecLocation
     {
         let mut outer_frames = Vec::<FrameIdentity>::new();
@@ -14,16 +42,16 @@ impl Interpreter
     
     pub (super) fn handle_func_call_or_expr(&mut self, global : &mut GlobalState, isexpr : bool)
     {
-        if let Some(funcdata) = self.top_frame.stack.pop()
+        if let Some(funcdata) = self.stack_pop()
         {
-            if let Some(argcount_val) = self.top_frame.stack.pop()
+            if let Some(argcount_val) = self.stack_pop_val()
             {
                 if let Value::Number(argcount) = argcount_val
                 {
                     let mut args = Vec::<Value>::new();
                     for _i in 0..(argcount.round() as usize)
                     {
-                        if let Some(arg) = self.top_frame.stack.pop()
+                        if let Some(arg) = self.stack_pop_val()
                         {
                             args.push(arg);
                         }
@@ -32,7 +60,7 @@ impl Interpreter
                             panic!("internal error: fewer variables on stack than expected in FUNCEXPR");
                         }
                     }
-                    if let Value::Var(var) = funcdata
+                    if let StackValue::Var(var) = funcdata
                     {
                         if let Some(funcdata_val) = self.evaluate_or_store(global, &var, None)
                         {
@@ -50,7 +78,7 @@ impl Interpreter
                             panic!("internal error: variable meant to hold function data in FUNCEXPR was invalid");
                         }
                     }
-                    else if let Value::Func(funcdata) = funcdata
+                    else if let StackValue::Val(Value::Func(funcdata)) = funcdata
                     {
                         self.call_function(global, *funcdata, args, isexpr)
                     }

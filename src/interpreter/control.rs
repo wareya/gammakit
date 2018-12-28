@@ -6,7 +6,7 @@ impl Interpreter {
         // if we are at the end of the expression, test it, jump outside of the loop if it's false
         if self.get_pc() == controller.controlpoints[1]
         {
-            if let Ok(testval) = self.stack_pop_any()
+            if let Some(testval) = self.stack_pop_val()
             {
                 if !value_truthy(&testval)
                 {
@@ -17,7 +17,7 @@ impl Interpreter {
             }
             else
             {
-                panic!("internal error: not enough values on stack while handling WHILE controller");
+                panic!("internal error: failed to find value on stack while handling WHILE controller");
             }
         }
         // if we are at the end of the loop, go back to the expression
@@ -32,7 +32,7 @@ impl Interpreter {
         if self.get_pc() == controller.controlpoints[0]
         {
             // if we are at the end of the expression, test it, jump to the "else" block if it's false
-            if let Ok(testval) = self.stack_pop_any()
+            if let Some(testval) = self.stack_pop_val()
             {
                 if !value_truthy(&testval)
                 {
@@ -41,7 +41,7 @@ impl Interpreter {
             }
             else
             {
-                panic!("internal error: not enough values on stack while handling IFELSE controller");
+                panic!("internal error: failed to find value on stack while handling IFELSE controller");
             }
         }
         else if self.get_pc() == controller.controlpoints[1]
@@ -63,7 +63,7 @@ impl Interpreter {
         if self.get_pc() == controller.controlpoints[0]
         {
             // if we are at the end of the expression, test it, jump past the block if it's false
-            if let Ok(testval) = self.stack_pop_any()
+            if let Some(testval) = self.stack_pop_val()
             {
                 if !value_truthy(&testval)
                 {
@@ -74,7 +74,7 @@ impl Interpreter {
             }
             else
             {
-                panic!("internal error: not enough values on stack while handling IF controller");
+                panic!("internal error: failed to find value on stack while handling IF controller");
             }
         }
     }
@@ -87,7 +87,7 @@ impl Interpreter {
                 self.suppress_for_expr_end = false;
             }
             // if we are at the end of the loop expression, test it, jump past the block if it's false
-            else if let Ok(testval) = self.stack_pop_any()
+            else if let Some(testval) = self.stack_pop_val()
             {
                 if !value_truthy(&testval)
                 {
@@ -103,7 +103,7 @@ impl Interpreter {
             }
             else
             {
-                panic!("internal error: not enough values on stack while handling FOR controller");
+                panic!("internal error: failed to find value on stack while handling FOR controller");
             }
         }
         else if self.get_pc() == controller.controlpoints[2]

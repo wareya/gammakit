@@ -61,25 +61,25 @@ impl Interpreter
     pub (crate) fn sim_PUSHFLT(&mut self, _global : &mut GlobalState)
     {
         let value = unpack_f64(&self.pull_from_code(8));
-        self.top_frame.stack.push(Value::Number(value));
+        self.stack_push_val(Value::Number(value));
     }
     #[allow(non_snake_case)]
     pub (crate) fn sim_PUSHSHORT(&mut self, _global : &mut GlobalState)
     {
         let value = unpack_u16(&self.pull_from_code(2));
-        self.top_frame.stack.push(Value::Number(value as f64));
+        self.stack_push_val(Value::Number(value as f64));
     }
     #[allow(non_snake_case)]
     pub (crate) fn sim_PUSHSTR(&mut self, _global : &mut GlobalState)
     {
         let text = self.read_string();
-        self.top_frame.stack.push(Value::Text(text));
+        self.stack_push_val(Value::Text(text));
     }
     #[allow(non_snake_case)]
     pub (crate) fn sim_PUSHNAME(&mut self, _global : &mut GlobalState)
     {
         let text = self.read_string();
-        self.top_frame.stack.push(Value::Var(Variable::Direct(DirectVar{name:text})));
+        self.stack_push_var(Variable::Direct(DirectVar{name:text}));
     }
     #[allow(non_snake_case)]
     pub (crate) fn sim_PUSHVAR(&mut self, global : &mut GlobalState)
@@ -88,7 +88,7 @@ impl Interpreter
         let dirvar = Variable::Direct(DirectVar{name : name.clone()}); // FIXME suboptimal but helps error message
         if let Some(val) = self.evaluate_or_store(global, &dirvar, None)
         {
-            self.top_frame.stack.push(val);
+            self.stack_push_val(val);
         }
         else
         {
@@ -98,11 +98,11 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_DECLVAR(&mut self, _global : &mut GlobalState)
     {
-        if self.top_frame.stack.is_empty()
+        if self.stack_len() < 1
         {
             panic!("internal error: DECLVAR instruction requires 1 values on the stack but only found 0");
         }
-        if let Ok(name) = self.stack_pop_name()
+        if let Some(name) = self.stack_pop_name()
         {
             if let Some(scope) = self.top_frame.scopes.last_mut()
             {
@@ -126,11 +126,11 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_DECLFAR(&mut self, global : &mut GlobalState)
     {
-        if self.top_frame.stack.is_empty()
+        if self.stack_len() < 1
         {
             panic!("internal error: DECLFAR instruction requires 1 values on the stack but only found 0");
         }
-        if let Ok(name) = self.stack_pop_name()
+        if let Some(name) = self.stack_pop_name()
         {
             if let Some(instance_id) = self.top_frame.instancestack.last()
             {
@@ -164,19 +164,19 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_INDIRECTION(&mut self, global : &mut GlobalState)
     {
-        if self.top_frame.stack.len() < 2
+        if self.stack_len() < 2
         {
-            panic!("internal error: INDIRECTION instruction requires 2 values on the stack but only found {}", self.top_frame.stack.len());
+            panic!("internal error: INDIRECTION instruction requires 2 values on the stack but only found {}", self.stack_len());
         }
-        if let Ok(right) = self.stack_pop_name()
+        if let Some(right) = self.stack_pop_name()
         {
-            if let Ok(left) = self.stack_pop_number()
+            if let Some(left) = self.stack_pop_number()
             {
                 let id = left.round() as usize;
                 
                 if global.instances.contains_key(&id)
                 {
-                    self.top_frame.stack.push(Value::Var(Variable::Indirect(IndirectVar{ident : id, name : right})));
+                    self.stack_push_var(Variable::Indirect(IndirectVar{ident : id, name : right}));
                 }
                 else
                 {
@@ -196,41 +196,31 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_EVALUATION(&mut self, global : &mut GlobalState)
     {
-        if let Some(val) = self.top_frame.stack.pop()
+        if let Some(var) = self.stack_pop_var()
         {
-            match val
+            match var
             {
-                Value::Var(var) =>
+                Variable::Indirect(_) |
+                Variable::Array(_) =>
                 {
-                    match var
+                    if let Some(value) = self.evaluate_or_store(global, &var, None)
                     {
-                        Variable::Indirect(_) |
-                        Variable::Array(_) =>
-                        {
-                            if let Some(value) = self.evaluate_or_store(global, &var, None)
-                            {
-                                self.top_frame.stack.push(value);
-                            }
-                            else
-                            {
-                                panic!("internal error: evaluate_or_store returned None when just storing a variable");
-                            }
-                        }
-                        Variable::Direct(var) =>
-                        {
-                            panic!("internal error: tried to evaluate direct variable `{}`\n(note: the evaluation instruction is for indirect (id.y) variables and array (arr[0]) variables; bytecode metaprogramming for dynamic direct variable access is unsupported)", var.name);
-                        }
+                        self.stack_push_val(value);
+                    }
+                    else
+                    {
+                        panic!("internal error: evaluate_or_store returned None when just storing a variable");
                     }
                 }
-                etc =>
+                Variable::Direct(var) =>
                 {
-                    panic!("internal error: tried to evaluate non-variable value\n({})", format_val(&etc).unwrap());
+                    panic!("internal error: tried to evaluate direct variable `{}`\n(note: the evaluation instruction is for indirect (id.y) variables and array (arr[0]) variables; bytecode metaprogramming for dynamic direct variable access is unsupported)", var.name);
                 }
             }
         }
         else
         {
-            panic!("internal error: EVALUATION instruction requires 1 values on the stack but only found 0");
+            panic!("internal error: failed to find a variable in the stack in EVALUATION");
         }
     }
     #[allow(non_snake_case)]
@@ -360,12 +350,12 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_WITH(&mut self, global : &mut GlobalState)
     {
-        if self.top_frame.stack.is_empty()
+        if self.stack_len() < 1
         {
             panic!("internal error: WITH instruction requires 1 values on the stack but found 0");
         }
         // NOTE: for with(), the self.top_frame.scopes.len() >= 0xFFFF error case is handled by SCOPE instruction
-        if let Ok(expr) = self.stack_pop_number()
+        if let Some(expr) = self.stack_pop_number()
         {
             let other_id = expr.round() as usize;
             
@@ -426,58 +416,51 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_BINSTATE(&mut self, global : &mut GlobalState)
     {
-        if self.top_frame.stack.len() < 2
+        if self.stack_len() < 2
         {
-            panic!("internal error: BINSTATE instruction requires 2 values on the stack but found {}", self.top_frame.stack.len());
+            panic!("internal error: BINSTATE instruction requires 2 values on the stack but found {}", self.stack_len());
         }
         
         let immediate = self.pull_single_from_code();
         
-        if let Some(value) = self.top_frame.stack.pop()
+        if let Some(value) = self.stack_pop_val()
         {
-            if let Some(var_val) = self.top_frame.stack.pop()
+            if let Some(var) = self.stack_pop_var()
             {
-                if let Value::Var(var) = var_val
+                if immediate == 0x00
                 {
-                    if immediate == 0x00
+                    self.evaluate_or_store(global, &var, Some(value));
+                }
+                else if let Some(opfunc) = get_binop_function(immediate)
+                {
+                    if let Some(var_initial_value) = self.evaluate_or_store(global, &var, None)
                     {
-                        self.evaluate_or_store(global, &var, Some(value));
-                    }
-                    else if let Some(opfunc) = get_binop_function(immediate)
-                    {
-                        if let Some(var_initial_value) = self.evaluate_or_store(global, &var, None)
+                        match opfunc(&var_initial_value, &value)
                         {
-                            match opfunc(&var_initial_value, &value)
+                            Ok(var_new_value) =>
                             {
-                                Ok(var_new_value) =>
-                                {
-                                    self.evaluate_or_store(global, &var, Some(var_new_value));
-                                }
-                                Err(text) =>
-                                {
-                                    //panic!("error: disallowed binary statement\n({})\n(line {})", text, self.top_frame.currline);
-                                    panic!("error: disallowed binary statement\n({})", text);
-                                }
+                                self.evaluate_or_store(global, &var, Some(var_new_value));
                             }
-                        }
-                        else
-                        {
-                            panic!("internal error: evaluate_or_store returned None when just accessing value");
+                            Err(text) =>
+                            {
+                                //panic!("error: disallowed binary statement\n({})\n(line {})", text, self.top_frame.currline);
+                                panic!("error: disallowed binary statement\n({})", text);
+                            }
                         }
                     }
                     else
                     {
-                        panic!("internal error: unknown binary operation 0x{:02X}", immediate);
+                        panic!("internal error: evaluate_or_store returned None when just accessing value");
                     }
                 }
                 else
                 {
-                    panic!("primary argument to BINSTATE was not a variable");
+                    panic!("internal error: unknown binary operation 0x{:02X}", immediate);
                 }
             }
             else
             {
-                panic!("internal error: not enough values on stack to run instruction BINSTATE (this error should be inaccessible)");
+                panic!("internal error: primary argument to BINSTATE could not be found or was not a variable");
             }
         }
         else
@@ -489,16 +472,16 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_BINOP(&mut self, _global : &mut GlobalState)
     {
-        if self.top_frame.stack.len() < 2
+        if self.stack_len() < 2
         {
-            panic!("internal error: BINOP instruction requires 2 values on the stack but found {}", self.top_frame.stack.len());
+            panic!("internal error: BINOP instruction requires 2 values on the stack but found {}", self.stack_len());
         }
         
         let immediate = self.pull_single_from_code();
         
-        if let Some(right) = self.top_frame.stack.pop()
+        if let Some(right) = self.stack_pop_val()
         {
-            if let Some(left) = self.top_frame.stack.pop()
+            if let Some(left) = self.stack_pop_val()
             {
                 if let Some(opfunc) = get_binop_function(immediate)
                 {
@@ -506,7 +489,7 @@ impl Interpreter
                     {
                         Ok(new_value) =>
                         {
-                            self.top_frame.stack.push(new_value);
+                            self.stack_push_val(new_value);
                         }
                         Err(text) =>
                         {
@@ -533,14 +516,14 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_UNOP(&mut self, _global : &mut GlobalState)
     {
-        if self.top_frame.stack.is_empty()
+        if self.stack_len() < 1
         {
-            panic!("internal error: UNOP instruction requires 2 values on the stack but found {}", self.top_frame.stack.len());
+            panic!("internal error: UNOP instruction requires 1 values on the stack but found {}", self.stack_len());
         }
         
         let immediate = self.pull_single_from_code();
         
-        if let Some(value) = self.top_frame.stack.pop()
+        if let Some(value) = self.stack_pop_val()
         {
             if let Some(opfunc) = get_unop_function(immediate)
             {
@@ -548,7 +531,7 @@ impl Interpreter
                 {
                     Ok(new_value) =>
                     {
-                        self.top_frame.stack.push(new_value);
+                        self.stack_push_val(new_value);
                     }
                     Err(text) =>
                     {
@@ -570,7 +553,7 @@ impl Interpreter
     pub (crate) fn sim_LAMBDA(&mut self, _global : &mut GlobalState)
     {
         let (captures, myfuncspec) = self.read_lambda();
-        self.top_frame.stack.push(Value::new_funcval(false, Some("lambda_self".to_string()), Some(captures), Some(myfuncspec)));
+        self.stack_push_val(Value::new_funcval(false, Some("lambda_self".to_string()), Some(captures), Some(myfuncspec)));
     }
     #[allow(non_snake_case)]
     pub (crate) fn sim_OBJDEF(&mut self, global : &mut GlobalState)
@@ -607,14 +590,14 @@ impl Interpreter
     pub (crate) fn sim_COLLECTARRAY(&mut self, _global : &mut GlobalState)
     {
         let numvals = unpack_u16(&self.pull_from_code(2)) as usize;
-        if self.top_frame.stack.len() < numvals
+        if self.stack_len() < numvals
         {
-            panic!("internal error: not enough values on stack for COLLECTARRAY instruction to build array (need {}, have {})", numvals, self.top_frame.stack.len());
+            panic!("internal error: not enough values on stack for COLLECTARRAY instruction to build array (need {}, have {})", numvals, self.stack_len());
         }
         let mut myarray = VecDeque::<Value>::new();
         for _i in 0..numvals
         {
-            if let Ok(val) = self.stack_pop_any()
+            if let Some(val) = self.stack_pop_val()
             {
                 myarray.push_front(val);
             }
@@ -623,15 +606,15 @@ impl Interpreter
                 panic!("internal error: COLLECTARRAY instruction failed to collect values from stack (this error should be unreachable!)");
             }
         }
-        self.top_frame.stack.push(Value::Array(myarray));
+        self.stack_push_val(Value::Array(myarray));
     }
     #[allow(non_snake_case)]
     pub (crate) fn sim_COLLECTDICT(&mut self, _global : &mut GlobalState)
     {
         let numvals = unpack_u16(&self.pull_from_code(2)) as usize;
-        if self.top_frame.stack.len() < numvals*2
+        if self.stack_len() < numvals*2
         {
-            panic!("internal error: not enough values on stack for COLLECTDICT instruction to build dict (need {}, have {})", numvals*2, self.top_frame.stack.len());
+            panic!("internal error: not enough values on stack for COLLECTDICT instruction to build dict (need {}, have {})", numvals*2, self.stack_len());
         }
         
         let mut names = VecDeque::<HashableValue>::new();
@@ -639,9 +622,9 @@ impl Interpreter
         
         for _i in 0..numvals
         {
-            if let Ok(val) = self.stack_pop_any()
+            if let Some(val) = self.stack_pop_val()
             {
-                if let Ok(key) = self.stack_pop_any()
+                if let Some(key) = self.stack_pop_val()
                 {
                     values.push_front(val);
                     match key
@@ -675,37 +658,37 @@ impl Interpreter
         {
             mydict.insert(name, value);
         }
-        self.top_frame.stack.push(Value::Dict(mydict));
+        self.stack_push_val(Value::Dict(mydict));
     }
     #[allow(non_snake_case)]
     pub (crate) fn sim_ARRAYEXPR(&mut self, _global : &mut GlobalState)
     {
-        if self.top_frame.stack.len() < 2
+        if self.stack_len() < 2
         {
-            panic!("internal error: ARRAYEXPR instruction requires 2 values on the stack but found {}", self.top_frame.stack.len());
+            panic!("internal error: ARRAYEXPR instruction requires 2 values on the stack but found {}", self.stack_len());
         }
-        if let Ok(index) = self.stack_pop_any()
+        if let Some(index) = self.stack_pop_val()
         {
-            if let Ok(array) = self.stack_pop_any()
+            if let Some(array) = self.stack_pop()
             {
                 match array
                 {
-                    Value::Var(Variable::Array(mut arrayvar)) =>
+                    StackValue::Var(Variable::Array(mut arrayvar)) =>
                     {
                         arrayvar.indexes.push(index);
-                        self.top_frame.stack.push(Value::Var(Variable::Array(arrayvar)));
+                        self.stack_push_var(Variable::Array(arrayvar));
                     }
-                    Value::Var(Variable::Direct(dirvar)) =>
+                    StackValue::Var(Variable::Direct(dirvar)) =>
                     {
-                        self.top_frame.stack.push(Value::Var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(index).into_iter().collect() } )));
+                        self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(index).into_iter().collect() } ));
                     }
-                    Value::Var(Variable::Indirect(indirvar)) =>
+                    StackValue::Var(Variable::Indirect(indirvar)) =>
                     {
-                        self.top_frame.stack.push(Value::Var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(index).into_iter().collect() } )));
+                        self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(index).into_iter().collect() } ));
                     }
-                    Value::Array(array) =>
+                    StackValue::Val(Value::Array(array)) =>
                     {
-                        self.top_frame.stack.push(Value::Var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualArray(array), indexes : vec!(index).into_iter().collect() } )));
+                        self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualArray(array), indexes : vec!(index).into_iter().collect() } ));
                     }
                     _ =>
                     {
@@ -734,7 +717,7 @@ impl Interpreter
             // exit implies no pushed variable. if the outside expects a value, push it
             if frame_was_expr
             {
-                self.top_frame.stack.push(Value::Number(0.0));
+                self.stack_push_val(Value::Number(0.0));
             }
         }
         else
@@ -747,7 +730,7 @@ impl Interpreter
     {
         if let Some(old_frame) = self.frames.pop()
         {
-            let inner_frame_stack_last = self.top_frame.stack.pop();
+            let inner_frame_stack_last = self.stack_pop();
             let frame_was_expr = self.top_frame.isexpr;
             self.top_frame = old_frame;
             // exit implies no pushed variable. if the outside expects a value, push it
@@ -755,12 +738,11 @@ impl Interpreter
             {
                 if let Some(val) = inner_frame_stack_last
                 {
-                    self.top_frame.stack.push(val);
+                    self.stack_push(val);
                 }
                 else
                 {
                     panic!("error: RETURN instruction needed a value remaining on the inner frame's stack, but there were none");
-                    //self.top_frame.stack.push(Value::Number(0.0));
                 }
             }
         }
