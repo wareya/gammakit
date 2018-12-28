@@ -81,7 +81,7 @@ pub (crate) struct Instance {
 // internal to ArrayVar
 #[derive(Debug)]
 #[derive(Clone)]
-pub (crate) enum NonArrayVariable {
+pub (super) enum NonArrayVariable {
     Indirect(IndirectVar), // x.y.z evaluates x.y before storing it as the instance identity under which to find y
     Direct(DirectVar),
     ActualArray(VecDeque<Value>) // for situations where the compiler doesn't know that EVALUATE is unnecessary, like func()[0]
@@ -89,24 +89,24 @@ pub (crate) enum NonArrayVariable {
 
 #[derive(Debug)]
 #[derive(Clone)]
-pub struct ArrayVar { // for x[y]
+pub (crate) struct ArrayVar { // for x[y]
     pub (super) location: NonArrayVariable,
     pub (super) indexes: Vec<Value>
 }
 #[derive(Debug)]
 #[derive(Clone)]
-pub struct IndirectVar { // for x.y
+pub (crate) struct IndirectVar { // for x.y
     pub (super) ident: usize, // id of an instance
     pub (super) name: String
 }
 #[derive(Debug)]
 #[derive(Clone)]
-pub struct DirectVar { // for x
+pub (crate) struct DirectVar { // for x
     pub (super) name: String
 }
 #[derive(Debug)]
 #[derive(Clone)]
-pub enum Variable {
+pub (crate) enum Variable {
     Array(ArrayVar),
     Indirect(IndirectVar),
     Direct(DirectVar)
@@ -121,7 +121,7 @@ pub struct FuncVal {
     pub (super) predefined: Option<HashMap<String, Value>>,
     pub (super) userdefdata: Option<FuncSpec>
 }
-// FIXME some kind of non-variable value? or a StackValue? (need to make more things non-pub
+
 #[derive(Debug)]
 #[derive(Clone)]
 pub enum Value {
