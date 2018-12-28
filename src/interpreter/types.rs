@@ -62,6 +62,7 @@ pub (crate) struct FuncSpecLocation {
     pub (crate) top_frame : FrameIdentity,
 }
 
+
 // inaccessible types
 #[derive(Debug)]
 #[derive(Clone)]

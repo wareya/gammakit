@@ -225,7 +225,7 @@ impl Interpreter
         
         if let Some(controller) = self.top_frame.controlstack.last()
         {
-            if controller.controltype == WHILE || controller.controltype == FOR // TODO: add WITH
+            if controller.controltype == WHILE || controller.controltype == FOR // TODO: let WITH support break/continue
             {
                 foundloop = true;
             }
