@@ -139,7 +139,7 @@ impl Interpreter
         
         if self.top_frame.stack.len() < capturecount*2
         {
-            panic!("internal error: not enough values on stack to satisfy requirements of read_lambda (need {}, have {})", capturecount*2, self.top_frame.stack.len());
+            return Err(Some(format!("internal error: not enough values on stack to satisfy requirements of read_lambda (need {}, have {})", capturecount*2, self.top_frame.stack.len())));
         }
         
         let mut captures = HashMap::<String, Value>::new();
@@ -151,18 +151,18 @@ impl Interpreter
                 {
                     if captures.contains_key(&name)
                     {
-                        panic!("error: duplicate capture variable name `{}` in lambda capture expression", name);
+                        return Err(Some(format!("error: duplicate capture variable name `{}` in lambda capture expression", name)));
                     }
                     captures.insert(name, val);
                 }
                 else
                 {
-                    panic!("internal error: read_lambda failed to collect capture name from stack");
+                    return Err(Some("internal error: read_lambda failed to collect capture name from stack".to_string()));
                 }
             }
             else
             {
-                panic!("internal error: read_lambda failed to collect capture value from stack");
+                return Err(Some("internal error: read_lambda failed to collect capture value from stack".to_string()));
             }
         }
         

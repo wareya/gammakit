@@ -23,7 +23,7 @@ mod control;
 use self::types::*;
 
 pub type StepResult = Result<(), Option<String>>;
-type InternalFunction = Fn(&mut Interpreter, Vec<Value>, bool) -> (Value, bool);
+type InternalFunction = Fn(&mut Interpreter, Vec<Value>, bool) -> Result<(Value, bool), Option<String>>;
 
 fn plainerr(mystr : &'static str) -> StepResult
 {

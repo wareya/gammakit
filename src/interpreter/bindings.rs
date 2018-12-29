@@ -60,7 +60,7 @@ impl Interpreter
     {
         self.internal_functions_noreturn.contains(name)
     }
-    pub (crate) fn sim_func_print(&mut self, args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_print(&mut self, args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
     {
         for arg in args
         {
@@ -73,9 +73,9 @@ impl Interpreter
                 panic!("error: tried to print unprintable value");
             }
         }
-        (Value::Number(0.0), false)
+        Ok((Value::Number(0.0), false))
     }
-    pub (crate) fn sim_func_len(&mut self, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_len(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
     {
         if args.len() != 1
         {
@@ -87,15 +87,15 @@ impl Interpreter
             {
                 Value::Text(string) =>
                 {
-                    (Value::Number(string.chars().count() as f64), false)
+                    Ok((Value::Number(string.chars().count() as f64), false))
                 }
                 Value::Array(array) =>
                 {
-                    (Value::Number(array.len() as f64), false)
+                    Ok((Value::Number(array.len() as f64), false))
                 }
                 Value::Dict(dict) =>
                 {
-                    (Value::Number(dict.keys().len() as f64), false)
+                    Ok((Value::Number(dict.keys().len() as f64), false))
                 }
                 _ =>
                 {
@@ -108,7 +108,7 @@ impl Interpreter
             panic!("internal error: failed to read argument for len() despite having the right number of arguments (this error should be unreachable!)");
         }
     }
-    pub (crate) fn sim_func_keys(&mut self, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_keys(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
     {
         if args.len() != 1
         {
@@ -125,7 +125,7 @@ impl Interpreter
                     {
                         list.push_back(Value::Number(i as f64));
                     }
-                    return (Value::Array(list), false);
+                    return Ok((Value::Array(list), false));
                 }
                 Value::Dict(dict) =>
                 {
@@ -134,7 +134,7 @@ impl Interpreter
                     {
                         list.push_back(hashval_to_val(key));
                     }
-                    return (Value::Array(list), false);
+                    return Ok((Value::Array(list), false));
                 }
                 _ =>
                 {
@@ -147,7 +147,7 @@ impl Interpreter
             panic!("internal error: failed to read argument for keys() despite having the right number of arguments (this error should be unreachable!)");
         }
     }
-    pub (crate) fn sim_func_instance_create(&mut self, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_instance_create(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
     {
         if args.len() != 1
         {
@@ -178,13 +178,13 @@ impl Interpreter
                 if let Some(function) = object.functions.get("create")
                 {
                     let pseudo_funcvar = FuncVal{internal : false, name : Some("create".to_string()), predefined : None, userdefdata : Some(function.clone())};
-                    self.jump_to_function(&function.clone(), Vec::new(), false, &pseudo_funcvar);
+                    self.jump_to_function(&function.clone(), Vec::new(), false, &pseudo_funcvar)?;
                     self.top_frame.instancestack.push(instance_id);
                     frame_moved = true;
                 }
                 
                 self.global.instance_id += 1;
-                return (Value::Number(instance_id as f64), frame_moved);
+                Ok((Value::Number(instance_id as f64), frame_moved))
             }
             else
             {
@@ -196,7 +196,7 @@ impl Interpreter
             panic!("error: tried to use a non-number as an object id");
         }
     }
-    pub (crate) fn sim_func_instance_add_variable(&mut self, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_instance_add_variable(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
     {
         if args.len() < 2
         {
@@ -249,9 +249,9 @@ impl Interpreter
         {
             panic!("error: first argument to instance_add_variable() must be a number");
         }
-        (Value::Number(0.0), false)
+        Ok((Value::Number(0.0), false))
     }
-    pub (crate) fn sim_func_instance_execute(&mut self, mut args : Vec<Value>, isexpr : bool) -> (Value, bool)
+    pub (crate) fn sim_func_instance_execute(&mut self, mut args : Vec<Value>, isexpr : bool) -> Result<(Value, bool), Option<String>>
     {
         if args.len() < 2
         {
@@ -270,7 +270,7 @@ impl Interpreter
                 {
                     if let Some(_inst) = self.global.instances.get_mut(&instance_id)
                     {
-                        self.jump_to_function(defdata, args.into_iter().rev().collect(), isexpr, &func);
+                        self.jump_to_function(defdata, args.into_iter().rev().collect(), isexpr, &func)?;
                         self.top_frame.instancestack.push(instance_id);
                     }
                     else
@@ -292,9 +292,9 @@ impl Interpreter
         {
             panic!("error: first argument to instance_execute() must be a number");
         }
-        (Value::Number(0.0), true)
+        Ok((Value::Number(0.0), true))
     }
-    pub (crate) fn sim_func_parse_text(&mut self, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_parse_text(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
     {
         if args.len() != 1
         {
@@ -308,7 +308,7 @@ impl Interpreter
                 let tokens = parser.tokenize(&program_lines, true);
                 if let Some(ref ast) = parser.parse_program(&tokens, &program_lines, true)
                 {
-                    (ast_to_dict(ast), false)
+                    Ok((ast_to_dict(ast), false))
                 }
                 else
                 {
@@ -326,7 +326,7 @@ impl Interpreter
         }
     }
 
-    pub (crate) fn sim_func_compile_ast(&mut self, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_compile_ast(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
     {
         if args.len() != 1
         {
@@ -334,12 +334,12 @@ impl Interpreter
         }
         if let Ok(dict) = self.list_pop_dict(&mut args)
         {
-            let ast = dict_to_ast(&dict);
+            let ast = dict_to_ast(&dict)?;
             
             let code = compile_bytecode(&ast);
             
             // endaddr at the start because Rc::new() moves `code`
-            return
+            return Ok(
             ( Value::new_funcval
               ( false,
                 None,
@@ -355,7 +355,8 @@ impl Interpreter
                   location : self.build_funcspec_location(),
                   impassable : true,
                 }
-                )), false);
+                )), false)
+            );
         }
         else
         {
@@ -363,7 +364,7 @@ impl Interpreter
         }
     }
 
-    pub (crate) fn sim_func_compile_text(&mut self, mut args : Vec<Value>, _ : bool) -> (Value, bool)
+    pub (crate) fn sim_func_compile_text(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
     {
         if args.len() != 1
         {
@@ -380,7 +381,7 @@ impl Interpreter
                     let code = compile_bytecode(ast);
                     
                     // endaddr at the start because Rc::new() moves `code`
-                    return
+                    return Ok(
                     ( Value::new_funcval
                       ( false,
                         None,
@@ -396,7 +397,8 @@ impl Interpreter
                           location : self.build_funcspec_location(),
                           impassable : true
                         }
-                        )), false);
+                        )), false)
+                    );
                 }
                 else
                 {

@@ -420,6 +420,8 @@ pub (crate) fn value_truthy(imm : &Value) -> bool
     }
 }
 
+// TODO: move these to bindings.rs or something
+
 pub (crate) fn ast_to_dict(ast : &ASTNode) -> Value
 {
     let mut astdict = HashMap::<HashableValue, Value>::new();
@@ -456,7 +458,12 @@ pub (crate) fn ast_to_dict(ast : &ASTNode) -> Value
     Value::Dict(astdict)
 }
 
-pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> ASTNode
+fn plainerr(mystr : &'static str) -> Result<ASTNode, Option<String>>
+{
+    Err(Some(mystr.to_string()))
+}
+
+pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTNode, Option<String>>
 {
     let mut ast = dummy_astnode();
     
@@ -476,7 +483,7 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> ASTNode
             }
             else
             {
-                panic!("error: tried to turn a dict into an ast but dict lacked \"{}\" field or the \"{}\" field was not {}", $str, $str, $errortext);
+                return Err(Some(format!("error: tried to turn a dict into an ast but dict lacked \"{}\" field or the \"{}\" field was not {}", $str, $str, $errortext)));
             }
         }
     }
@@ -490,7 +497,7 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> ASTNode
     }
     else
     {
-        panic!("error: tried to turn a dict into an ast but dict lacked \"isparent\" field or the \"isparent\" field was not a number");
+        return plainerr("error: tried to turn a dict into an ast but dict lacked \"isparent\" field or the \"isparent\" field was not a number");
     }
     
     if let Some(Value::Array(val_children)) = get!(dict, "children")
@@ -500,17 +507,17 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> ASTNode
         {
             if let Value::Dict(dict) = child
             {
-                ast.children.push(dict_to_ast(&dict));
+                ast.children.push(dict_to_ast(&dict)?);
             }
             else
             {
-                panic!("error: values in list of children in ast node must be dictionaries that are themselves ast nodes");
+                return plainerr("error: values in list of children in ast node must be dictionaries that are themselves ast nodes");
             }
         }
     }
     else
     {
-        panic!("error: tried to turn a dict into an ast but dict lacked \"children\" field or the \"children\" field was not a list");
+        return plainerr("error: tried to turn a dict into an ast but dict lacked \"children\" field or the \"children\" field was not a list");
     }
     
     if let Some(Value::Dict(val_opdata)) = get!(dict, "opdata")
@@ -521,7 +528,7 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> ASTNode
         }
         else
         {
-            panic!("error: tried to turn a dict into an ast but dict's opdata lacked \"isop\" field or the \"isop\" field was not a number");
+            return plainerr("error: tried to turn a dict into an ast but dict's opdata lacked \"isop\" field or the \"isop\" field was not a number");
         }
         if let Some(Value::Number(assoc)) = get!(val_opdata, "assoc")
         {
@@ -529,7 +536,7 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> ASTNode
         }
         else
         {
-            panic!("error: tried to turn a dict into an ast but dict's opdata lacked \"assoc\" field or the \"assoc\" field was not a number");
+            return plainerr("error: tried to turn a dict into an ast but dict's opdata lacked \"assoc\" field or the \"assoc\" field was not a number");
         }
         if let Some(Value::Number(precedence)) = get!(val_opdata, "precedence")
         {
@@ -537,13 +544,13 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> ASTNode
         }
         else
         {
-            panic!("error: tried to turn a dict into an ast but dict's opdata lacked \"precedence\" field or the \"precedence\" field was not a number");
+            return plainerr("error: tried to turn a dict into an ast but dict's opdata lacked \"precedence\" field or the \"precedence\" field was not a number");
         }
     }
     else
     {
-        panic!("error: tried to turn a dict into an ast but dict lacked \"opdata\" field or the \"opdata\" field was not a dictionary");
+        return plainerr("error: tried to turn a dict into an ast but dict lacked \"opdata\" field or the \"opdata\" field was not a dictionary");
     }
     
-    ast
+    Ok(ast)
 }

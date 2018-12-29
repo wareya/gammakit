@@ -2,7 +2,7 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
-    pub (crate) fn jump_to_function(&mut self, function : &FuncSpec, mut args : Vec<Value>, isexpr : bool, funcdata : &FuncVal)
+    pub (crate) fn jump_to_function(&mut self, function : &FuncSpec, mut args : Vec<Value>, isexpr : bool, funcdata : &FuncVal) -> StepResult
     {
         if function.varnames.len() > args.len()
         {
@@ -46,8 +46,9 @@ impl Interpreter
         {
             panic!("internal error: no scope in top frame despite just making it in jump_to_function (this error should be unreachable!)");
         }
+        Ok(())
     }
-    pub (crate) fn call_function(&mut self, funcdata : FuncVal, args : Vec<Value>, isexpr : bool)
+    pub (crate) fn call_function(&mut self, funcdata : FuncVal, args : Vec<Value>, isexpr : bool) -> StepResult
     {
         if funcdata.internal
         {
@@ -55,7 +56,7 @@ impl Interpreter
             {
                 if let Some(internal_func) = self.get_internal_function(&name)
                 {
-                    let (ret, moved_frame) = internal_func(self, args, isexpr);
+                    let (ret, moved_frame) = internal_func(self, args, isexpr)?;
                     if isexpr && !self.internal_function_is_noreturn(&name)
                     {
                         let frames_len = self.frames.len(); // for the panic down there (non-lexical borrow lifetimes pls happen soon)
@@ -90,8 +91,8 @@ impl Interpreter
             {
                 if !defdata.fromobj
                 {
-                    self.jump_to_function(&defdata, args, isexpr, &funcdata);
-                    return;
+                    self.jump_to_function(&defdata, args, isexpr, &funcdata)?;
+                    return Ok(());
                 }
                 else if defdata.forcecontext != 0
                 {
@@ -106,9 +107,9 @@ impl Interpreter
                         {
                             panic!("error: tried to call function from object type {} in the context of an instance of object type {}", defdata.parentobj, inst.objtype);
                         }
-                        self.jump_to_function(&defdata, args, isexpr, &funcdata);
+                        self.jump_to_function(&defdata, args, isexpr, &funcdata)?;
                         self.top_frame.instancestack.push(defdata.forcecontext);
-                        return;
+                        return Ok(());
                     }
                 }
                 else
@@ -127,9 +128,9 @@ impl Interpreter
                             {
                                 panic!("error: tried to call function from object type {} in the context of an instance of object type {}", defdata.parentobj, inst.objtype);
                             }
-                            self.jump_to_function(&defdata, args, isexpr, &funcdata);
+                            self.jump_to_function(&defdata, args, isexpr, &funcdata)?;
                             self.top_frame.instancestack.push(instance);
-                            return;
+                            return Ok(());
                         }
                         else
                         {
@@ -143,5 +144,6 @@ impl Interpreter
                 panic!("internal error: called a function that was not internal but didn't have definition data");
             }
         }
+        Ok(())
     }
 }

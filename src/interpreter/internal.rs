@@ -66,7 +66,7 @@ impl Interpreter
                         {
                             if let Value::Func(funcdata) = funcdata_val
                             {
-                                self.call_function(*funcdata, args, isexpr);
+                                self.call_function(*funcdata, args, isexpr)?;
                                 Ok(())
                             }
                             else
@@ -81,7 +81,7 @@ impl Interpreter
                     }
                     else if let StackValue::Val(Value::Func(funcdata)) = funcdata
                     {
-                        self.call_function(*funcdata, args, isexpr);
+                        self.call_function(*funcdata, args, isexpr)?;
                         Ok(())
                     }
                     else

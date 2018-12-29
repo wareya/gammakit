@@ -22,7 +22,6 @@ fn plainerr(mystr : &'static str) -> Result<Option<Value>, Option<String>>
     Err(Some(mystr.to_string()))
 }
 
-
 fn assign_or_return(value : Option<Value>, var : &mut Value) -> Result<Option<Value>, Option<String>>
 {
     if let Some(value) = value
