@@ -3,11 +3,6 @@
 
 use crate::interpreter::*;
 
-fn plainerr(mystr : &'static str) -> StepResult
-{
-    Err(Some(mystr.to_string()))
-}
-
 impl Interpreter
 {
     pub (crate) fn get_opfunc(&mut self, op : u8) -> Option<Box<Fn(&mut Interpreter) -> StepResult>>
@@ -95,7 +90,7 @@ impl Interpreter
     {
         let name = self.read_string()?;
         let dirvar = Variable::Direct(DirectVar{name : name.clone()}); // FIXME suboptimal but helps error message
-        if let Some(val) = self.evaluate_or_store(&dirvar, None)
+        if let Some(val) = self.evaluate_or_store(&dirvar, None)?
         {
             self.stack_push_val(val);
         }
@@ -216,7 +211,7 @@ impl Interpreter
                 Variable::Indirect(_) |
                 Variable::Array(_) =>
                 {
-                    if let Some(value) = self.evaluate_or_store(&var, None)
+                    if let Some(value) = self.evaluate_or_store(&var, None)?
                     {
                         self.stack_push_val(value);
                     }
@@ -240,14 +235,12 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_FUNCCALL(&mut self) -> StepResult
     {
-        self.handle_func_call_or_expr(false);
-        Ok(())
+        self.handle_func_call_or_expr(false)
     }
     #[allow(non_snake_case)]
     pub (crate) fn sim_FUNCEXPR(&mut self) -> StepResult
     {
-        self.handle_func_call_or_expr(true);
-        Ok(())
+        self.handle_func_call_or_expr(true)
     }
     
     #[allow(non_snake_case)]
@@ -455,17 +448,17 @@ impl Interpreter
             {
                 if immediate == 0x00
                 {
-                    self.evaluate_or_store(&var, Some(value));
+                    self.evaluate_or_store(&var, Some(value))?;
                 }
                 else if let Some(opfunc) = get_binop_function(immediate)
                 {
-                    if let Some(var_initial_value) = self.evaluate_or_store(&var, None)
+                    if let Some(var_initial_value) = self.evaluate_or_store(&var, None)?
                     {
                         match opfunc(&var_initial_value, &value)
                         {
                             Ok(var_new_value) =>
                             {
-                                self.evaluate_or_store(&var, Some(var_new_value));
+                                self.evaluate_or_store(&var, Some(var_new_value))?;
                             }
                             Err(text) =>
                             {

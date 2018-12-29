@@ -25,6 +25,11 @@ use self::types::*;
 pub type StepResult = Result<(), Option<String>>;
 type InternalFunction = Fn(&mut Interpreter, Vec<Value>, bool) -> (Value, bool);
 
+fn plainerr(mystr : &'static str) -> StepResult
+{
+    Err(Some(mystr.to_string()))
+}
+
 // global interpreter data
 struct GlobalState {
     instance_id: usize,// init 100000000

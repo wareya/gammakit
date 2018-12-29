@@ -17,20 +17,26 @@ use crate::interpreter::*;
 
 // Before you ask: Things like x += y work by evaluating x and storing the evaluation temporarily, so variableaccess.rs only handles evaluation and storage.
 
-fn assign_or_return(value : Option<Value>, var : &mut Value) -> Option<Value>
+fn plainerr(mystr : &'static str) -> Result<Option<Value>, Option<String>>
+{
+    Err(Some(mystr.to_string()))
+}
+
+
+fn assign_or_return(value : Option<Value>, var : &mut Value) -> Result<Option<Value>, Option<String>>
 {
     if let Some(value) = value
     {
         *var = value;
-        None
+        Ok(None)
     }
     else
     {
-        Some(var.clone())
+        Ok(Some(var.clone()))
     }
 }
 
-fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &[Value]) -> Option<Value>
+fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &[Value]) -> Result<Option<Value>, Option<String>>
 {
     let num_indexes = indexes.len();
     if num_indexes == 0
@@ -52,12 +58,12 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                     }
                     else
                     {
-                        panic!("error: tried to access non-extant index {} of an array", indexnum);
+                        Err(Some(format!("error: tried to access non-extant index {} of an array", indexnum)))
                     }
                 }
                 else
                 {
-                    panic!("error: tried to use a non-number as an array index");
+                    plainerr("error: tried to use a non-number as an array index")
                 }
             }
             Value::Dict(ref mut var) =>
@@ -70,7 +76,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                     }
                     else
                     {
-                        panic!("error: tried to access non-extant index {} of a dict", indexnum);
+                        Err(Some(format!("error: tried to access non-extant index {} of a dict", indexnum)))
                     }
                 }
                 else if let Value::Text(indexstr) = index
@@ -81,20 +87,19 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                     }
                     else
                     {
-                        panic!("error: tried to access non-extant index {} of a dict", indexstr);
+                        Err(Some(format!("error: tried to access non-extant index {} of a dict", indexstr)))
                     }
                 }
                 else
                 {
-                    panic!("error: tried to use a non-number, non-string as a dict index");
+                    plainerr("error: tried to use a non-number, non-string as a dict index")
                 }
             }
             Value::Text(ref mut text) =>
             {
                 if num_indexes != 1
                 {
-                    // FIXME should we just treat further indexes as 0? that's what they would do if they were indexes into the substring at that index anyway, so...
-                    panic!("error: tried to index into the value at another index in a string (i.e. tried to do something like \"asdf\"[0][0])");
+                    plainerr("error: tried to index into the value at another index in a string (i.e. tried to do something like \"asdf\"[0][0])")
                 }
                 else if let Value::Number(indexnum) = index
                 {
@@ -112,16 +117,16 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                                 // turn array of codepoints back into string
                                 let newstr : String = codepoints.iter().collect();
                                 *text = newstr;
-                                None
+                                Ok(None)
                             }
                             else
                             {
-                                panic!("error: tried to assign to an index into a string with a string that was not exactly one character long (was {} characters long)", mychar.len());
+                                Err(Some(format!("error: tried to assign to an index into a string with a string that was not exactly one character long (was {} characters long)", mychar.len())))
                             }
                         }
                         else
                         {
-                            panic!("error: tried to assign non-string to an index into a string (assigning by codepoint is not supported yet)");
+                            plainerr("error: tried to assign non-string to an index into a string (assigning by codepoint is not supported yet)")
                         }
                     }
                     else
@@ -129,17 +134,17 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                         let mychar = text.chars().collect::<Vec<char>>()[realindex];
                         let mut newstr = String::new();
                         newstr.push(mychar);
-                        Some(Value::Text(newstr))
+                        Ok(Some(Value::Text(newstr)))
                     }
                 }
                 else
                 {
-                    panic!("error: tried to use a non-number as an index into a string");
+                    plainerr("error: tried to use a non-number as an index into a string")
                 }
             }
             _ =>
             {
-                panic!("error: tried to index into a non-array, non-dict value");
+                plainerr("error: tried to index into a non-array, non-dict value")
             }
         }
     }
@@ -168,7 +173,7 @@ fn check_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, dir
     }
     false
 }
-fn access_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, value : Option<Value>, indexes : &[Value]) -> Option<Value>
+fn access_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, value : Option<Value>, indexes : &[Value]) -> Result<Option<Value>, Option<String>>
 {
     // FIXME: do I even want to search up instance stacks rather than just accessing the main one?
     for scope in frame.scopes.iter_mut().rev()
@@ -190,7 +195,7 @@ fn access_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, di
             // FIXME is this good behavior?
         }
     }
-    panic!("internal error: tried to assign (via index) to a variable that could not be found");
+    plainerr("internal error: tried to assign (via index) to a variable that could not be found")
 }
 fn check_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar) -> bool
 {
@@ -221,7 +226,7 @@ fn check_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &D
     }
     false
 }
-fn access_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, value : Option<Value>) -> Option<Value>
+fn access_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, value : Option<Value>) -> Result<Option<Value>, Option<String>>
 {
     for scope in frame.scopes.iter_mut().rev()
     {
@@ -245,24 +250,24 @@ fn access_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &
                 {
                     if value.is_some()
                     {
-                        panic!("error: tried to assign to function `{}` in instance of object type `{}`", dirvar.name, objspec.name);
+                        return Err(Some(format!("error: tried to assign to function `{}` in instance of object type `{}`", dirvar.name, objspec.name)));
                         // FIXME is this good behavior?
                     }
                     else
                     {
                         let mut mydata = funcdat.clone();
                         mydata.forcecontext = inst.ident;
-                        return Some(Value::new_funcval(false, Some(dirvar.name.clone()), None, Some(mydata)));
+                        return Ok(Some(Value::new_funcval(false, Some(dirvar.name.clone()), None, Some(mydata))));
                     }
                 }
             }
         }
     }
-    panic!("internal error: tried to assign to a variable that could not be found");
+    Err(Some(format!("internal error: tried to assign to a variable that could not be found")))
 }
 impl Interpreter
 {
-    fn evaluate_or_store_of_array(&mut self, arrayvar : &ArrayVar, value : Option<Value>) -> Option<Value>
+    fn evaluate_or_store_of_array(&mut self, arrayvar : &ArrayVar, value : Option<Value>) -> Result<Option<Value>, Option<String>>
     {
         match &arrayvar.location
         {
@@ -276,12 +281,12 @@ impl Interpreter
                     }
                     else
                     {
-                        panic!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident);
+                        Err(Some(format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident)))
                     }
                 }
                 else
                 {
-                    panic!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, indirvar.ident);
+                    Err(Some(format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, indirvar.ident)))
                 }
             }
             NonArrayVariable::Direct(ref dirvar) =>
@@ -303,13 +308,13 @@ impl Interpreter
                 }
                 if self.global.objectnames.get(&dirvar.name).is_some()
                 {
-                    panic!("error: tried to index into object name as though it was an array");
+                    return plainerr("error: tried to index into object name as though it was an array");
                 }
                 if self.get_internal_function(&dirvar.name).is_some()
                 {
-                    panic!("error: tried to index into internal function name as though it was an array");
+                    return plainerr("error: tried to index into internal function name as though it was an array");
                 }
-                panic!("error: unknown variable `{}`", dirvar.name);
+                Err(Some(format!("error: unknown variable `{}`", dirvar.name)))
             }
             NonArrayVariable::ActualArray(ref array) =>
             {
@@ -319,18 +324,18 @@ impl Interpreter
                 }
                 else
                 {
-                    panic!("error: tried to assign to a non-variable array value");
+                    plainerr("error: tried to assign to a non-variable array value")
                 }
             }
         }
     }
-    fn evaluate_or_store_of_indirect(&mut self, indirvar : &IndirectVar, value : Option<Value>) -> Option<Value>
+    fn evaluate_or_store_of_indirect(&mut self, indirvar : &IndirectVar, value : Option<Value>) -> Result<Option<Value>, Option<String>>
     {
         if let Some(instance) = self.global.instances.get_mut(&indirvar.ident)
         {
             if let Some(var) = instance.variables.get_mut(&indirvar.name)
             {
-                return assign_or_return(value, var);
+                assign_or_return(value, var)
             }
             else if let Some(objspec) = self.global.objects.get(&instance.objtype)
             {
@@ -338,31 +343,31 @@ impl Interpreter
                 {
                     if let Some(_value) = value
                     {
-                        panic!("error: tried to assign to function `{}` in instance of object type `{}`", indirvar.name, objspec.name);
+                        Err(Some(format!("error: tried to assign to function `{}` in instance of object type `{}`", indirvar.name, objspec.name)))
                     }
                     else
                     {
                         let mut mydata = funcdat.clone();
                         mydata.forcecontext = indirvar.ident;
-                        return Some(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata)));
+                        Ok(Some(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata))))
                     }
                 }
                 else
                 {
-                    panic!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident);
+                    Err(Some(format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident)))
                 }
             }
             else
             {
-                panic!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident);
+                Err(Some(format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident)))
             }
         }
         else
         {
-            panic!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, indirvar.ident);
+            Err(Some(format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, indirvar.ident)))
         }
     }
-    fn evaluate_or_store_of_direct(&mut self, dirvar : &DirectVar, value : Option<Value>) -> Option<Value>
+    fn evaluate_or_store_of_direct(&mut self, dirvar : &DirectVar, value : Option<Value>) -> Result<Option<Value>, Option<String>>
     {
         if check_frame_dirvar(&mut self.global, &mut self.top_frame, dirvar)
         {
@@ -383,23 +388,23 @@ impl Interpreter
         {
             if let Some(_value) = value
             {
-                panic!("error: tried to assign to read-only object name `{}`", dirvar.name);
+                return Err(Some(format!("error: tried to assign to read-only object name `{}`", dirvar.name)));
             }
             else
             {
-                return Some(Value::Number(*var as f64));
+                return Ok(Some(Value::Number(*var as f64)));
             }
         }
         // TODO: Store actual function pointer instead?
         if let Some(_internal_func) = self.get_internal_function(&dirvar.name)
         {
-            return Some(Value::new_funcval(true, Some(dirvar.name.clone()), None, None ));
+            return Ok(Some(Value::new_funcval(true, Some(dirvar.name.clone()), None, None)));
         }
         
-        panic!("error: unknown identifier `{}`", dirvar.name);
+        Err(Some(format!("error: unknown identifier `{}`", dirvar.name)))
     }
     // if value is None, finds and returns appropriate value; otherwise, stores value and returns None
-    pub (crate) fn evaluate_or_store(&mut self, variable : &Variable, value : Option<Value>) -> Option<Value>
+    pub (crate) fn evaluate_or_store(&mut self, variable : &Variable, value : Option<Value>) -> Result<Option<Value>, Option<String>>
     {
         match &variable
         {

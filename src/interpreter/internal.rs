@@ -40,7 +40,7 @@ impl Interpreter
         FuncSpecLocation { outer_frames, top_frame : FrameIdentity::new(&self.top_frame) }
     }
     
-    pub (super) fn handle_func_call_or_expr(&mut self, isexpr : bool)
+    pub (super) fn handle_func_call_or_expr(&mut self, isexpr : bool) -> StepResult
     {
         if let Some(funcdata) = self.stack_pop()
         {
@@ -62,11 +62,12 @@ impl Interpreter
                     }
                     if let StackValue::Var(var) = funcdata
                     {
-                        if let Some(funcdata_val) = self.evaluate_or_store(&var, None)
+                        if let Some(funcdata_val) = self.evaluate_or_store(&var, None)?
                         {
                             if let Value::Func(funcdata) = funcdata_val
                             {
-                                self.call_function(*funcdata, args, isexpr)
+                                self.call_function(*funcdata, args, isexpr);
+                                Ok(())
                             }
                             else
                             {
@@ -80,7 +81,8 @@ impl Interpreter
                     }
                     else if let StackValue::Val(Value::Func(funcdata)) = funcdata
                     {
-                        self.call_function(*funcdata, args, isexpr)
+                        self.call_function(*funcdata, args, isexpr);
+                        Ok(())
                     }
                     else
                     {
