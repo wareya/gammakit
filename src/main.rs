@@ -47,10 +47,12 @@ fn main() -> std::io::Result<()>
         {
             if false
             {
-                let disassembly = disassemble_bytecode(&code, 0, 0);
-                for line in disassembly
+                if let Ok(disassembly) = disassemble_bytecode(&code, 0, 0)
                 {
-                    println!("{}", line);
+                    for line in disassembly
+                    {
+                        println!("{}", line);
+                    }
                 }
             }
             
