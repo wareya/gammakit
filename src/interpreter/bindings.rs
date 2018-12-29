@@ -287,7 +287,10 @@ impl Interpreter
             let instance_id = self.global.instance_id as usize;
             if let Some(object) = self.global.objects.get(&object_id)
             {
-                let new = Instance { objtype : object_id, ident : instance_id, variables : hashmap!{"x".to_string() => Value::Number(0.0), "y".to_string() => Value::Number(0.0)} }; // FIXME configurable default variables?
+                let mut variables = HashMap::new();
+                variables.insert("x".to_string(), Value::Number(0.0));
+                variables.insert("y".to_string(), Value::Number(0.0));
+                let new = Instance { objtype : object_id, ident : instance_id, variables }; // FIXME configurable default variables?
                 self.global.instances.insert(instance_id, new); // FIXME: check for id clash
                 
                 let mut dumbworkaround = true;
