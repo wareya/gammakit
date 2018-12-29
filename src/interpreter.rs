@@ -98,7 +98,7 @@ impl Interpreter {
         if let Some(opfunc) = self.get_opfunc(op)
         {
             opfunc(self)?;
-            self.handle_flow_control();
+            self.handle_flow_control()?;
             if self.doexit
             {
                 Err(None)

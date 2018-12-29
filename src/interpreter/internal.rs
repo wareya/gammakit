@@ -57,7 +57,7 @@ impl Interpreter
                         }
                         else
                         {
-                            panic!("internal error: fewer variables on stack than expected in FUNCEXPR");
+                            return plainerr("internal error: fewer variables on stack than expected in FUNCEXPR");
                         }
                     }
                     if let StackValue::Var(var) = funcdata
@@ -71,12 +71,12 @@ impl Interpreter
                             }
                             else
                             {
-                                panic!("internal error: variable meant to hold function data in FUNCEXPR was not holding function data");
+                                plainerr("internal error: variable meant to hold function data in FUNCEXPR was not holding function data")
                             }
                         }
                         else
                         {
-                            panic!("internal error: variable meant to hold function data in FUNCEXPR was invalid");
+                            plainerr("internal error: variable meant to hold function data in FUNCEXPR was invalid")
                         }
                     }
                     else if let StackValue::Val(Value::Func(funcdata)) = funcdata
@@ -86,22 +86,22 @@ impl Interpreter
                     }
                     else
                     {
-                        panic!("internal error: variable meant to hold function data in FUNCEXPR was not holding function data");
+                        plainerr("internal error: variable meant to hold function data in FUNCEXPR was not holding function data")
                     }
                 }
                 else
                 {
-                    panic!("internal error: number on stack of arguments to function was not a number");
+                    plainerr("internal error: number on stack of arguments to function was not a number")
                 }
             }
             else
             {
-                panic!("internal error: not enough values on stack to run instruction FUNCEXPR");
+                plainerr("internal error: not enough values on stack to run instruction FUNCEXPR")
             }
         }
         else
         {
-            panic!("internal error: not enough values on stack to run instruction FUNCEXPR");
+            plainerr("internal error: not enough values on stack to run instruction FUNCEXPR")
         }
     }
 }
