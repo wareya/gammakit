@@ -36,7 +36,7 @@ pub (crate) fn unpack_u64(vec : &[u8]) ->  Result<u64, Option<String>>
 
 pub (crate) fn pun_f64_as_u64(num : f64) -> u64
 {
-    unsafe { std::mem::transmute(num) }
+    num.to_bits()
 }
 
 pub (crate) fn pack_f64(num : f64) -> Vec<u8>
