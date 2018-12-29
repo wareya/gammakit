@@ -1,58 +1,72 @@
 use super::strings::*;
 use super::bytecode::*;
 
-fn pull_n<'a>(pc : &mut usize, code : &'a[u8], n : usize) -> &'a [u8]
+fn pull_n<'a>(pc : &mut usize, code : &'a[u8], n : usize) -> Result<&'a[u8], String>
 {
     *pc += n;
-    &code[*pc-n..*pc]
+    if *pc >= code.len()
+    {
+        Ok(&code[*pc-n..*pc])
+    }
+    else
+    {
+        Err("error: tried to read past end of code".to_string())
+    }
 }
-fn pull(pc : &mut usize, code : &[u8]) -> u8
+fn pull(pc : &mut usize, code : &[u8]) -> Result<u8, String>
 {
     *pc += 1;
-    code[*pc-1]
+    if *pc >= code.len()
+    {
+        Ok(code[*pc-1])
+    }
+    else
+    {
+        Err("error: tried to read past end of code".to_string())
+    }
 }
 fn put_lit(ret : &mut Vec<String>, mystr : &str)
 {
     ret.push(mystr.to_string());
 }
-fn pull_text(pc : &mut usize, code : &[u8]) -> String
+fn pull_text(pc : &mut usize, code : &[u8]) -> Result<String, String>
 {
     let mut bytes = Vec::<u8>::new();
     
-    let mut c = pull(pc, &code);
+    let mut c = pull(pc, &code)?;
     while c != 0 && *pc < code.len() // FIXME check if this should be < or <= (will only affect malformed bytecode, but still)
     {
         bytes.push(c);
-        c = pull(pc, &code);
+        c = pull(pc, &code)?;
     }
     
     if let Ok(res) = std::str::from_utf8(&bytes)
     {
-        escape(res)
+        Ok(escape(res))
     }
     else
     {
-        "<invalid utf-8>".to_string()
+        Err("error: tried to decode invalid utf-8".to_string())
     }
 }
-fn pull_text_unescaped(pc : &mut usize, code : &[u8]) -> String
+fn pull_text_unescaped(pc : &mut usize, code : &[u8]) -> Result<String, String>
 {
     let mut bytes = Vec::<u8>::new();
     
-    let mut c = pull(pc, &code);
+    let mut c = pull(pc, &code)?;
     while c != 0 && *pc < code.len() // FIXME check if this should be < or <= (will only affect malformed bytecode, but still)
     {
         bytes.push(c);
-        c = pull(pc, &code);
+        c = pull(pc, &code)?;
     }
     
     if let Ok(res) = std::str::from_utf8(&bytes)
     {
-        res.to_string()
+        Ok(res.to_string())
     }
     else
     {
-        "<invalid utf-8>".to_string()
+        Err("error: tried to decode invalid utf-8".to_string())
     }
 }
 fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>) -> Result<usize, String>
@@ -60,25 +74,25 @@ fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>)
     macro_rules! pull_n {
         ($n:expr) =>
         {
-            pull_n(&mut pc, &code, $n)
+            pull_n(&mut pc, &code, $n)?
         }
     }
     macro_rules! pull {
         () =>
         {
-            pull(&mut pc, &code)
+            pull(&mut pc, &code)?
         }
     }
     macro_rules! pull_text {
         () =>
         {
-            pull_text(&mut pc, &code)
+            pull_text(&mut pc, &code)?
         }
     }
     macro_rules! pull_text_unescaped {
         () =>
         {
-            pull_text_unescaped(&mut pc, &code)
+            pull_text_unescaped(&mut pc, &code)?
         }
     }
     macro_rules! put_lit {
