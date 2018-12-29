@@ -42,23 +42,27 @@ impl Interpreter
     
     pub (crate) fn pull_from_code(&mut self, n : usize) -> Result<Vec<u8>, Option<String>>
     {
-        if self.get_pc()+n >= self.get_code().len()
+        if let Some(vec) = self.get_code().get(self.get_pc()..self.get_pc()+n)
+        {
+            self.add_pc(n);
+            Ok(vec.to_vec())
+        }
+        else
         {
             return Err(Some("error: tried to access past end of code".to_string()))
         }
-        let vec = self.get_code()[self.get_pc()..self.get_pc()+n].to_vec();
-        self.add_pc(n);
-        Ok(vec)
     }
     pub (crate) fn pull_single_from_code(&mut self) -> Result<u8, Option<String>>
     {
-        if self.get_pc() >= self.get_code().len()
+        if let Some(byte) = self.get_code().get(self.get_pc())
+        {
+            self.add_pc(1);
+            Ok(*byte)
+        }
+        else
         {
             return Err(Some("error: tried to access past end of code".to_string()))
         }
-        let vec = self.get_code()[self.get_pc()];
-        self.add_pc(1);
-        Ok(vec)
     }
     
     // second val: 0: no value on stack; 1: value on stack was of the wrong type

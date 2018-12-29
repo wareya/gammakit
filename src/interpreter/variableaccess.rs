@@ -37,14 +37,8 @@ fn assign_or_return(value : Option<Value>, var : &mut Value) -> Result<Option<Va
 
 fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &[Value]) -> Result<Option<Value>, Option<String>>
 {
-    let num_indexes = indexes.len();
-    if num_indexes == 0
+    if let (Some(index), Some(new_indexes)) = (indexes.get(0), indexes.get(1..))
     {
-        assign_or_return(value, var)
-    }
-    else
-    {
-        let index = &indexes[0];
         match var
         {
             Value::Array(ref mut var) =>
@@ -53,7 +47,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                 {
                     if let Some(mut newvar) = var.get_mut(indexnum.round() as usize)
                     {
-                        assign_or_return_indexed(value, &mut newvar, &indexes[1..])
+                        assign_or_return_indexed(value, &mut newvar, new_indexes)
                     }
                     else
                     {
@@ -71,7 +65,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                 {
                     if let Some(mut newvar) = var.get_mut(&HashableValue::Number(*indexnum))
                     {
-                        assign_or_return_indexed(value, &mut newvar, &indexes[1..])
+                        assign_or_return_indexed(value, &mut newvar, new_indexes)
                     }
                     else
                     {
@@ -82,7 +76,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                 {
                     if let Some(mut newvar) = var.get_mut(&HashableValue::Text(indexstr.clone()))
                     {
-                        assign_or_return_indexed(value, &mut newvar, &indexes[1..])
+                        assign_or_return_indexed(value, &mut newvar, new_indexes)
                     }
                     else
                     {
@@ -96,7 +90,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
             }
             Value::Text(ref mut text) =>
             {
-                if num_indexes != 1
+                if new_indexes.len() != 0
                 {
                     plainerr("error: tried to index into the value at another index in a string (i.e. tried to do something like \"asdf\"[0][0])")
                 }
@@ -144,10 +138,17 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                     }
                     else
                     {
-                        let mychar = text.chars().collect::<Vec<char>>()[realindex];
-                        let mut newstr = String::new();
-                        newstr.push(mychar);
-                        Ok(Some(Value::Text(newstr)))
+                        let codepoints = text.chars().collect::<Vec<char>>();
+                        if let Some(codepoint) = codepoints.get(realindex)
+                        {
+                            let mut newstr = String::new();
+                            newstr.push(*codepoint);
+                            Ok(Some(Value::Text(newstr)))
+                        }
+                        else
+                        {
+                            return plainerr("error: tried to evaluate a character from an index that was past the end of a string");
+                        }
                     }
                 }
                 else
@@ -160,6 +161,10 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                 plainerr("error: tried to index into a non-array, non-dict value")
             }
         }
+    }
+    else
+    {
+        assign_or_return(value, var)
     }
 }
 
@@ -290,7 +295,7 @@ impl Interpreter
                 {
                     if let Some(mut var) = instance.variables.get_mut(&indirvar.name)
                     {
-                        return assign_or_return_indexed(value, &mut var, &arrayvar.indexes[..]);
+                        return assign_or_return_indexed(value, &mut var, &arrayvar.indexes);
                     }
                     else
                     {
@@ -306,7 +311,7 @@ impl Interpreter
             {
                 if check_frame_dirvar_indexed(&mut self.global, &mut self.top_frame, dirvar)
                 {
-                    return access_frame_dirvar_indexed(&mut self.global, &mut self.top_frame, dirvar, value, &arrayvar.indexes[..]);
+                    return access_frame_dirvar_indexed(&mut self.global, &mut self.top_frame, dirvar, value, &arrayvar.indexes);
                 }
                 if !self.top_frame.impassable
                 {
@@ -314,7 +319,7 @@ impl Interpreter
                     {
                         if check_frame_dirvar_indexed(&mut self.global, &mut frame, dirvar)
                         {
-                            return access_frame_dirvar_indexed(&mut self.global, &mut frame, dirvar, value, &arrayvar.indexes[..]);
+                            return access_frame_dirvar_indexed(&mut self.global, &mut frame, dirvar, value, &arrayvar.indexes);
                         }
                         if frame.impassable { break; }
                     }
@@ -333,7 +338,7 @@ impl Interpreter
             {
                 if value.is_none()
                 {
-                    assign_or_return_indexed(None, &mut Value::Array(array.clone()), &arrayvar.indexes[..])
+                    assign_or_return_indexed(None, &mut Value::Array(array.clone()), &arrayvar.indexes)
                 }
                 else
                 {

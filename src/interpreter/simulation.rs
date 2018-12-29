@@ -1,5 +1,6 @@
 #![allow(clippy::cast_lossless)]
 #![allow(clippy::map_entry)]
+#![allow(non_snake_case)]
 
 use crate::interpreter::*;
 
@@ -52,40 +53,34 @@ impl Interpreter
         }
     }
     
-    #[allow(non_snake_case)] 
     pub (crate) fn sim_NOP(&mut self) -> StepResult
     {
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_PUSHFLT(&mut self) -> StepResult
     {
         let value = unpack_f64(&self.pull_from_code(8)?)?;
         self.stack_push_val(Value::Number(value));
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_PUSHSHORT(&mut self) -> StepResult
     {
         let value = unpack_u16(&self.pull_from_code(2)?)?;
         self.stack_push_val(Value::Number(value as f64));
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_PUSHSTR(&mut self) -> StepResult
     {
         let text = self.read_string()?;
         self.stack_push_val(Value::Text(text));
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_PUSHNAME(&mut self) -> StepResult
     {
         let text = self.read_string()?;
         self.stack_push_var(Variable::Direct(DirectVar{name:text}));
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_PUSHVAR(&mut self) -> StepResult
     {
         let name = self.read_string()?;
@@ -100,7 +95,6 @@ impl Interpreter
         }
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_DECLVAR(&mut self) -> StepResult
     {
         if self.stack_len() < 1
@@ -129,7 +123,6 @@ impl Interpreter
         Ok(())
     }
     
-    #[allow(non_snake_case)]
     pub (crate) fn sim_DECLFAR(&mut self) -> StepResult
     {
         if self.stack_len() < 1
@@ -168,7 +161,6 @@ impl Interpreter
         Ok(())
     }
     
-    #[allow(non_snake_case)]
     pub (crate) fn sim_INDIRECTION(&mut self) -> StepResult
     {
         if self.stack_len() < 2
@@ -201,7 +193,6 @@ impl Interpreter
         }
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_EVALUATION(&mut self) -> StepResult
     {
         if let Some(var) = self.stack_pop_var()
@@ -232,18 +223,15 @@ impl Interpreter
         }
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_FUNCCALL(&mut self) -> StepResult
     {
         self.handle_func_call_or_expr(false)
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_FUNCEXPR(&mut self) -> StepResult
     {
         self.handle_func_call_or_expr(true)
     }
     
-    #[allow(non_snake_case)]
     pub (crate) fn sim_SCOPE(&mut self) -> StepResult
     {
         self.top_frame.scopes.push(HashMap::new());
@@ -255,7 +243,6 @@ impl Interpreter
         }
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_UNSCOPE(&mut self) -> StepResult
     {
         let immediate = unpack_u16(&self.pull_from_code(2)?)? as usize;
@@ -263,28 +250,29 @@ impl Interpreter
         self.drain_scopes((immediate+1) as u16);
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_BREAK(&mut self) -> StepResult
     {
         self.pop_controlstack_until_loop();
         
         if let Some(controller) = self.top_frame.controlstack.last().cloned()
         {
-            if controller.controltype == WHILE
+            let destination_index =
+            match controller.controltype
             {
-                self.set_pc(controller.controlpoints[2]);
-                self.drain_scopes(controller.scopes);
-                self.top_frame.controlstack.pop();
-            }
-            else if controller.controltype == FOR
+                WHILE => 2,
+                FOR => 3,
+                _ => return Err(Some(format!("FIXME: unimplemented BREAK out from 0x{:02X} loop", controller.controltype)))
+            };
+            
+            if let Some(destination_address) = controller.controlpoints.get(destination_index)
             {
-                self.set_pc(controller.controlpoints[3]);
+                self.set_pc(*destination_address);
                 self.drain_scopes(controller.scopes);
                 self.top_frame.controlstack.pop();
             }
             else
             {
-                return Err(Some(format!("FIXME: unimplemented BREAK out from 0x{:02X} loop", controller.controltype)));
+                return Err(Some(format!("internal error: break instruction found invalid associated destination index")))
             }
             Ok(())
         }
@@ -293,27 +281,28 @@ impl Interpreter
             return plainerr("error: break instruction not inside of loop");
         }
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_CONTINUE(&mut self) -> StepResult
     {
         self.pop_controlstack_until_loop();
         
         if let Some(controller) = self.top_frame.controlstack.last().cloned()
         {
-            if controller.controltype == WHILE
+            let destination_index =
+            match controller.controltype
             {
-                self.set_pc(controller.controlpoints[0]);
-                self.drain_scopes(controller.scopes);
-            }
-            else if controller.controltype == FOR
+                WHILE => 0,
+                FOR => {self.suppress_for_expr_end = true; 1},
+                _ => return Err(Some(format!("FIXME: unimplemented CONTINUE out from 0x{:02X} loop", controller.controltype)))
+            };
+            
+            if let Some(destination_address) = controller.controlpoints.get(destination_index)
             {
-                self.set_pc(controller.controlpoints[1]);
-                self.suppress_for_expr_end = true;
+                self.set_pc(*destination_address);
                 self.drain_scopes(controller.scopes);
             }
             else
             {
-                return Err(Some(format!("FIXME: unimplemented CONTINUE out from 0x{:02X} loop", controller.controltype)));
+                return Err(Some(format!("internal error: continue instruction found invalid associated destination index")))
             }
             Ok(())
         }
@@ -322,7 +311,6 @@ impl Interpreter
             return plainerr("error: continue instruction not inside of loop");
         }
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_IF(&mut self) -> StepResult
     {
         let exprlen = unpack_u64(&self.pull_from_code(8)?)? as usize;
@@ -332,7 +320,6 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : IF, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen), scopes : scopelen, other : None});
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_IFELSE(&mut self) -> StepResult
     {
         let exprlen = unpack_u64(&self.pull_from_code(8)?)? as usize;
@@ -343,7 +330,6 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : IFELSE, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen1, current_pc+exprlen+codelen1+codelen2), scopes : scopelen, other : None});
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_WHILE(&mut self) -> StepResult
     {
         let exprlen = unpack_u64(&self.pull_from_code(8)?)? as usize;
@@ -353,7 +339,6 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : WHILE, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+codelen), scopes : scopelen, other : None});
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_FOR(&mut self) -> StepResult
     {
         let exprlen = unpack_u64(&self.pull_from_code(8)?)? as usize;
@@ -364,7 +349,6 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : FOR, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+postlen, current_pc+exprlen+postlen+codelen), scopes : scopelen, other : None});
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_WITH(&mut self) -> StepResult
     {
         if self.stack_len() < 1
@@ -412,7 +396,6 @@ impl Interpreter
         }
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_FUNCDEF(&mut self) -> StepResult
     {
         let (funcname, myfuncspec) = self.read_function()?;
@@ -432,7 +415,6 @@ impl Interpreter
         Ok(())
     }
     
-    #[allow(non_snake_case)]
     pub (crate) fn sim_BINSTATE(&mut self) -> StepResult
     {
         if self.stack_len() < 2
@@ -489,7 +471,6 @@ impl Interpreter
         Ok(())
     }
     
-    #[allow(non_snake_case)]
     pub (crate) fn sim_BINOP(&mut self) -> StepResult
     {
         if self.stack_len() < 2
@@ -541,7 +522,6 @@ impl Interpreter
         Ok(())
     }
     
-    #[allow(non_snake_case)]
     pub (crate) fn sim_UNOP(&mut self) -> StepResult
     {
         if self.stack_len() < 1
@@ -578,14 +558,12 @@ impl Interpreter
         }
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_LAMBDA(&mut self) -> StepResult
     {
         let (captures, myfuncspec) = self.read_lambda()?;
         self.stack_push_val(Value::new_funcval(false, Some("lambda_self".to_string()), Some(captures), Some(myfuncspec)));
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_OBJDEF(&mut self) -> StepResult
     {
         let name = self.read_string()?;
@@ -617,7 +595,6 @@ impl Interpreter
         self.global.object_id += 1;
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_COLLECTARRAY(&mut self) -> StepResult
     {
         let numvals = unpack_u16(&self.pull_from_code(2)?)? as usize;
@@ -640,7 +617,6 @@ impl Interpreter
         self.stack_push_val(Value::Array(myarray));
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_COLLECTDICT(&mut self) -> StepResult
     {
         let numvals = unpack_u16(&self.pull_from_code(2)?)? as usize;
@@ -693,7 +669,6 @@ impl Interpreter
         self.stack_push_val(Value::Dict(mydict));
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_ARRAYEXPR(&mut self) -> StepResult
     {
         if self.stack_len() < 2
@@ -741,7 +716,6 @@ impl Interpreter
         }
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_EXIT(&mut self) -> StepResult // an exit is a return with no value
     {
         if let Some(top_frame) = self.frames.pop()
@@ -760,7 +734,6 @@ impl Interpreter
         }
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_RETURN(&mut self) -> StepResult
     {
         if let Some(old_frame) = self.frames.pop()
@@ -787,7 +760,6 @@ impl Interpreter
         }
         Ok(())
     }
-    #[allow(non_snake_case)]
     pub (crate) fn sim_LINENUM(&mut self) -> StepResult
     {
         self.top_frame.currline = unpack_u64(&self.pull_from_code(8)?)? as usize;

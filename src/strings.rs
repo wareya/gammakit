@@ -4,15 +4,15 @@ pub (crate) fn slice(text : &str, start : i64, end : i64) -> String
 {
     let chars : Vec<char> = text.chars().collect();
     let u_start = if start < 0 {chars.len() - (-start as usize)} else {start as usize};
-    let u_end   = if end   < 0 {chars.len() - (-end   as usize)} else {end   as usize};
+    let u_end   = if end   <= 0 {chars.len() - (-end   as usize)} else {end   as usize};
     
-    if u_start >= chars.len()
+    if let Some(chars) = chars.get(u_start..u_end)
     {
-        "".to_string()
+        chars.into_iter().collect()
     }
     else
     {
-        chars[u_start..u_end].into_iter().collect()
+        "".to_string()
     }
 }
 

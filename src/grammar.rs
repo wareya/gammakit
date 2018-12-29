@@ -31,7 +31,6 @@ impl GrammarForm
         let re = &mut parser.internal_regexes;
         let mut ret = GrammarForm { tokens : Vec::new() };
         let tokens : Vec<&str> = line.split(' ').collect();
-        let tokenslen = tokens.len();
         for token in &tokens
         {
             if *token == ""
@@ -88,22 +87,21 @@ impl GrammarForm
             }
             else if *token == r"\l" || *token == r"\r"
             {
-                if ret.tokens.len() == 1
+                if ret.tokens.len() != 1
                 {
-                    if tokenslen == 3
+                    return plainerr("error: operator description line is malformed (associativity sigil in wrong place)");
+                }
+                if let Some(GrammarToken::Plain(ref left)) = ret.tokens.get(0)
+                {
+                    if tokens.len() != 3
                     {
-                        if let Ok(precedence) = tokens[2].parse::<i32>()
+                        return plainerr("error: operator description line consists of not exactly three tokens");
+                    }
+                    if let (Some(token), Some(sigil)) = (tokens.get(2), tokens.get(1))
+                    {
+                        if let Ok(precedence) = token.parse::<i32>()
                         {
-                            let optext : String;
-                            if let GrammarToken::Plain(ref left) = ret.tokens[0]
-                            {
-                                optext = left.to_string();
-                            }
-                            else
-                            {
-                                return plainerr("error: operator associativity sigil's leftwards token is not a plain text token");
-                            }
-                            ret.tokens[0] = GrammarToken::Op{text: optext, assoc: if tokens[1] == r"\l" {1} else {0}, precedence};
+                            ret.tokens = vec!(GrammarToken::Op{text: left.to_string(), assoc: if *sigil == r"\l" {1} else {0}, precedence});
                             return Ok(ret);
                         }
                         else
@@ -113,12 +111,12 @@ impl GrammarForm
                     }
                     else
                     {
-                        return plainerr("error: operator description line consists of not exactly three tokens");
+                        return plainerr("internal error: failed to get tokens 2 and 1 (third and second) of token list that supposedly had three tokens");
                     }
                 }
                 else
                 {
-                    return plainerr("error: operator description line is malformed (associativity sigil in wrong place)");
+                    return plainerr("error: operator associativity sigil's leftwards token is not a plain text token; or there was an internal error and there is no associativity sigil");
                 }
             }
             else if slice(token, 0, 1) == "$" && token.len() > 1

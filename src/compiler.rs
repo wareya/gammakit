@@ -298,22 +298,39 @@ fn compile_whilecondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usiz
 fn compile_forcondition(ast : &ASTNode, code : &mut Vec<u8>, mut scopedepth : usize) -> Result<(), Option<String>>
 {
     // FIXME make this not disgusting
-    let mut header_nodes : Vec<Option<&ASTNode>> = vec!(None, None, None);
+    let mut header_node_0 = None;
+    let mut header_node_1 = None;
+    let mut header_node_2 = None;
+    
     let mut header_index = 0;
     for node in ast.child_slice(2, -2)?
     {
         if node.isparent
         {
-            header_nodes[header_index] = Some(&node);
+            match header_index
+            {
+                0 => header_node_0 = Some(node),
+                1 => header_node_1 = Some(node),
+                2 => header_node_2 = Some(node),
+                _ => return plainerr("internal error: too many parts to for condition head")
+            };
         }
-        else if !node.isparent && node.text == ";"
+        else if node.text == ";"
         {
             header_index += 1;
         }
+        else
+        {
+            return plainerr("internal error: unexpected literal child in head of for condition");
+        }
+    }
+    if header_index != 2
+    {
+        return plainerr("internal error: too many parts to for condition head");
     }
     
     // FOR loops need an extra layer of scope around them if they have an init statement
-    if let Some(ref init) = header_nodes[0]
+    if let Some(ref init) = header_node_0
     {
         code.push(SCOPE);
         scopedepth += 1;
@@ -321,7 +338,7 @@ fn compile_forcondition(ast : &ASTNode, code : &mut Vec<u8>, mut scopedepth : us
     }
     
     // FIXME: expr needs to just test true if it's zero length
-    let expr = if let Some(ref expr) = header_nodes[1] {compile_astnode(&expr, scopedepth)?} else {Vec::<u8>::new()};
+    let expr = if let Some(ref expr) = header_node_1 {compile_astnode(&expr, scopedepth)?} else {Vec::<u8>::new()};
     
     let mut block : Vec<u8>;
     let post : Vec<u8>;
@@ -331,14 +348,14 @@ fn compile_forcondition(ast : &ASTNode, code : &mut Vec<u8>, mut scopedepth : us
     if !sentinel.isparent && sentinel.text == "{"
     {
         block = compile_astnode(ast.last_child()?.child(0)?, scopedepth)?;
-        post = if let Some(ref body) = header_nodes[2] {compile_astnode(&body, scopedepth)?} else {Vec::<u8>::new()};
+        post = if let Some(ref body) = header_node_2 {compile_astnode(&body, scopedepth)?} else {Vec::<u8>::new()};
     }
     else
     {
         block = Vec::<u8>::new();
         block.push(SCOPE);
         block.extend(compile_astnode(ast.last_child()?.child(0)?, scopedepth+1)?);
-        post = if let Some(ref body) = header_nodes[2] {compile_astnode(&body, scopedepth+1)?} else {Vec::<u8>::new()};
+        post = if let Some(ref body) = header_node_2 {compile_astnode(&body, scopedepth+1)?} else {Vec::<u8>::new()};
         block.push(UNSCOPE);
         block.extend(pack_u16(scopedepth as u16));
     }
@@ -351,7 +368,7 @@ fn compile_forcondition(ast : &ASTNode, code : &mut Vec<u8>, mut scopedepth : us
     code.extend(block);
     
     // FOR loops need an extra layer of scope around them if they have an init statement
-    if let Some(ref _init) = header_nodes[0]
+    if header_node_0.is_some()
     {
         scopedepth -= 1;
         code.push(UNSCOPE);
@@ -621,9 +638,9 @@ fn compile_objdef(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Re
     for child in funcs.iter()
     {
         let code = compile_astnode(child, scopedepth)?;
-        if code.len() > 1
+        if let Some(without_first_byte) = code.get(1..) // cut off the FUNCDEF byte
         {
-            childcode.extend(code[1..].iter()) // cut off the FUNCDEF byte
+            childcode.extend(without_first_byte);
         }
         else
         {

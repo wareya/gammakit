@@ -197,9 +197,8 @@ impl Parser {
             while offset < line.len() // also in bytes
             {
                 // check for comments before doing anything else
-                if offset+1 < line.len()
+                if let Some(signal) = line.get(offset..offset+2)
                 {
-                    let signal = &line[offset..offset+2];
                     if signal == "*/" && in_multiline_comment
                     {
                         in_multiline_comment = false;
@@ -244,31 +243,35 @@ impl Parser {
                 if continue_the_while { continue; }
                 for text in &self.symbol_list
                 {
-                    if offset + text.len() > line.len() { continue; }
-                    if line[offset..offset+text.len()] == *text.as_str()
+                    if let Some(segment) = line.get(offset..offset+text.len())
                     {
-                        ret.push_back(LexToken{text : text.clone(), line : linecount, position : offset});
-                        offset += text.len();
-                        continue_the_while = true;
-                        break;
+                        if segment == text.as_str()
+                        {
+                            ret.push_back(LexToken{text : text.clone(), line : linecount, position : offset});
+                            offset += text.len();
+                            continue_the_while = true;
+                            break;
+                        }
                     }
                 }
                 if continue_the_while { continue; }
                 for text in &self.text_list
                 {
-                    if offset + text.len() > line.len() { continue; }
-                    if line[offset..offset+text.len()] == *text.as_str()
+                    if let Some(segment) = line.get(offset..offset+text.len())
                     {
-                        // don't tokenize the beginnings of names as actual names
-                        if offset + text.len() + 1 > line.len()
-                           && self.internal_regexes.is_exact(r"[a-zA-Z0-9_]", &slice(&line, (offset+text.len()) as i64, (offset+text.len()+1) as i64))
+                        if segment == text.as_str()
                         {
-                            continue;
+                            // don't tokenize the beginnings of names as actual names
+                            if offset + text.len() + 1 > line.len()
+                               && self.internal_regexes.is_exact(r"[a-zA-Z0-9_]", &slice(&line, (offset+text.len()) as i64, (offset+text.len()+1) as i64))
+                            {
+                                continue;
+                            }
+                            ret.push_back(LexToken{text : text.clone(), line : linecount, position : offset});
+                            offset += text.len();
+                            continue_the_while = true;
+                            break;
                         }
-                        ret.push_back(LexToken{text : text.clone(), line : linecount, position : offset});
-                        offset += text.len();
-                        continue_the_while = true;
-                        break;
                     }
                 }
                 if continue_the_while { continue; }
@@ -306,133 +309,157 @@ impl Parser {
             {
                 GrammarToken::Name(text) =>
                 {
-                    if !self.nodetypemap.contains_key(text)
+                    if let Some(kind) = self.nodetypemap.get(text)
                     {
-                        return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
-                    }
-                    let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
-                    build_best_error(&mut latesterror, error);
-                    if let Some(node) = bit
-                    {
-                        nodes.push(node);
-                        totalconsumed += consumed;
+                        let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, kind)?;
+                        build_best_error(&mut latesterror, error);
+                        if let Some(node) = bit
+                        {
+                            nodes.push(node);
+                            totalconsumed += consumed;
+                        }
+                        else
+                        {
+                            return Ok((defaultreturn.0, defaultreturn.1, latesterror));
+                        }
                     }
                     else
                     {
-                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
+                        return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
                     }
                 }
                 GrammarToken::NameList(text) =>
                 {
-                    if !self.nodetypemap.contains_key(text)
+                    if let Some(kind) = self.nodetypemap.get(text)
+                    {
+                        let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, kind)?;
+                        build_best_error(&mut latesterror, error);
+                        if bit.is_none()
+                        {
+                            return Ok((defaultreturn.0, defaultreturn.1, latesterror));
+                        }
+                        while let Some(node) = bit
+                        {
+                            nodes.push(node);
+                            totalconsumed += consumed;
+                            
+                            let tuple = self.parse(&tokens, index+totalconsumed, kind)?;
+                            bit = tuple.0;
+                            consumed = tuple.1;
+                            error = tuple.2;
+                            
+                            build_best_error(&mut latesterror, error);
+                        }
+                    }
+                    else
                     {
                         return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
-                    }
-                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
-                    build_best_error(&mut latesterror, error);
-                    if bit.is_none()
-                    {
-                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
-                    }
-                    while let Some(node) = bit
-                    {
-                        nodes.push(node);
-                        totalconsumed += consumed;
-                        
-                        let tuple = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
-                        bit = tuple.0;
-                        consumed = tuple.1;
-                        error = tuple.2;
-                        
-                        build_best_error(&mut latesterror, error);
                     }
                 }
                 GrammarToken::OptionalName(text) =>
                 {
-                    if !self.nodetypemap.contains_key(text)
+                    if let Some(kind) = self.nodetypemap.get(text)
+                    {
+                        let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, kind)?;
+                        build_best_error(&mut latesterror, error);
+                        if let Some(node) = bit
+                        {
+                            nodes.push(node);
+                            totalconsumed += consumed;
+                        }
+                    }
+                    else
                     {
                         return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
-                    }
-                    let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
-                    build_best_error(&mut latesterror, error);
-                    if let Some(node) = bit
-                    {
-                        nodes.push(node);
-                        totalconsumed += consumed;
                     }
                 }
                 GrammarToken::OptionalNameList(text) =>
                 {
-                    if !self.nodetypemap.contains_key(text)
+                    if let Some(kind) = self.nodetypemap.get(text)
+                    {
+                        let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, kind)?;
+                        build_best_error(&mut latesterror, error);
+                        while let Some(node) = bit
+                        {
+                            nodes.push(node);
+                            totalconsumed += consumed;
+                            
+                            let tuple = self.parse(&tokens, index+totalconsumed, kind)?;
+                            bit = tuple.0;
+                            consumed = tuple.1;
+                            error = tuple.2;
+                            
+                            build_best_error(&mut latesterror, error);
+                        }
+                    }
+                    else
                     {
                         return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
-                    }
-                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
-                    build_best_error(&mut latesterror, error);
-                    while let Some(node) = bit
-                    {
-                        nodes.push(node);
-                        totalconsumed += consumed;
-                        
-                        let tuple = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
-                        bit = tuple.0;
-                        consumed = tuple.1;
-                        error = tuple.2;
-                        
-                        build_best_error(&mut latesterror, error);
                     }
                 }
                 GrammarToken::SeparatorNameList{text, separator} =>
                 {
-                    if !self.nodetypemap.contains_key(text)
+                    if let Some(kind) = self.nodetypemap.get(text)
                     {
-                        return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
-                    }
-                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
-                    build_best_error(&mut latesterror, error);
-                    if bit.is_none()
-                    {
-                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
-                    }
-                    while let Some(node) = bit
-                    {
-                        nodes.push(node);
-                        totalconsumed += consumed;
-                        
-                        if tokens.len() <= index+totalconsumed { break; }
-                        if tokens[index+totalconsumed].text != *separator { break; }
-                        totalconsumed += 1;
-                        
-                        let tuple = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
-                        bit = tuple.0;
-                        consumed = tuple.1;
-                        error = tuple.2;
-                        
+                        let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, kind)?;
                         build_best_error(&mut latesterror, error);
-                        
-                        // undo separator drain if right-hand rule parse failed
                         if bit.is_none()
                         {
-                            totalconsumed -= 1;
+                            return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                         }
+                        while let Some(node) = bit
+                        {
+                            nodes.push(node);
+                            totalconsumed += consumed;
+                            
+                            if let Some(check_separator) = tokens.get(index+totalconsumed)
+                            {
+                                if check_separator.text == *separator
+                                {
+                                    totalconsumed += 1;
+                                    
+                                    let tuple = self.parse(&tokens, index+totalconsumed, kind)?;
+                                    bit = tuple.0;
+                                    consumed = tuple.1;
+                                    error = tuple.2;
+                                    
+                                    build_best_error(&mut latesterror, error);
+                                    
+                                    // undo separator drain if right-hand rule parse failed
+                                    if bit.is_none()
+                                    {
+                                        totalconsumed -= 1;
+                                    }
+                                }
+                                else
+                                {
+                                    break;
+                                }
+                            }
+                            else
+                            {
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
                     }
                 }
                 GrammarToken::Plain(text) =>
                 {
-                    if tokens.len() <= index+totalconsumed
+                    let mut done = false;
+                    if let Some(token) = tokens.get(index+totalconsumed)
                     {
-                        let error = Some(ParseError::new(index+totalconsumed, &text));
-                        build_best_error(&mut latesterror, error);
-                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
+                        if token.text == *text
+                        {
+                            nodes.push(ASTNode{text : token.text.to_string(), line : token.line, position : token.position, isparent: false, children : Vec::new(), opdata : dummy_opdata()});
+                            totalconsumed += 1;
+                            done = true;
+                        }
                     }
-                    let token_text = &tokens[index+totalconsumed].text;
-                    //println!("comparing {} to {}", token_text, *text);
-                    if token_text == text
-                    {
-                        nodes.push(ASTNode{text : token_text.to_string(), line : tokens[index+totalconsumed].line, position : tokens[index+totalconsumed].position, isparent: false, children : Vec::new(), opdata : dummy_opdata()});
-                        totalconsumed += 1;
-                    }
-                    else
+                    if !done
                     {
                         let error = Some(ParseError::new(index+totalconsumed, &text));
                         build_best_error(&mut latesterror, error);
@@ -441,20 +468,17 @@ impl Parser {
                 }
                 GrammarToken::Regex(text) =>
                 {
-                    if tokens.len() <= index+totalconsumed
+                    let mut done = false;
+                    if let Some(token) = tokens.get(index+totalconsumed)
                     {
-                        let error = Some(ParseError::new(index+totalconsumed, &text));
-                        build_best_error(&mut latesterror, error);
-                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
+                        if self.internal_regexes.is_exact_immut(text, &token.text)?
+                        {
+                            nodes.push(ASTNode{text : token.text.to_string(), line : token.line, position : token.position, isparent: false, children : Vec::new(), opdata : dummy_opdata()});
+                            totalconsumed += 1;
+                            done = true;
+                        }
                     }
-                    let token_text = &tokens[index+totalconsumed].text;
-                    //println!("regex comparing {} to {}", token_text, *text);
-                    if self.internal_regexes.is_exact_immut(text, token_text)?
-                    {
-                        nodes.push(ASTNode{text : token_text.to_string(), line : tokens[index+totalconsumed].line, position : tokens[index+totalconsumed].position, isparent: false, children : Vec::new(), opdata : dummy_opdata()});
-                        totalconsumed += 1;
-                    }
-                    else
+                    if !done
                     {
                         let error = Some(ParseError::new(index+totalconsumed, &text));
                         build_best_error(&mut latesterror, error);
@@ -463,19 +487,17 @@ impl Parser {
                 }
                 GrammarToken::Op{text, assoc, precedence} =>
                 {
-                    if tokens.len() <= index+totalconsumed
+                    let mut done = false;
+                    if let Some(token) = tokens.get(index+totalconsumed)
                     {
-                        let error = Some(ParseError::new(index+totalconsumed, &text));
-                        build_best_error(&mut latesterror, error);
-                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
+                        if token.text == *text
+                        {
+                            nodes.push(ASTNode{text : token.text.to_string(), line : token.line, position : token.position, isparent: false, children : Vec::new(), opdata : OpData{isop : true, assoc: *assoc, precedence: *precedence}});
+                            totalconsumed += 1;
+                            done = true;
+                        }
                     }
-                    let token_text = &tokens[index+totalconsumed].text;
-                    if token_text == text
-                    {
-                        nodes.push(ASTNode{text : token_text.to_string(), line : tokens[index+totalconsumed].line, position : tokens[index+totalconsumed].position, isparent: false, children : Vec::new(), opdata : OpData{isop : true, assoc: *assoc, precedence: *precedence}});
-                        totalconsumed += 1;
-                    }
-                    else
+                    if !done
                     {
                         let error = Some(ParseError::new(index+totalconsumed, &text));
                         build_best_error(&mut latesterror, error);
@@ -506,9 +528,12 @@ impl Parser {
         {
             let (nodes, consumed, error) = self.parse_form(&tokens, index, form)?;
             build_best_error(&mut latesterror, error);
-            if let Some(nodes) = nodes
+            if let Some(token) = tokens.get(index)
             {
-                return Ok((Some(ASTNode{text : nodetype.name.clone(), line : tokens[index].line, position : tokens[index].position, isparent : true, children : nodes, opdata : dummy_opdata()}), consumed, latesterror));
+                if let Some(nodes) = nodes
+                {
+                    return Ok((Some(ASTNode{text : nodetype.name.clone(), line : token.line, position : token.position, isparent : true, children : nodes, opdata : dummy_opdata()}), consumed, latesterror));
+                }
             }
         }
         Ok((None, 0, latesterror))
@@ -585,7 +610,14 @@ impl Parser {
                 // FIXME no idea if this works lol
                 let mut temp = Vec::new();
                 std::mem::swap(&mut temp, &mut ast.children);
-                std::mem::swap(ast, &mut temp[0]);
+                if let Some(dummy) = temp.get_mut(0)
+                {
+                    std::mem::swap(ast, dummy);
+                }
+                else
+                {
+                    return plainerr("internal error: could not access child that was supposed to be there in expression summarization");
+                }
             }
             match ast.text.as_str()
             {
@@ -752,83 +784,104 @@ impl Parser {
         {
             println!("parsing...");
         }
-        let (raw_ast, consumed, latesterror) = self.parse(&tokens, 0, &self.nodetypemap["program"])?;
-        if !silent
+        if let Some(program_type) = self.nodetypemap.get("program")
         {
-            println!("successfully parsed {} out of {} tokens", consumed, tokens.len());
-            println!("parse took {:?}", Instant::now().duration_since(start_time));
-        }
-        
-        if consumed != tokens.len() || raw_ast.is_none()
-        {
-            if let Some(error) = latesterror
+            let (raw_ast, consumed, latesterror) = self.parse(&tokens, 0, program_type)?;
+            if !silent
             {
-                let mut expected : Vec<String> = error.expected.iter().cloned().collect();
-                expected.sort();
-                if error.expected.len() == 1
+                println!("successfully parsed {} out of {} tokens", consumed, tokens.len());
+                println!("parse took {:?}", Instant::now().duration_since(start_time));
+            }
+            
+            if consumed != tokens.len() || raw_ast.is_none()
+            {
+                if let Some(error) = latesterror
                 {
-                    println!("error: expected `{}`", expected[0]);
+                    let mut expected : Vec<String> = error.expected.iter().cloned().collect();
+                    expected.sort();
+                    if error.expected.len() == 1
+                    {
+                        if let Some(expect) = expected.get(0)
+                        {
+                            println!("error: expected `{}`", expect);
+                        }
+                        else
+                        {
+                            println!("internal error: failed to grab expected symbol that was supposed to be there while printing parser error");
+                        }
+                    }
+                    else
+                    {
+                        println!("error: expected one of `{}`", expected.join("`, `"));
+                    }
+                    if let Some(token) = tokens.get(error.token)
+                    {
+                        let linenum = token.line;
+                        let position = token.position;
+                        if let Some(line) = lines.get(linenum-1)
+                        {
+                            println!("context:\n{}\n{}^", line, " ".repeat(position));
+                        }
+                        else
+                        {
+                            println!("internal error: failed to grab context text for parse error");
+                        }
+                    }
+                    else
+                    {
+                        println!("internal error: failed to grab context info for parse error");
+                    }
                 }
                 else
                 {
-                    println!("error: expected one of `{}`", expected.join("`, `"));
+                    println!("error: unexpected or malformed expression");
+                    if let Some(token) = tokens.get(consumed)
+                    {
+                        println!("(line {})\n(position {})", token.line, token.position);
+                    }
+                    else
+                    {
+                        println!("internal error: failed to grab context for parse error");
+                    }
                 }
-                if let Some(token) = tokens.get(error.token)
+                
+                Ok(None)
+            }
+            else if let Some(mut ast) = raw_ast
+            {
+                if !silent
                 {
-                    let linenum = token.line;
-                    let position = token.position;
-                    println!("context:\n{}\n{}^", lines[linenum-1], " ".repeat(position));
+                    println!("fixing associativity...");
                 }
-                else
+                self.parse_fix_associativity(&mut ast)?;
+                
+                if !silent
                 {
-                    println!("internal error: failed to grab context for parse error");
+                    println!("tweaking AST...");
                 }
+                self.parse_tweak_ast(&mut ast)?;
+                
+                if !silent
+                {
+                    println!("verifying AST...");
+                }
+                self.verify_ast(&ast)?;
+                
+                if !silent
+                {
+                    println!("all good!");
+                }
+                
+                Ok(Some(ast))
             }
             else
             {
-                println!("error: unexpected or malformed expression");
-                if let Some(token) = tokens.get(consumed)
-                {
-                    println!("(line {})\n(position {})", token.line, token.position);
-                }
-                else
-                {
-                    println!("internal error: failed to grab context for parse error");
-                }
+                plainerr("internal error: parser did not return AST despite it failing is_none() check")
             }
-            
-            Ok(None)
-        }
-        else if let Some(mut ast) = raw_ast
-        {
-            if !silent
-            {
-                println!("fixing associativity...");
-            }
-            self.parse_fix_associativity(&mut ast)?;
-            
-            if !silent
-            {
-                println!("tweaking AST...");
-            }
-            self.parse_tweak_ast(&mut ast)?;
-            
-            if !silent
-            {
-                println!("verifying AST...");
-            }
-            self.verify_ast(&ast)?;
-            
-            if !silent
-            {
-                println!("all good!");
-            }
-            
-            Ok(Some(ast))
         }
         else
         {
-            plainerr("internal error: parser did not return AST despite it failing is_none() check")
+            plainerr("internal error: grammar does not define \"program\" node type")
         }
     }
 }

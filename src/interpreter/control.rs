@@ -3,150 +3,181 @@ use crate::interpreter::*;
 impl Interpreter {
     fn handle_while_flow(&mut self, controller : &mut ControlData, put_controller_back : &mut bool) -> Result<(), Option<String>>
     {
-        // if we are at the end of the expression, test it, jump outside of the loop if it's false
-        if self.get_pc() == controller.controlpoints[1]
+        if let (Some(expr_start), Some(loop_start), Some(loop_end)) = (controller.controlpoints.get(0), controller.controlpoints.get(1), controller.controlpoints.get(2))
         {
-            if let Some(testval) = self.stack_pop_val()
+            // if we are at the end of the expression, test it, jump outside of the loop if it's false
+            if self.get_pc() == *loop_start
             {
-                if !value_truthy(&testval)
+                if let Some(testval) = self.stack_pop_val()
                 {
-                    self.set_pc(controller.controlpoints[2]);
-                    self.drain_scopes(controller.scopes);
-                    *put_controller_back = false;
+                    if !value_truthy(&testval)
+                    {
+                        self.set_pc(*loop_end);
+                        self.drain_scopes(controller.scopes);
+                        *put_controller_back = false;
+                    }
+                }
+                else
+                {
+                    return plainerr("internal error: failed to find value on stack while handling WHILE controller");
                 }
             }
-            else
+            // if we are at the end of the loop, go back to the expression
+            else if self.get_pc() == *loop_end
             {
-                return plainerr("internal error: failed to find value on stack while handling WHILE controller");
+                self.set_pc(*expr_start);
+                self.drain_scopes(controller.scopes);
             }
+            Ok(())
         }
-        // if we are at the end of the loop, go back to the expression
-        else if self.get_pc() == controller.controlpoints[2]
+        else
         {
-            self.set_pc(controller.controlpoints[0]);
-            self.drain_scopes(controller.scopes);
+            plainerr("internal error: control logic could not find the 3 control points required to handle WHILE controller")
         }
-        
-        Ok(())
     }
     fn handle_ifelse_flow(&mut self, controller : &mut ControlData, put_controller_back : &mut bool) -> Result<(), Option<String>>
     {
-        if self.get_pc() == controller.controlpoints[0]
+        if let (Some(expr_end), Some(if_end), Some(else_end)) = (controller.controlpoints.get(0), controller.controlpoints.get(1), controller.controlpoints.get(2))
         {
-            // if we are at the end of the expression, test it, jump to the "else" block if it's false
-            if let Some(testval) = self.stack_pop_val()
+            if self.get_pc() == *expr_end
             {
-                if !value_truthy(&testval)
+                // if we are at the end of the expression, test it, jump to the "else" block if it's false
+                if let Some(testval) = self.stack_pop_val()
                 {
-                    self.set_pc(controller.controlpoints[1]);
+                    if !value_truthy(&testval)
+                    {
+                        self.set_pc(*if_end);
+                    }
+                }
+                else
+                {
+                    return plainerr("internal error: failed to find value on stack while handling IFELSE controller");
                 }
             }
-            else
+            else if self.get_pc() == *if_end
             {
-                return plainerr("internal error: failed to find value on stack while handling IFELSE controller");
+                // end of the main block, jump to the end of the "else" block
+                self.set_pc(*else_end);
+                self.drain_scopes(controller.scopes);
+                *put_controller_back = false;
             }
+            else if self.get_pc() == *else_end
+            {
+                // end of the "else" block, clean up
+                self.drain_scopes(controller.scopes);
+                *put_controller_back = false;
+            }
+            Ok(())
         }
-        else if self.get_pc() == controller.controlpoints[1]
+        else
         {
-            // end of the main block, jump to the end of the "else" block
-            self.set_pc(controller.controlpoints[2]);
-            self.drain_scopes(controller.scopes);
-            *put_controller_back = false;
+            plainerr("internal error: control logic could not find the 3 control points required to handle IFELSE controller")
         }
-        else if self.get_pc() == controller.controlpoints[2]
-        {
-            // end of the "else" block, clean up
-            self.drain_scopes(controller.scopes);
-            *put_controller_back = false;
-        }
-        
-        Ok(())
     }
     fn handle_if_flow(&mut self, controller : &mut ControlData, put_controller_back : &mut bool) -> Result<(), Option<String>>
     {
-        if self.get_pc() == controller.controlpoints[0]
+        if let (Some(expr_end), Some(if_end)) = (controller.controlpoints.get(0), controller.controlpoints.get(1))
         {
-            // if we are at the end of the expression, test it, jump past the block if it's false
-            if let Some(testval) = self.stack_pop_val()
+            if self.get_pc() == *expr_end
             {
-                if !value_truthy(&testval)
+                // if we are at the end of the expression, test it, jump past the block if it's false
+                if let Some(testval) = self.stack_pop_val()
                 {
-                    self.set_pc(controller.controlpoints[1]);
-                    self.drain_scopes(controller.scopes);
-                    *put_controller_back = false;
+                    if !value_truthy(&testval)
+                    {
+                        self.set_pc(*if_end);
+                        self.drain_scopes(controller.scopes);
+                        *put_controller_back = false;
+                    }
+                }
+                else
+                {
+                    return plainerr("internal error: failed to find value on stack while handling IF controller");
                 }
             }
-            else
-            {
-                return plainerr("internal error: failed to find value on stack while handling IF controller");
-            }
+            Ok(())
         }
-        
-        Ok(())
+        else
+        {
+            plainerr("internal error: control logic could not find the 2 control points required to handle IF controller")
+        }
     }
     fn handle_for_flow(&mut self, controller : &mut ControlData, put_controller_back : &mut bool) -> Result<(), Option<String>>
     {
-        if self.get_pc() == controller.controlpoints[1]
+        // the "init" block of a for loop is outside of the actual control region, because it is always run exactly once
+        if let (Some(expr_start), Some(post_start), Some(loop_start), Some(loop_end)) = (controller.controlpoints.get(0), controller.controlpoints.get(1), controller.controlpoints.get(2), controller.controlpoints.get(3))
         {
-            if self.suppress_for_expr_end
+            if self.get_pc() == *post_start
             {
-                self.suppress_for_expr_end = false;
-            }
-            // if we are at the end of the loop expression, test it, jump past the block if it's false
-            else if let Some(testval) = self.stack_pop_val()
-            {
-                if !value_truthy(&testval)
+                if self.suppress_for_expr_end
                 {
-                    self.set_pc(controller.controlpoints[3]);
-                    self.drain_scopes(controller.scopes);
-                    *put_controller_back = false;
+                    self.suppress_for_expr_end = false;
                 }
-                // otherwise jump to code (end of post expression)
+                // if we are at the end of the loop expression, test it, jump past the block if it's false
+                else if let Some(testval) = self.stack_pop_val()
+                {
+                    if !value_truthy(&testval)
+                    {
+                        self.set_pc(*loop_end);
+                        self.drain_scopes(controller.scopes);
+                        *put_controller_back = false;
+                    }
+                    // otherwise jump to code (end of post expression)
+                    else
+                    {
+                        self.set_pc(*loop_start);
+                    }
+                }
                 else
                 {
-                    self.set_pc(controller.controlpoints[2]);
+                    return plainerr("internal error: failed to find value on stack while handling FOR controller");
                 }
             }
-            else
+            else if self.get_pc() == *loop_start
             {
-                return plainerr("internal error: failed to find value on stack while handling FOR controller");
+                // if we are at the end of the post expression, jump to the expression
+                self.set_pc(*expr_start);
             }
+            else if self.get_pc() == *loop_end
+            {
+                // if we are at the end of the code block, jump to the post expression
+                self.set_pc(*post_start);
+            }
+            Ok(())
         }
-        else if self.get_pc() == controller.controlpoints[2]
+        else
         {
-            // if we are at the end of the post expression, jump to the expression
-            self.set_pc(controller.controlpoints[0]);
+            plainerr("internal error: control logic could not find the 4 control points required to handle FOR controller")
         }
-        else if self.get_pc() == controller.controlpoints[3]
-        {
-            // if we are at the end of the code block, jump to the post expression
-            self.set_pc(controller.controlpoints[1]);
-        }
-        
-        Ok(())
     }
     fn handle_with_flow(&mut self, controller : &mut ControlData, put_controller_back : &mut bool) -> Result<(), Option<String>>
     {
-        if self.get_pc() == controller.controlpoints[1]
+        if let (Some(loop_start), Some(loop_end)) = (controller.controlpoints.get(0), controller.controlpoints.get(1))
         {
-            if let Some(ref mut inst_list) = controller.other
+            if self.get_pc() == *loop_end
             {
-                if let Some(next_instance) = inst_list.remove(0)
+                if let Some(ref mut inst_list) = controller.other
                 {
-                    self.top_frame.instancestack.pop();
-                    self.top_frame.instancestack.push(next_instance);
-                    self.set_pc(controller.controlpoints[0]);
-                }
-                else
-                {
-                    self.top_frame.instancestack.pop();
-                    // FIXME do we have to drain scopes here or is it always consistent?
-                    *put_controller_back = false;
+                    if let Some(next_instance) = inst_list.remove(0)
+                    {
+                        self.top_frame.instancestack.pop();
+                        self.top_frame.instancestack.push(next_instance);
+                        self.set_pc(*loop_start);
+                    }
+                    else
+                    {
+                        self.top_frame.instancestack.pop();
+                        // FIXME do we have to drain scopes here or is it always consistent?
+                        *put_controller_back = false;
+                    }
                 }
             }
+            Ok(())
         }
-        
-        Ok(())
+        else
+        {
+            plainerr("internal error: control logic could not find the 2 control points required to handle WITH controller")
+        }
     }
     pub (super) fn handle_flow_control(&mut self) -> Result<(), Option<String>>
     {

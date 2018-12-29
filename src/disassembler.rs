@@ -4,9 +4,9 @@ use super::bytecode::*;
 fn pull_n<'a>(pc : &mut usize, code : &'a[u8], n : usize) -> Result<&'a[u8], Option<String>>
 {
     *pc += n;
-    if *pc >= code.len()
+    if let Some(code) = code.get(*pc-n..*pc)
     {
-        Ok(&code[*pc-n..*pc])
+        Ok(code)
     }
     else
     {
@@ -16,9 +16,9 @@ fn pull_n<'a>(pc : &mut usize, code : &'a[u8], n : usize) -> Result<&'a[u8], Opt
 fn pull(pc : &mut usize, code : &[u8]) -> Result<u8, Option<String>>
 {
     *pc += 1;
-    if *pc >= code.len()
+    if let Some(code) = code.get(*pc-1)
     {
-        Ok(code[*pc-1])
+        Ok(*code)
     }
     else
     {
@@ -488,17 +488,18 @@ pub fn disassemble_bytecode(code : &[u8], mut pc : usize, mut end : usize) -> Re
     {
         end = code.len()
     }
-    else if end > code.len()
+    else if end >= code.len()
     {
         return Err(Some(format!("end value {} is past actual end of code {} in disassembler", end, code.len())));
     }
     
-    while pc < end
+    while let Some(op) = code.get(pc)
     {
-        let op = code[pc];
-        pc += 1;
-        
-        pc = disassemble_op(op, code, pc, &mut ret)?;
+        pc = disassemble_op(*op, code, pc+1, &mut ret)?;
+        if pc >= end
+        {
+            break;
+        }
     }
     
     Ok(ret)
