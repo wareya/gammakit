@@ -37,6 +37,10 @@ pub struct ASTNode {
 }
 
 impl ASTNode {
+    pub (crate) fn last_child<'a>(&'a self) -> Result<&'a ASTNode, Option<String>>
+    {
+        self.child(self.children.len()-1)
+    }
     pub (crate) fn child<'a>(&'a self, n : usize) -> Result<&'a ASTNode, Option<String>>
     {
         if n >= self.children.len()

@@ -110,13 +110,27 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                         {
                             if mychar.len() == 1
                             {
-                                // turn into array of codepoints, then modify
-                                let mut codepoints = text.chars().collect::<Vec<char>>();
-                                codepoints[realindex] = mychar.chars().next().unwrap();
-                                // turn array of codepoints back into string
-                                let newstr : String = codepoints.iter().collect();
-                                *text = newstr;
-                                Ok(None)
+                                if let Some(mychar) = mychar.chars().next()
+                                {
+                                    // turn into array of codepoints, then modify
+                                    let mut codepoints = text.chars().collect::<Vec<char>>();
+                                    if let Some(codepoint) = codepoints.get_mut(realindex)
+                                    {
+                                        *codepoint = mychar;
+                                    }
+                                    else
+                                    {
+                                        return plainerr("error: tried to assign to a character index that was past the end of a string");
+                                    }
+                                    // turn array of codepoints back into string
+                                    let newstr : String = codepoints.iter().collect();
+                                    *text = newstr;
+                                    Ok(None)
+                                }
+                                else
+                                {
+                                    plainerr("internal error: failed to get first character of a string of length 0")
+                                }
                             }
                             else
                             {

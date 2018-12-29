@@ -60,9 +60,9 @@ fn main() -> std::io::Result<()>
                     
                     while interpreter.step().is_ok(){}
                 }
-                else if let Err(err) = code
+                else if let Err(Some(err)) = code
                 {
-                    println!("{}", err.unwrap());
+                    println!("{}", err);
                 }
             }
         }

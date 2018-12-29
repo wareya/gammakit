@@ -576,7 +576,7 @@ impl Parser {
     {
         if ast.isparent
         {
-            if ast.text == "statement" && !ast.children.last().unwrap().isparent && ast.children.last().unwrap().text == ";"
+            if ast.text == "statement" && !ast.last_child()?.isparent && ast.last_child()?.text == ";"
             {
                 ast.children.pop();
             }
@@ -592,8 +592,8 @@ impl Parser {
                 "funcargs" =>
                 {
                     if ast.children.len() >= 2
-                    && ast.children.first().unwrap().text == "(" && !ast.children.first().unwrap().isparent
-                    && ast.children.last().unwrap().text == ")" && !ast.children.last().unwrap().isparent
+                    && ast.child(0)?.text == "(" && !ast.child(0)?.isparent
+                    && ast.last_child()?.text == ")" && !ast.last_child()?.isparent
                     {
                         ast.children.pop();
                         ast.children.remove(0);
@@ -773,19 +773,28 @@ impl Parser {
                 {
                     println!("error: expected one of `{}`", expected.join("`, `"));
                 }
-                let token = tokens.get(error.token).unwrap().clone();
-                let linenum = token.line;
-                let position = token.position;
-                println!("context:\n{}\n{}^", lines[linenum-1], " ".repeat(position));
-                //println!("(token {})", error.token);
-                //println!("(line {})", tokens.get(error.token).unwrap().line);
-                //println!("(position {})", );
+                if let Some(token) = tokens.get(error.token)
+                {
+                    let linenum = token.line;
+                    let position = token.position;
+                    println!("context:\n{}\n{}^", lines[linenum-1], " ".repeat(position));
+                }
+                else
+                {
+                    println!("internal error: failed to grab context for parse error");
+                }
             }
             else
             {
                 println!("error: unexpected or malformed expression");
-                println!("(line {})", tokens.get(consumed).unwrap().line);
-                println!("(position {})", tokens.get(consumed).unwrap().position);
+                if let Some(token) = tokens.get(consumed)
+                {
+                    println!("(line {})\n(position {})", token.line, token.position);
+                }
+                else
+                {
+                    println!("internal error: failed to grab context for parse error");
+                }
             }
             
             Ok(None)
@@ -819,7 +828,7 @@ impl Parser {
         }
         else
         {
-            plainerr("failed to unwrap AST despite it failing is_none() check")
+            plainerr("internal error: parser did not return AST despite it failing is_none() check")
         }
     }
 }

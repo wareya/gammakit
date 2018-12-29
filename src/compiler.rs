@@ -13,7 +13,7 @@ fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
 {
     code.push(LINENUM);
     code.extend(pack_u64(ast.line as u64));
-    if !ast.child(0)?.isparent && !ast.children.last().unwrap().isparent && ast.child(0)?.text == "{" && ast.children.last().unwrap().text == "}"
+    if !ast.child(0)?.isparent && !ast.last_child()?.isparent && ast.child(0)?.text == "{" && ast.last_child()?.text == "}"
     {
         code.push(SCOPE);
         for child in ast.child_slice(1, -1)?
@@ -327,17 +327,17 @@ fn compile_forcondition(ast : &ASTNode, code : &mut Vec<u8>, mut scopedepth : us
     let post : Vec<u8>;
     
     // FIXME: make this a subroutine lmao
-    let sentinel = &ast.children.last().unwrap().child(0)?.child(0)?;
+    let sentinel = &ast.last_child()?.child(0)?.child(0)?;
     if !sentinel.isparent && sentinel.text == "{"
     {
-        block = compile_astnode(ast.children.last().unwrap().child(0)?, scopedepth)?;
+        block = compile_astnode(ast.last_child()?.child(0)?, scopedepth)?;
         post = if let Some(ref body) = header_nodes[2] {compile_astnode(&body, scopedepth)?} else {Vec::<u8>::new()};
     }
     else
     {
         block = Vec::<u8>::new();
         block.push(SCOPE);
-        block.extend(compile_astnode(ast.children.last().unwrap().child(0)?, scopedepth+1)?);
+        block.extend(compile_astnode(ast.last_child()?.child(0)?, scopedepth+1)?);
         post = if let Some(ref body) = header_nodes[2] {compile_astnode(&body, scopedepth+1)?} else {Vec::<u8>::new()};
         block.push(UNSCOPE);
         block.extend(pack_u16(scopedepth as u16));

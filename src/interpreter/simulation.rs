@@ -268,59 +268,59 @@ impl Interpreter
     {
         self.pop_controlstack_until_loop();
         
-        if self.top_frame.controlstack.is_empty()
+        if let Some(controller) = self.top_frame.controlstack.last().cloned()
         {
-            return plainerr("error: break instruction not inside of loop");
-        }
-        
-        let controller = self.top_frame.controlstack.last().unwrap().clone();
-        
-        if controller.controltype == WHILE
-        {
-            self.set_pc(controller.controlpoints[2]);
-            self.drain_scopes(controller.scopes);
-            self.top_frame.controlstack.pop();
-        }
-        else if controller.controltype == FOR
-        {
-            self.set_pc(controller.controlpoints[3]);
-            self.drain_scopes(controller.scopes);
-            self.top_frame.controlstack.pop();
+            if controller.controltype == WHILE
+            {
+                self.set_pc(controller.controlpoints[2]);
+                self.drain_scopes(controller.scopes);
+                self.top_frame.controlstack.pop();
+            }
+            else if controller.controltype == FOR
+            {
+                self.set_pc(controller.controlpoints[3]);
+                self.drain_scopes(controller.scopes);
+                self.top_frame.controlstack.pop();
+            }
+            else
+            {
+                return Err(Some(format!("FIXME: unimplemented BREAK out from 0x{:02X} loop", controller.controltype)));
+            }
+            Ok(())
         }
         else
         {
-            return Err(Some(format!("FIXME: unimplemented BREAK out from 0x{:02X} loop", controller.controltype)));
+            return plainerr("error: break instruction not inside of loop");
         }
-        Ok(())
     }
     #[allow(non_snake_case)]
     pub (crate) fn sim_CONTINUE(&mut self) -> StepResult
     {
         self.pop_controlstack_until_loop();
         
-        if self.top_frame.controlstack.is_empty()
+        if let Some(controller) = self.top_frame.controlstack.last().cloned()
         {
-            return plainerr("error: continue instruction not inside of loop");
-        }
-        
-        let controller = self.top_frame.controlstack.last().unwrap().clone();
-        
-        if controller.controltype == WHILE
-        {
-            self.set_pc(controller.controlpoints[0]);
-            self.drain_scopes(controller.scopes);
-        }
-        else if controller.controltype == FOR
-        {
-            self.set_pc(controller.controlpoints[1]);
-            self.suppress_for_expr_end = true;
-            self.drain_scopes(controller.scopes);
+            if controller.controltype == WHILE
+            {
+                self.set_pc(controller.controlpoints[0]);
+                self.drain_scopes(controller.scopes);
+            }
+            else if controller.controltype == FOR
+            {
+                self.set_pc(controller.controlpoints[1]);
+                self.suppress_for_expr_end = true;
+                self.drain_scopes(controller.scopes);
+            }
+            else
+            {
+                return Err(Some(format!("FIXME: unimplemented CONTINUE out from 0x{:02X} loop", controller.controltype)));
+            }
+            Ok(())
         }
         else
         {
-            return Err(Some(format!("FIXME: unimplemented CONTINUE out from 0x{:02X} loop", controller.controltype)));
+            return plainerr("error: continue instruction not inside of loop");
         }
-        Ok(())
     }
     #[allow(non_snake_case)]
     pub (crate) fn sim_IF(&mut self) -> StepResult
@@ -513,7 +513,14 @@ impl Interpreter
                         }
                         Err(text) =>
                         {
-                            return Err(Some(format!("error: disallowed binary expression\n({})\n(value 1: {})\n(value 2: {})", text, format_val(&left).unwrap(), format_val(&right).unwrap())));
+                            if let (Some(left_fmt), Some(right_fmt)) = (format_val(&left), format_val(&right))
+                            {
+                                return Err(Some(format!("error: disallowed binary expression\n({})\n(value 1: {})\n(value 2: {})", text, left_fmt, right_fmt)));
+                            }
+                            else
+                            {
+                                return plainerr("internal error: error while trying to format error for disallowed binary expression");
+                            }
                         }
                     }
                 }
