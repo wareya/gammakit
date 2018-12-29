@@ -451,7 +451,7 @@ impl Parser {
                     }
                     let token_text = &tokens[index+totalconsumed].text;
                     //println!("regex comparing {} to {}", token_text, *text);
-                    if self.internal_regexes.is_exact_immut(text, token_text)
+                    if self.internal_regexes.is_exact_immut(text, token_text)?
                     {
                         nodes.push(ASTNode{text : token_text.to_string(), line : tokens[index+totalconsumed].line, position : tokens[index+totalconsumed].position, isparent: false, children : Vec::new(), opdata : dummy_opdata()});
                         totalconsumed += 1;

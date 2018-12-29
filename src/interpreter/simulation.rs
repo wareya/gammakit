@@ -60,14 +60,14 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_PUSHFLT(&mut self) -> StepResult
     {
-        let value = unpack_f64(&self.pull_from_code(8)?);
+        let value = unpack_f64(&self.pull_from_code(8)?)?;
         self.stack_push_val(Value::Number(value));
         Ok(())
     }
     #[allow(non_snake_case)]
     pub (crate) fn sim_PUSHSHORT(&mut self) -> StepResult
     {
-        let value = unpack_u16(&self.pull_from_code(2)?);
+        let value = unpack_u16(&self.pull_from_code(2)?)?;
         self.stack_push_val(Value::Number(value as f64));
         Ok(())
     }
@@ -258,7 +258,7 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_UNSCOPE(&mut self) -> StepResult
     {
-        let immediate = unpack_u16(&self.pull_from_code(2)?) as usize;
+        let immediate = unpack_u16(&self.pull_from_code(2)?)? as usize;
         
         self.drain_scopes((immediate+1) as u16);
         Ok(())
@@ -325,8 +325,8 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_IF(&mut self) -> StepResult
     {
-        let exprlen = unpack_u64(&self.pull_from_code(8)?) as usize;
-        let codelen = unpack_u64(&self.pull_from_code(8)?) as usize;
+        let exprlen = unpack_u64(&self.pull_from_code(8)?)? as usize;
+        let codelen = unpack_u64(&self.pull_from_code(8)?)? as usize;
         let current_pc = self.get_pc();
         let scopelen = self.top_frame.scopes.len() as u16;
         self.top_frame.controlstack.push(ControlData{controltype : IF, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen), scopes : scopelen, other : None});
@@ -335,9 +335,9 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_IFELSE(&mut self) -> StepResult
     {
-        let exprlen = unpack_u64(&self.pull_from_code(8)?) as usize;
-        let codelen1 = unpack_u64(&self.pull_from_code(8)?) as usize;
-        let codelen2 = unpack_u64(&self.pull_from_code(8)?) as usize;
+        let exprlen = unpack_u64(&self.pull_from_code(8)?)? as usize;
+        let codelen1 = unpack_u64(&self.pull_from_code(8)?)? as usize;
+        let codelen2 = unpack_u64(&self.pull_from_code(8)?)? as usize;
         let current_pc = self.get_pc();
         let scopelen = self.top_frame.scopes.len() as u16;
         self.top_frame.controlstack.push(ControlData{controltype : IFELSE, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen1, current_pc+exprlen+codelen1+codelen2), scopes : scopelen, other : None});
@@ -346,8 +346,8 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_WHILE(&mut self) -> StepResult
     {
-        let exprlen = unpack_u64(&self.pull_from_code(8)?) as usize;
-        let codelen = unpack_u64(&self.pull_from_code(8)?) as usize;
+        let exprlen = unpack_u64(&self.pull_from_code(8)?)? as usize;
+        let codelen = unpack_u64(&self.pull_from_code(8)?)? as usize;
         let current_pc = self.get_pc();
         let scopelen = self.top_frame.scopes.len() as u16;
         self.top_frame.controlstack.push(ControlData{controltype : WHILE, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+codelen), scopes : scopelen, other : None});
@@ -356,9 +356,9 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_FOR(&mut self) -> StepResult
     {
-        let exprlen = unpack_u64(&self.pull_from_code(8)?) as usize;
-        let postlen = unpack_u64(&self.pull_from_code(8)?) as usize;
-        let codelen = unpack_u64(&self.pull_from_code(8)?) as usize;
+        let exprlen = unpack_u64(&self.pull_from_code(8)?)? as usize;
+        let postlen = unpack_u64(&self.pull_from_code(8)?)? as usize;
+        let codelen = unpack_u64(&self.pull_from_code(8)?)? as usize;
         let current_pc = self.get_pc();
         let scopelen = self.top_frame.scopes.len() as u16;
         self.top_frame.controlstack.push(ControlData{controltype : FOR, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+postlen, current_pc+exprlen+postlen+codelen), scopes : scopelen, other : None});
@@ -376,7 +376,7 @@ impl Interpreter
         {
             let other_id = expr.round() as usize;
             
-            let codelen = unpack_u64(&self.pull_from_code(8)?);
+            let codelen = unpack_u64(&self.pull_from_code(8)?)?;
             
             let current_pc = self.get_pc();
             
@@ -588,7 +588,7 @@ impl Interpreter
         }
         
         let object_id = self.global.object_id;
-        let numfuncs = unpack_u16(&self.pull_from_code(2)?);
+        let numfuncs = unpack_u16(&self.pull_from_code(2)?)?;
         
         let mut funcs = HashMap::<String, FuncSpec>::new();
         for _ in 0..numfuncs
@@ -613,7 +613,7 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_COLLECTARRAY(&mut self) -> StepResult
     {
-        let numvals = unpack_u16(&self.pull_from_code(2)?) as usize;
+        let numvals = unpack_u16(&self.pull_from_code(2)?)? as usize;
         if self.stack_len() < numvals
         {
             return Err(Some(format!("internal error: not enough values on stack for COLLECTARRAY instruction to build array (need {}, have {})", numvals, self.stack_len())));
@@ -636,7 +636,7 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_COLLECTDICT(&mut self) -> StepResult
     {
-        let numvals = unpack_u16(&self.pull_from_code(2)?) as usize;
+        let numvals = unpack_u16(&self.pull_from_code(2)?)? as usize;
         if self.stack_len() < numvals*2
         {
             return Err(Some(format!("internal error: not enough values on stack for COLLECTDICT instruction to build dict (need {}, have {})", numvals*2, self.stack_len())));
@@ -783,7 +783,7 @@ impl Interpreter
     #[allow(non_snake_case)]
     pub (crate) fn sim_LINENUM(&mut self) -> StepResult
     {
-        self.top_frame.currline = unpack_u64(&self.pull_from_code(8)?) as usize;
+        self.top_frame.currline = unpack_u64(&self.pull_from_code(8)?)? as usize;
         Ok(())
     }
 }

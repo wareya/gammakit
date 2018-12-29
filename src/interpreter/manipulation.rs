@@ -115,9 +115,9 @@ impl Interpreter
         
         let name = self.read_string()?;
         
-        let argcount = unpack_u16(&self.pull_from_code(2)?);
+        let argcount = unpack_u16(&self.pull_from_code(2)?)?;
         
-        let bodylen = unpack_u64(&self.pull_from_code(8)?) as usize;
+        let bodylen = unpack_u64(&self.pull_from_code(8)?)? as usize;
         
         let mut args = Vec::<String>::new();
         for _ in 0..argcount
@@ -135,7 +135,7 @@ impl Interpreter
     {
         let code = self.get_code();
         
-        let capturecount = unpack_u16(&self.pull_from_code(2)?) as usize;
+        let capturecount = unpack_u16(&self.pull_from_code(2)?)? as usize;
         
         if self.top_frame.stack.len() < capturecount*2
         {
@@ -166,9 +166,9 @@ impl Interpreter
             }
         }
         
-        let argcount = unpack_u16(&self.pull_from_code(2)?);
+        let argcount = unpack_u16(&self.pull_from_code(2)?)?;
         
-        let bodylen = unpack_u64(&self.pull_from_code(8)?) as usize;
+        let bodylen = unpack_u64(&self.pull_from_code(8)?)? as usize;
         
         let mut args = Vec::<String>::new();
         for _ in 0..argcount

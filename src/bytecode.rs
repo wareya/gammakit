@@ -1,50 +1,37 @@
 #![allow(clippy::cast_lossless)]
 
-/*
-fn pack_u8(num : u8) -> Vec<u8>
-{
-    return vec!(num);
-}
-fn unpack_u8(vec : &[u8]) -> u8
-{
-    assert!(vec.len() == 1);
-    return vec[0];
-}
-*/
-
 pub (crate) fn pack_u16(num : u16) -> Vec<u8>
 {
     vec!(((num>>8)&0xFF) as u8, (num&0xFF) as u8)
 }
-pub (crate) fn unpack_u16(vec : &[u8]) -> u16
+pub (crate) fn unpack_u16(vec : &[u8]) -> Result<u16, Option<String>>
 {
-    assert!(vec.len() == 2);
-    (vec[1] as u16) | ((vec[0] as u16)<<8)
+    if vec.len() != 2
+    {
+        return Err(Some("tried to unpack u16 from buffer of size other than 2 bytes".to_string()));
+    }
+    Ok
+    (
+      (vec[1] as u16) | ((vec[0] as u16)<<8)
+    )
 }
-
-/*
-fn pack_u32(num : u32) -> Vec<u8>
-{
-    return vec!((num&0xFF) as u8, ((num>>8)&0xFF) as u8, ((num>>16)&0xFF) as u8, ((num>>24)&0xFF) as u8);
-}
-fn unpack_u32(vec : &Vec<u8>) -> u32
-{
-    assert!(vec.len() == 4);
-    return (vec[0] as u32) | ((vec[1] as u32)<<8) | ((vec[2] as u32)<<16) | ((vec[3] as u32)<<24);
-}
-*/
-
 
 pub (crate) fn pack_u64(num : u64) -> Vec<u8>
 {
     vec!(((num>>56)&0xFF) as u8, ((num>>48)&0xFF) as u8, ((num>>40)&0xFF) as u8, ((num>>32)&0xFF) as u8,
          ((num>>24)&0xFF) as u8, ((num>>16)&0xFF) as u8, ((num>> 8)&0xFF) as u8, ((num    )&0xFF) as u8)
 }
-pub (crate) fn unpack_u64(vec : &[u8]) -> u64
+pub (crate) fn unpack_u64(vec : &[u8]) ->  Result<u64, Option<String>>
 {
-    assert!(vec.len() == 8);
-    (   vec[7] as u64)      | ((vec[6] as u64)<< 8) | ((vec[5] as u64)<<16) | ((vec[4] as u64)<<24)
-    | ((vec[3] as u64)<<32) | ((vec[2] as u64)<<40) | ((vec[1] as u64)<<48) | ((vec[0] as u64)<<56)
+    if vec.len() != 8
+    {
+        return Err(Some("tried to unpack u64 from buffer of size other than 8 bytes".to_string()));
+    }
+    Ok
+    (
+      (   vec[7] as u64)      | ((vec[6] as u64)<< 8) | ((vec[5] as u64)<<16) | ((vec[4] as u64)<<24)
+      | ((vec[3] as u64)<<32) | ((vec[2] as u64)<<40) | ((vec[1] as u64)<<48) | ((vec[0] as u64)<<56)
+    )
 }
 
 pub (crate) fn pun_f64_as_u64(num : f64) -> u64
@@ -57,11 +44,14 @@ pub (crate) fn pack_f64(num : f64) -> Vec<u8>
     pack_u64(pun_f64_as_u64(num))
 }
 
-pub (crate) fn unpack_f64(vec : &[u8]) -> f64
+pub (crate) fn unpack_f64(vec : &[u8]) ->  Result<f64, Option<String>>
 {
-    assert!(vec.len() == 8);
-    let num = unpack_u64(vec);
-    f64::from_bits(num)
+    if vec.len() != 8
+    {
+        return Err(Some("tried to unpack f64 from buffer of size other than 8 bytes".to_string()));
+    }
+    let num = unpack_u64(vec)?;
+    Ok(f64::from_bits(num))
 }
 
 
@@ -103,11 +93,11 @@ pub (crate) const LINENUM : u8 = 0xF8;
 pub (crate) fn get_assignment_type(optext : &str) -> Option<u8>
 {
     match optext
-    { "="    => Some(0x00),
-      "+="   => Some(0x30),
-      "-="   => Some(0x31),
-      "*="   => Some(0x40),
-      "/="   => Some(0x41),
+    { "="  => Some(0x00),
+      "+=" => Some(0x30),
+      "-=" => Some(0x31),
+      "*=" => Some(0x40),
+      "/=" => Some(0x41),
       _ => None
     }
 }

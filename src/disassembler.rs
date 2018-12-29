@@ -1,7 +1,7 @@
 use super::strings::*;
 use super::bytecode::*;
 
-fn pull_n<'a>(pc : &mut usize, code : &'a[u8], n : usize) -> Result<&'a[u8], String>
+fn pull_n<'a>(pc : &mut usize, code : &'a[u8], n : usize) -> Result<&'a[u8], Option<String>>
 {
     *pc += n;
     if *pc >= code.len()
@@ -10,10 +10,10 @@ fn pull_n<'a>(pc : &mut usize, code : &'a[u8], n : usize) -> Result<&'a[u8], Str
     }
     else
     {
-        Err("error: tried to read past end of code".to_string())
+        Err(Some("error: tried to read past end of code".to_string()))
     }
 }
-fn pull(pc : &mut usize, code : &[u8]) -> Result<u8, String>
+fn pull(pc : &mut usize, code : &[u8]) -> Result<u8, Option<String>>
 {
     *pc += 1;
     if *pc >= code.len()
@@ -22,14 +22,14 @@ fn pull(pc : &mut usize, code : &[u8]) -> Result<u8, String>
     }
     else
     {
-        Err("error: tried to read past end of code".to_string())
+        Err(Some("error: tried to read past end of code".to_string()))
     }
 }
 fn put_lit(ret : &mut Vec<String>, mystr : &str)
 {
     ret.push(mystr.to_string());
 }
-fn pull_text(pc : &mut usize, code : &[u8]) -> Result<String, String>
+fn pull_text(pc : &mut usize, code : &[u8]) -> Result<String, Option<String>>
 {
     let mut bytes = Vec::<u8>::new();
     
@@ -46,10 +46,10 @@ fn pull_text(pc : &mut usize, code : &[u8]) -> Result<String, String>
     }
     else
     {
-        Err("error: tried to decode invalid utf-8".to_string())
+        Err(Some("error: tried to decode invalid utf-8".to_string()))
     }
 }
-fn pull_text_unescaped(pc : &mut usize, code : &[u8]) -> Result<String, String>
+fn pull_text_unescaped(pc : &mut usize, code : &[u8]) -> Result<String, Option<String>>
 {
     let mut bytes = Vec::<u8>::new();
     
@@ -66,10 +66,10 @@ fn pull_text_unescaped(pc : &mut usize, code : &[u8]) -> Result<String, String>
     }
     else
     {
-        Err("error: tried to decode invalid utf-8".to_string())
+        Err(Some("error: tried to decode invalid utf-8".to_string()))
     }
 }
-fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>) -> Result<usize, String>
+fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>) -> Result<usize, Option<String>>
 {
     macro_rules! pull_n {
         ($n:expr) =>
@@ -111,13 +111,13 @@ fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>)
         PUSHFLT =>
         {
             let immediate = pull_n!(8);
-            let num = unpack_f64(&immediate);
+            let num = unpack_f64(&immediate)?;
             ret.push(format!("PUSHFLT {}", num));
         }
         PUSHSHORT =>
         {
             let immediate = pull_n!(2);
-            let num = unpack_u16(&immediate);
+            let num = unpack_u16(&immediate)?;
             ret.push(format!("PUSHSHORT {}", num));
         }
         PUSHSTR =>
@@ -210,27 +210,27 @@ fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>)
         UNSCOPE =>
         {
             let immediate = pull_n!(2);
-            let num = unpack_u16(&immediate);
+            let num = unpack_u16(&immediate)?;
             ret.push(format!("UNSCOPE {}", num));
         }
         COLLECTARRAY =>
         {
             let immediate = pull_n!(2);
-            let num = unpack_u16(&immediate);
+            let num = unpack_u16(&immediate)?;
             ret.push(format!("COLLECTARRAY {}", num));
         }
         COLLECTDICT =>
         {
             let immediate = pull_n!(2);
-            let num = unpack_u16(&immediate);
+            let num = unpack_u16(&immediate)?;
             ret.push(format!("COLLECTDICT {}", num));
         }
         IF =>
         {
             let immediate_1 = pull_n!(8);
             let immediate_2 = pull_n!(8);
-            let num_1 = unpack_u64(&immediate_1) as usize;
-            let num_2 = unpack_u64(&immediate_2) as usize;
+            let num_1 = unpack_u64(&immediate_1)? as usize;
+            let num_2 = unpack_u64(&immediate_2)? as usize;
             let expr_disassembly = disassemble_bytecode(code, pc, pc+num_1)?;
             let code_disassembly = disassemble_bytecode(code, pc+num_1, pc+num_1+num_2)?;
             pc += num_1;
@@ -254,9 +254,9 @@ fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>)
             let immediate_1 = pull_n!(8);
             let immediate_2 = pull_n!(8);
             let immediate_3 = pull_n!(8);
-            let num_1 = unpack_u64(&immediate_1) as usize;
-            let num_2 = unpack_u64(&immediate_2) as usize;
-            let num_3 = unpack_u64(&immediate_3) as usize;
+            let num_1 = unpack_u64(&immediate_1)? as usize;
+            let num_2 = unpack_u64(&immediate_2)? as usize;
+            let num_3 = unpack_u64(&immediate_3)? as usize;
             let expr_disassembly = disassemble_bytecode(code, pc, pc+num_1)?;
             let code_disassembly = disassemble_bytecode(code, pc+num_1, pc+num_1+num_2)?;
             let else_disassembly = disassemble_bytecode(code, pc+num_1+num_2, pc+num_1+num_2+num_3)?;
@@ -287,8 +287,8 @@ fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>)
         {
             let immediate_1 = pull_n!(8);
             let immediate_2 = pull_n!(8);
-            let num_1 = unpack_u64(&immediate_1) as usize;
-            let num_2 = unpack_u64(&immediate_2) as usize;
+            let num_1 = unpack_u64(&immediate_1)? as usize;
+            let num_2 = unpack_u64(&immediate_2)? as usize;
             let expr_disassembly = disassemble_bytecode(code, pc, pc+num_1)?;
             let code_disassembly = disassemble_bytecode(code, pc+num_1, pc+num_1+num_2)?;
             pc += num_1;
@@ -312,9 +312,9 @@ fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>)
             let immediate_1 = pull_n!(8);
             let immediate_2 = pull_n!(8);
             let immediate_3 = pull_n!(8);
-            let num_1 = unpack_u64(&immediate_1) as usize;
-            let num_2 = unpack_u64(&immediate_2) as usize;
-            let num_3 = unpack_u64(&immediate_3) as usize;
+            let num_1 = unpack_u64(&immediate_1)? as usize;
+            let num_2 = unpack_u64(&immediate_2)? as usize;
+            let num_3 = unpack_u64(&immediate_3)? as usize;
             let expr_disassembly = disassemble_bytecode(code, pc, pc+num_1)?;
             let post_disassembly = disassemble_bytecode(code, pc+num_1, pc+num_1+num_2)?;
             let code_disassembly = disassemble_bytecode(code, pc+num_1+num_2, pc+num_1+num_2+num_3)?;
@@ -344,7 +344,7 @@ fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>)
         WITH =>
         {
             let immediate = pull_n!(8);
-            let num = unpack_u64(&immediate) as usize;
+            let num = unpack_u64(&immediate)? as usize;
             let code_disassembly = disassemble_bytecode(code, pc, pc+num)?;
             pc += num;
             put_lit!("WITH");
@@ -380,8 +380,8 @@ fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>)
             let name = pull_text!();
             let immediate_1 = pull_n!(2);
             let immediate_2 = pull_n!(8);
-            let num_1 = unpack_u16(&immediate_1);
-            let num_2 = unpack_u64(&immediate_2) as usize;
+            let num_1 = unpack_u16(&immediate_1)?;
+            let num_2 = unpack_u64(&immediate_2)? as usize;
             ret.push(format!("FUNCDEF {}", name));
             put_lit!("(");
             for _ in 0..num_1
@@ -403,9 +403,9 @@ fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>)
             let immediate_1 = pull_n!(2);
             let immediate_2 = pull_n!(2);
             let immediate_3 = pull_n!(8);
-            let num_1 = unpack_u16(&immediate_1);
-            let num_2 = unpack_u16(&immediate_2);
-            let num_3 = unpack_u64(&immediate_3) as usize;
+            let num_1 = unpack_u16(&immediate_1)?;
+            let num_2 = unpack_u16(&immediate_2)?;
+            let num_3 = unpack_u64(&immediate_3)? as usize;
             put_lit!("LAMBDA");
             ret.push(format!("[{}]", num_1));
             put_lit!("(");
@@ -428,7 +428,7 @@ fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>)
             let objname = pull_text!();
             
             let immediate = pull_n!(2);
-            let num = unpack_u16(&immediate);
+            let num = unpack_u16(&immediate)?;
             
             ret.push(format!("OBJDEF {}", objname));
             put_lit!("{");
@@ -438,8 +438,8 @@ fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>)
                 let name = pull_text!();
                 let immediate_1 = pull_n!(2);
                 let immediate_2 = pull_n!(8);
-                let num_1 = unpack_u16(&immediate_1);
-                let num_2 = unpack_u64(&immediate_2) as usize;
+                let num_1 = unpack_u16(&immediate_1)?;
+                let num_2 = unpack_u64(&immediate_2)? as usize;
                 ret.push(format!("    FUNCTION {}", name));
                 put_lit!("    (");
                 for _ in 0..num_1
@@ -469,7 +469,7 @@ fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>)
         LINENUM =>
         {
             let immediate = pull_n!(8);
-            let num = unpack_u64(&immediate);
+            let num = unpack_u64(&immediate)?;
             ret.push(format!("LINE {}", num));
         }
         _ =>
@@ -480,7 +480,7 @@ fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>)
     Ok(pc)
 }
 
-pub fn disassemble_bytecode(code : &[u8], mut pc : usize, mut end : usize) -> Result<Vec<String>, String>
+pub fn disassemble_bytecode(code : &[u8], mut pc : usize, mut end : usize) -> Result<Vec<String>, Option<String>>
 {
     let mut ret = Vec::<String>::new();
     
@@ -490,7 +490,7 @@ pub fn disassemble_bytecode(code : &[u8], mut pc : usize, mut end : usize) -> Re
     }
     else if end > code.len()
     {
-        return Err(format!("end value {} is past actual end of code {} in disassembler", end, code.len()));
+        return Err(Some(format!("end value {} is past actual end of code {} in disassembler", end, code.len())));
     }
     
     while pc < end

@@ -33,32 +33,30 @@ impl RegexHolder {
         self.exact_regexes.insert(regex_text.to_string(), regex);
         self.is_exact(regex_text, text)
     }
-    pub (crate) fn is_exact_immut(& self, regex_text : &str, text : &str) -> bool
+    pub (crate) fn is_exact_immut(& self, regex_text : &str, text : &str) -> Result<bool, Option<String>>
     {
         if let Some(regex) = self.exact_regexes.get(regex_text)
         {
             if let Ok(regex) = regex
             {
-                return regex.is_match(text);
+                Ok(regex.is_match(text))
             }
             else
             {
-                return false;
+                Ok(false)
             }
         }
         else
         {
-            panic!("internal error: attempted to use is_exact_immut for a regex that has not yet been cached");
+            Err(Some("internal error: attempted to use is_exact_immut for a regex that has not yet been cached".to_string()))
         }
     }
-    /*
     // regex offsets are bytes:
-    let mystr = "あそこだよっ！";
-    println!("{}", mystr);
-    let re = Regex::new("[あそ]").unwrap();
-    assert!(re.find_at(mystr, 0).unwrap().start() == 0);
-    assert!(re.find_at(mystr, 3).unwrap().start() == 3);
-    */
+    // let mystr = "あそこだよっ！";
+    // println!("{}", mystr);
+    // let re = Regex::new("[あそ]").unwrap();
+    // assert!(re.find_at(mystr, 0).unwrap().start() == 0);
+    // assert!(re.find_at(mystr, 3).unwrap().start() == 3);
     pub (crate) fn match_at(&mut self, regex_text : &str, text : &str, start : usize) -> Option<String>
     {
         if let Some(regex) = self.regexes.get(regex_text)
