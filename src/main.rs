@@ -55,7 +55,7 @@ fn main() -> std::io::Result<()>
         let mut interpreter = Interpreter::new(code, Some(parser));
         interpreter.insert_default_internal_functions();
         
-        while interpreter.step(){}
+        while interpreter.step().is_ok(){}
     }
     
     Ok(())
