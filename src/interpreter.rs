@@ -22,6 +22,9 @@ mod control;
 
 use self::types::*;
 
+pub type StepResult = Result<(), Option<String>>;
+type InternalFunction = Fn(&mut Interpreter, Vec<Value>, bool) -> (Value, bool);
+
 // global interpreter data
 struct GlobalState {
     instance_id: usize,// init 100000000
@@ -37,11 +40,18 @@ struct GlobalState {
 impl GlobalState {
     fn new(parser : Option<Parser>) -> GlobalState
     {
-        GlobalState { instance_id : 1_0000_0000, object_id : 3_0000_0000, instances : HashMap::new(), instances_by_type : HashMap::new(), objectnames : HashMap::new(), objects : HashMap::new() , regex_holder : RegexHolder::new(), parser }
+        GlobalState {
+            instance_id : 1_0000_0000,
+            object_id : 3_0000_0000,
+            instances : HashMap::new(),
+            instances_by_type : HashMap::new(),
+            objectnames : HashMap::new(),
+            objects : HashMap::new(),
+            regex_holder : RegexHolder::new(),
+            parser
+        }
     }
 }
-
-type InternalFunction = Fn(&mut Interpreter, Vec<Value>, bool) -> (Value, bool);
 
 // interpreter state
 pub struct Interpreter {
@@ -76,35 +86,26 @@ impl Interpreter {
     /// If execution cannot return, Err(Option<String>) is returned. This includes graceful exits.
     ///
     /// If there is an error string (Err(Some(string))), exit was non-graceful (i.e. there was an error). Otherwise (Err(None)), it was graceful.
-    pub fn step(&mut self) -> Result<(), Option<String>>
+    pub fn step(&mut self) -> StepResult
     {
-        let code = self.get_code();
+        let op = self.pull_single_from_code()?;
         
-        if self.top_frame.pc >= code.len()
+        if let Some(opfunc) = self.get_opfunc(op)
         {
-            return Err(Some("internal error: ran past end of code".to_string()));
-        }
-        else
-        {
-            let op = self.pull_single_from_code();
-            
-            if let Some(opfunc) = self.get_opfunc(op)
+            opfunc(self)?;
+            self.handle_flow_control();
+            if self.doexit
             {
-                opfunc(self);
-                self.handle_flow_control();
-                if self.doexit
-                {
-                    Err(None)
-                }
-                else
-                {
-                    Ok(())
-                }
+                Err(None)
             }
             else
             {
-                Err(Some(format!("internal error: unknown operation 0x{:02X}\nline: {}", op, self.top_frame.currline)))
+                Ok(())
             }
+        }
+        else
+        {
+            Err(Some(format!("internal error: unknown operation 0x{:02X}\nline: {}", op, self.top_frame.currline)))
         }
     }
 }

@@ -40,17 +40,25 @@ impl Interpreter
         self.top_frame.pc += new;
     }
     
-    pub (crate) fn pull_from_code(&mut self, n : usize) -> Vec<u8>
+    pub (crate) fn pull_from_code(&mut self, n : usize) -> Result<Vec<u8>, Option<String>>
     {
+        if self.get_pc()+n >= self.get_code().len()
+        {
+            return Err(Some("error: tried to access past end of code".to_string()))
+        }
         let vec = self.get_code()[self.get_pc()..self.get_pc()+n].to_vec();
         self.add_pc(n);
-        vec
+        Ok(vec)
     }
-    pub (crate) fn pull_single_from_code(&mut self) -> u8
+    pub (crate) fn pull_single_from_code(&mut self) -> Result<u8, Option<String>>
     {
+        if self.get_pc() >= self.get_code().len()
+        {
+            return Err(Some("error: tried to access past end of code".to_string()))
+        }
         let vec = self.get_code()[self.get_pc()];
         self.add_pc(1);
-        vec
+        Ok(vec)
     }
     
     // second val: 0: no value on stack; 1: value on stack was of the wrong type
@@ -75,59 +83,59 @@ impl Interpreter
         list_pop_generic!(args, Dict)
     }
     
-    pub (crate) fn read_string(&mut self) -> String
+    pub (crate) fn read_string(&mut self) -> Result<String, Option<String>>
     {
         let code = self.get_code();
         if self.get_pc() >= code.len()
         {
-            return "".to_string();
+            return Err(Some("error: tried to decode a string past the end of code".to_string()));
         }
         
         let mut bytes = Vec::<u8>::new();
         
-        let mut c = self.pull_single_from_code();
-        while c != 0 && self.get_pc() < code.len() // FIXME check if this should be < or <= (will only affect malformed bytecode, but still)
+        let mut c = self.pull_single_from_code()?;
+        while c != 0 && self.get_pc() < code.len()
         {
             bytes.push(c);
-            c = self.pull_single_from_code();
+            c = self.pull_single_from_code()?;
         }
         
         if let Ok(res) = std::str::from_utf8(&bytes)
         {
-            res.to_string()
+            Ok(res.to_string())
         }
         else
         {
-            "".to_string()
+            Err(Some("error: tried to decode a string that was not utf-8".to_string()))
         }
     }
-    pub (crate) fn read_function(&mut self) -> (String, FuncSpec)
+    pub (crate) fn read_function(&mut self) -> Result<(String, FuncSpec), Option<String>>
     {
         let code = self.get_code();
         
-        let name = self.read_string();
+        let name = self.read_string()?;
         
-        let argcount = unpack_u16(&self.pull_from_code(2));
+        let argcount = unpack_u16(&self.pull_from_code(2)?);
         
-        let bodylen = unpack_u64(&self.pull_from_code(8)) as usize;
+        let bodylen = unpack_u64(&self.pull_from_code(8)?) as usize;
         
         let mut args = Vec::<String>::new();
         for _ in 0..argcount
         {
-            args.push(self.read_string());
+            args.push(self.read_string()?);
         }
         
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        (name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location(), impassable : true } )
+        Ok((name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location(), impassable : true }))
     }
     
-    pub (crate) fn read_lambda(&mut self) -> (HashMap<String, Value>, FuncSpec)
+    pub (crate) fn read_lambda(&mut self) -> Result<(HashMap<String, Value>, FuncSpec), Option<String>>
     {
         let code = self.get_code();
         
-        let capturecount = unpack_u16(&self.pull_from_code(2)) as usize;
+        let capturecount = unpack_u16(&self.pull_from_code(2)?) as usize;
         
         if self.top_frame.stack.len() < capturecount*2
         {
@@ -158,20 +166,20 @@ impl Interpreter
             }
         }
         
-        let argcount = unpack_u16(&self.pull_from_code(2));
+        let argcount = unpack_u16(&self.pull_from_code(2)?);
         
-        let bodylen = unpack_u64(&self.pull_from_code(8)) as usize;
+        let bodylen = unpack_u64(&self.pull_from_code(8)?) as usize;
         
         let mut args = Vec::<String>::new();
         for _ in 0..argcount
         {
-            args.push(self.read_string());
+            args.push(self.read_string()?);
         }
         
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        (captures, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location(), impassable : true } )
+        Ok((captures, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, location : self.build_funcspec_location(), impassable : true }))
     }
     
     pub (crate) fn stack_pop_number(&mut self) -> Option<f64>
