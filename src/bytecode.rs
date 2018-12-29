@@ -1,5 +1,14 @@
 #![allow(clippy::cast_lossless)]
 
+fn get(vec : &[u8], n : usize) -> Result<u8, Option<String>>
+{
+    match vec.get(n)
+    {
+        Some(r) => Ok(*r),
+        None => Err(Some("tried to unpack past range of buffer".to_string()))
+    }
+}
+
 pub (crate) fn pack_u16(num : u16) -> Vec<u8>
 {
     vec!(((num>>8)&0xFF) as u8, (num&0xFF) as u8)
@@ -12,7 +21,7 @@ pub (crate) fn unpack_u16(vec : &[u8]) -> Result<u16, Option<String>>
     }
     Ok
     (
-      (vec[1] as u16) | ((vec[0] as u16)<<8)
+        (get(vec, 1)? as u16) | ((get(vec, 0)? as u16)<<8)
     )
 }
 
@@ -29,8 +38,8 @@ pub (crate) fn unpack_u64(vec : &[u8]) ->  Result<u64, Option<String>>
     }
     Ok
     (
-      (   vec[7] as u64)      | ((vec[6] as u64)<< 8) | ((vec[5] as u64)<<16) | ((vec[4] as u64)<<24)
-      | ((vec[3] as u64)<<32) | ((vec[2] as u64)<<40) | ((vec[1] as u64)<<48) | ((vec[0] as u64)<<56)
+        (   get(vec, 7)? as u64)      | ((get(vec, 6)? as u64)<< 8) | ((get(vec, 5)? as u64)<<16) | ((get(vec, 4)? as u64)<<24)
+        | ((get(vec, 3)? as u64)<<32) | ((get(vec, 2)? as u64)<<40) | ((get(vec, 1)? as u64)<<48) | ((get(vec, 0)? as u64)<<56)
     )
 }
 
