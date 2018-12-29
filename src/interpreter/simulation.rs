@@ -591,7 +591,7 @@ impl Interpreter
         let name = self.read_string()?;
         if self.global.objectnames.contains_key(&name)
         {
-            panic!("error: redeclared object {}", name);
+            return Err(Some(format!("error: redeclared object {}", name)));
         }
         
         let object_id = self.global.object_id;
@@ -605,7 +605,7 @@ impl Interpreter
             myfuncspec.parentobj = object_id;
             if funcs.contains_key(&funcname)
             {
-                panic!("error: redeclared function {} in object {}", funcname, name);
+                return Err(Some(format!("error: redeclared function {} in object {}", funcname, name)));
             }
             funcs.insert(funcname, myfuncspec);
         }
@@ -623,7 +623,7 @@ impl Interpreter
         let numvals = unpack_u16(&self.pull_from_code(2)?) as usize;
         if self.stack_len() < numvals
         {
-            panic!("internal error: not enough values on stack for COLLECTARRAY instruction to build array (need {}, have {})", numvals, self.stack_len());
+            return Err(Some(format!("internal error: not enough values on stack for COLLECTARRAY instruction to build array (need {}, have {})", numvals, self.stack_len())));
         }
         let mut myarray = VecDeque::<Value>::new();
         for _i in 0..numvals
@@ -634,7 +634,7 @@ impl Interpreter
             }
             else
             {
-                panic!("internal error: COLLECTARRAY instruction failed to collect values from stack (this error should be unreachable!)");
+                return plainerr("internal error: COLLECTARRAY instruction failed to collect values from stack (this error should be unreachable!)");
             }
         }
         self.stack_push_val(Value::Array(myarray));
@@ -646,7 +646,7 @@ impl Interpreter
         let numvals = unpack_u16(&self.pull_from_code(2)?) as usize;
         if self.stack_len() < numvals*2
         {
-            panic!("internal error: not enough values on stack for COLLECTDICT instruction to build dict (need {}, have {})", numvals*2, self.stack_len());
+            return Err(Some(format!("internal error: not enough values on stack for COLLECTDICT instruction to build dict (need {}, have {})", numvals*2, self.stack_len())));
         }
         
         let mut names = VecDeque::<HashableValue>::new();
@@ -671,18 +671,18 @@ impl Interpreter
                         }
                         _ =>
                         {
-                            panic!("error: dictionary key must be a string or number; was {:?}; line {}", key, self.top_frame.currline);
+                            return Err(Some(format!("error: dictionary key must be a string or number; was {:?}; line {}", key, self.top_frame.currline)));
                         }
                     }
                 }
                 else
                 {
-                    panic!("internal error: COLLECTDICT instruction failed to collect values from stack");
+                    return plainerr("internal error: COLLECTDICT instruction failed to collect values from stack");
                 }
             }
             else
             {
-                panic!("internal error: COLLECTDICT instruction failed to collect values from stack");
+                return plainerr("internal error: COLLECTDICT instruction failed to collect values from stack");
             }
         }
         let mut mydict = HashMap::<HashableValue, Value>::new();
@@ -698,7 +698,7 @@ impl Interpreter
     {
         if self.stack_len() < 2
         {
-            panic!("internal error: ARRAYEXPR instruction requires 2 values on the stack but found {}", self.stack_len());
+            return Err(Some(format!("internal error: ARRAYEXPR instruction requires 2 values on the stack but found {}", self.stack_len())));
         }
         if let Some(index) = self.stack_pop_val()
         {
@@ -726,18 +726,18 @@ impl Interpreter
                     _ =>
                     {
                         //panic!("error: tried to use array indexing on a non-indexable value\n{}", array);
-                        panic!("error: tried to use array indexing on a non-indexable value");
+                        return plainerr("error: tried to use array indexing on a non-indexable value");
                     }
                 }
             }
             else
             {
-                panic!("internal error: TODO write error askdgfauiowef");
+                return plainerr("internal error: TODO write error askdgfauiowef");
             }
         }
         else
         {
-            panic!("internal error: TODO write error askdgfauiowef");
+            return plainerr("internal error: TODO write error askdgfauiowef");
         }
         Ok(())
     }
@@ -777,13 +777,13 @@ impl Interpreter
                 }
                 else
                 {
-                    panic!("error: RETURN instruction needed a value remaining on the inner frame's stack, but there were none");
+                    return plainerr("error: RETURN instruction needed a value remaining on the inner frame's stack, but there were none");
                 }
             }
         }
         else
         {
-            panic!("error: attempted to return from global code; use exit() instead");
+            return plainerr("error: attempted to return from global code; use exit() instead");
         }
         Ok(())
     }
