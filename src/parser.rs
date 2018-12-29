@@ -713,7 +713,10 @@ impl Parser {
         {
             if ast.text == "objdef"
             {
-                assert!(ast.children.len() >= 3);
+                if !(ast.children.len() >= 3)
+                {
+                    return plainerr("internal error: objdef AST node does not have at least 3 children");
+                }
                 for child in ast.child_slice(3, -1)?
                 {
                     if matches!(child.child(1)?.child(0)?.text.as_str(), "create" | "destroy")
@@ -727,11 +730,13 @@ impl Parser {
             if matches!(ast.text.as_str(), "funccall" | "funcexpr" | "arrayref")
                && ast.children.len() != 2
             {
-                println!("broken ast node");
-                println!("-----");
-                print_ast_node(ast, 0);
-                println!("-----");
-                assert!(false);
+                // panic!() fixme
+                return plainerr("broken ast node");
+                //println!("broken ast node");
+                //println!("-----");
+                //print_ast_node(ast, 0);
+                //println!("-----");
+                //assert!(false);
             }
             
             for child in &ast.children
