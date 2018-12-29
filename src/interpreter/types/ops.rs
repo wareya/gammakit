@@ -162,11 +162,11 @@ fn value_op_modulo(left : &Value, right : &Value) -> Result<Value, String>
         }
     }
 }
-fn float_booly(f : f64) -> bool
+pub (crate) fn float_booly(f : f64) -> bool
 {
     f >= 0.5 // FIXME do we want to replicate this or can we get away with using f.round() != 0.0 instead?
 }
-fn bool_floaty(b : bool) -> f64
+pub (crate) fn bool_floaty(b : bool) -> f64
 {
     if b {1.0} else {0.0}
 }
@@ -418,139 +418,4 @@ pub (crate) fn value_truthy(imm : &Value) -> bool
             true
         }
     }
-}
-
-// TODO: move these to bindings.rs or something
-
-pub (crate) fn ast_to_dict(ast : &ASTNode) -> Value
-{
-    let mut astdict = HashMap::<HashableValue, Value>::new();
-    
-    macro_rules! to_key {
-        ( $str:expr ) =>
-        {
-            HashableValue::Text($str.to_string())
-        }
-    }
-    
-    astdict.insert(to_key!("text"), Value::Text(ast.text.clone()));
-    astdict.insert(to_key!("line"), Value::Number(ast.line as f64));
-    astdict.insert(to_key!("position"), Value::Number(ast.line as f64));
-    astdict.insert(to_key!("isparent"), Value::Number(bool_floaty(ast.isparent)));
-    
-    let mut children = VecDeque::<Value>::new();
-    
-    for child in &ast.children
-    {
-        children.push_back(ast_to_dict(&child));
-    }
-    
-    astdict.insert(to_key!("children"), Value::Array(children));
-    
-    let mut opdata = HashMap::<HashableValue, Value>::new();
-    
-    opdata.insert(to_key!("isop"), Value::Number(bool_floaty(ast.opdata.isop)));
-    opdata.insert(to_key!("assoc"), Value::Number(ast.opdata.assoc as f64));
-    opdata.insert(to_key!("precedence"), Value::Number(ast.opdata.precedence as f64));
-    
-    astdict.insert(to_key!("opdata"), Value::Dict(opdata));
-    
-    Value::Dict(astdict)
-}
-
-fn plainerr(mystr : &'static str) -> Result<ASTNode, Option<String>>
-{
-    Err(Some(mystr.to_string()))
-}
-
-pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTNode, Option<String>>
-{
-    let mut ast = dummy_astnode();
-    
-    macro_rules! get {
-        ( $dict:expr, $str:expr ) =>
-        {
-            $dict.get(&HashableValue::Text($str.to_string()))
-        }
-    }
-    
-    macro_rules! handle {
-        ( $into:expr, $dict:expr, $str:expr, $strident:ident, $subtype:ident, $helper:ident, $cast:ident, $errortext:expr ) =>
-        {
-            if let Some(Value::$subtype($strident)) = get!($dict, $str)
-            {
-                $into.$strident = $strident.$helper() as $cast;
-            }
-            else
-            {
-                return Err(Some(format!("error: tried to turn a dict into an ast but dict lacked \"{}\" field or the \"{}\" field was not {}", $str, $str, $errortext)));
-            }
-        }
-    }
-    
-    handle!(ast, dict, "text", text, Text, clone, String, "a string");
-    handle!(ast, dict, "line", line, Number, round, usize, "a number");
-    handle!(ast, dict, "position", position, Number, round, usize, "a number");
-    if let Some(Value::Number(isparent)) = get!(dict, "isparent")
-    {
-        ast.isparent = float_booly(*isparent);
-    }
-    else
-    {
-        return plainerr("error: tried to turn a dict into an ast but dict lacked \"isparent\" field or the \"isparent\" field was not a number");
-    }
-    
-    if let Some(Value::Array(val_children)) = get!(dict, "children")
-    {
-        // ast.children from dummy_astnode() starts out extant but empty
-        for child in val_children
-        {
-            if let Value::Dict(dict) = child
-            {
-                ast.children.push(dict_to_ast(&dict)?);
-            }
-            else
-            {
-                return plainerr("error: values in list of children in ast node must be dictionaries that are themselves ast nodes");
-            }
-        }
-    }
-    else
-    {
-        return plainerr("error: tried to turn a dict into an ast but dict lacked \"children\" field or the \"children\" field was not a list");
-    }
-    
-    if let Some(Value::Dict(val_opdata)) = get!(dict, "opdata")
-    {
-        if let Some(Value::Number(isop)) = get!(val_opdata, "isop")
-        {
-            ast.opdata.isop = float_booly(*isop);
-        }
-        else
-        {
-            return plainerr("error: tried to turn a dict into an ast but dict's opdata lacked \"isop\" field or the \"isop\" field was not a number");
-        }
-        if let Some(Value::Number(assoc)) = get!(val_opdata, "assoc")
-        {
-            ast.opdata.assoc = assoc.round() as i32;
-        }
-        else
-        {
-            return plainerr("error: tried to turn a dict into an ast but dict's opdata lacked \"assoc\" field or the \"assoc\" field was not a number");
-        }
-        if let Some(Value::Number(precedence)) = get!(val_opdata, "precedence")
-        {
-            ast.opdata.precedence = precedence.round() as i32;
-        }
-        else
-        {
-            return plainerr("error: tried to turn a dict into an ast but dict's opdata lacked \"precedence\" field or the \"precedence\" field was not a number");
-        }
-    }
-    else
-    {
-        return plainerr("error: tried to turn a dict into an ast but dict lacked \"opdata\" field or the \"opdata\" field was not a dictionary");
-    }
-    
-    Ok(ast)
 }

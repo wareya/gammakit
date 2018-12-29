@@ -1,9 +1,135 @@
 #![allow(clippy::type_complexity)]
 
 use crate::interpreter::*;
+use crate::interpreter::types::ops::{float_booly, bool_floaty};
 
-// last argument is isexpr - as of the time of writing this comment, it's used exclusively by instance_execute
-// second return value is whether the frame was moved - necessary for weird functions like instance_create that implicly call user defined functions, because moving the frame to call user defined functions also moves the original stack
+pub (crate) fn ast_to_dict(ast : &ASTNode) -> Value
+{
+    let mut astdict = HashMap::<HashableValue, Value>::new();
+    
+    macro_rules! to_key {
+        ( $str:expr ) =>
+        {
+            HashableValue::Text($str.to_string())
+        }
+    }
+    
+    astdict.insert(to_key!("text"), Value::Text(ast.text.clone()));
+    astdict.insert(to_key!("line"), Value::Number(ast.line as f64));
+    astdict.insert(to_key!("position"), Value::Number(ast.line as f64));
+    astdict.insert(to_key!("isparent"), Value::Number(bool_floaty(ast.isparent)));
+    
+    let mut children = VecDeque::<Value>::new();
+    
+    for child in &ast.children
+    {
+        children.push_back(ast_to_dict(&child));
+    }
+    
+    astdict.insert(to_key!("children"), Value::Array(children));
+    
+    let mut opdata = HashMap::<HashableValue, Value>::new();
+    
+    opdata.insert(to_key!("isop"), Value::Number(bool_floaty(ast.opdata.isop)));
+    opdata.insert(to_key!("assoc"), Value::Number(ast.opdata.assoc as f64));
+    opdata.insert(to_key!("precedence"), Value::Number(ast.opdata.precedence as f64));
+    
+    astdict.insert(to_key!("opdata"), Value::Dict(opdata));
+    
+    Value::Dict(astdict)
+}
+
+pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTNode, Option<String>>
+{
+    let mut ast = dummy_astnode();
+    
+    macro_rules! get {
+        ( $dict:expr, $str:expr ) =>
+        {
+            $dict.get(&HashableValue::Text($str.to_string()))
+        }
+    }
+    
+    macro_rules! handle {
+        ( $into:expr, $dict:expr, $str:expr, $strident:ident, $subtype:ident, $helper:ident, $cast:ident, $errortext:expr ) =>
+        {
+            if let Some(Value::$subtype($strident)) = get!($dict, $str)
+            {
+                $into.$strident = $strident.$helper() as $cast;
+            }
+            else
+            {
+                return Err(Some(format!("error: tried to turn a dict into an ast but dict lacked \"{}\" field or the \"{}\" field was not {}", $str, $str, $errortext)));
+            }
+        }
+    }
+    
+    handle!(ast, dict, "text", text, Text, clone, String, "a string");
+    handle!(ast, dict, "line", line, Number, round, usize, "a number");
+    handle!(ast, dict, "position", position, Number, round, usize, "a number");
+    if let Some(Value::Number(isparent)) = get!(dict, "isparent")
+    {
+        ast.isparent = float_booly(*isparent);
+    }
+    else
+    {
+        return plainerr("error: tried to turn a dict into an ast but dict lacked \"isparent\" field or the \"isparent\" field was not a number");
+    }
+    
+    if let Some(Value::Array(val_children)) = get!(dict, "children")
+    {
+        // ast.children from dummy_astnode() starts out extant but empty
+        for child in val_children
+        {
+            if let Value::Dict(dict) = child
+            {
+                ast.children.push(dict_to_ast(&dict)?);
+            }
+            else
+            {
+                return plainerr("error: values in list of children in ast node must be dictionaries that are themselves ast nodes");
+            }
+        }
+    }
+    else
+    {
+        return plainerr("error: tried to turn a dict into an ast but dict lacked \"children\" field or the \"children\" field was not a list");
+    }
+    
+    if let Some(Value::Dict(val_opdata)) = get!(dict, "opdata")
+    {
+        if let Some(Value::Number(isop)) = get!(val_opdata, "isop")
+        {
+            ast.opdata.isop = float_booly(*isop);
+        }
+        else
+        {
+            return plainerr("error: tried to turn a dict into an ast but dict's opdata lacked \"isop\" field or the \"isop\" field was not a number");
+        }
+        if let Some(Value::Number(assoc)) = get!(val_opdata, "assoc")
+        {
+            ast.opdata.assoc = assoc.round() as i32;
+        }
+        else
+        {
+            return plainerr("error: tried to turn a dict into an ast but dict's opdata lacked \"assoc\" field or the \"assoc\" field was not a number");
+        }
+        if let Some(Value::Number(precedence)) = get!(val_opdata, "precedence")
+        {
+            ast.opdata.precedence = precedence.round() as i32;
+        }
+        else
+        {
+            return plainerr("error: tried to turn a dict into an ast but dict's opdata lacked \"precedence\" field or the \"precedence\" field was not a number");
+        }
+    }
+    else
+    {
+        return plainerr("error: tried to turn a dict into an ast but dict lacked \"opdata\" field or the \"opdata\" field was not a dictionary");
+    }
+    
+    Ok(ast)
+}
 
 impl Interpreter
 {
@@ -60,6 +186,8 @@ impl Interpreter
     {
         self.internal_functions_noreturn.contains(name)
     }
+    // last argument is isexpr - as of the time of writing this comment, it's used exclusively by instance_execute
+    // second return value is whether the frame was moved - necessary for weird functions like instance_create that implicly call user defined functions, because moving the frame to call user defined functions also moves the original stack
     pub (crate) fn sim_func_print(&mut self, args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
     {
         for arg in args
@@ -70,7 +198,7 @@ impl Interpreter
             }
             else
             {
-                panic!("error: tried to print unprintable value");
+                return plainerr("error: tried to print unprintable value");
             }
         }
         Ok((Value::Number(0.0), false))
@@ -79,7 +207,7 @@ impl Interpreter
     {
         if args.len() != 1
         {
-            panic!("error: wrong number of arguments to len(); expected 1, got {}", args.len());
+            return Err(Some(format!("error: wrong number of arguments to len(); expected 1, got {}", args.len())));
         }
         if let Some(arg) = args.pop()
         {
@@ -99,20 +227,20 @@ impl Interpreter
                 }
                 _ =>
                 {
-                    panic!("error: tried to take length of lengthless type");
+                    return plainerr("error: tried to take length of lengthless type");
                 }
             }
         }
         else
         {
-            panic!("internal error: failed to read argument for len() despite having the right number of arguments (this error should be unreachable!)");
+            return plainerr("internal error: failed to read argument for len() despite having the right number of arguments (this error should be unreachable!)");
         }
     }
     pub (crate) fn sim_func_keys(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
     {
         if args.len() != 1
         {
-            panic!("error: wrong number of arguments to keys(); expected 1, got {}", args.len());
+            return Err(Some(format!("error: wrong number of arguments to keys(); expected 1, got {}", args.len())));
         }
         if let Some(arg) = args.pop()
         {
@@ -138,20 +266,20 @@ impl Interpreter
                 }
                 _ =>
                 {
-                    panic!("error: tried to take length of lengthless type");
+                    return plainerr("error: tried to take length of lengthless type");
                 }
             }
         }
         else
         {
-            panic!("internal error: failed to read argument for keys() despite having the right number of arguments (this error should be unreachable!)");
+            return plainerr("internal error: failed to read argument for keys() despite having the right number of arguments (this error should be unreachable!)");
         }
     }
     pub (crate) fn sim_func_instance_create(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
     {
         if args.len() != 1
         {
-            panic!("error: wrong number of arguments to instance_create(); expected 1, got {}", args.len());
+            return Err(Some(format!("error: wrong number of arguments to instance_create(); expected 1, got {}", args.len())));
         }
         if let Ok(object_id_f) = self.list_pop_number(&mut args)
         {
@@ -188,19 +316,19 @@ impl Interpreter
             }
             else
             {
-                panic!("error: tried to create instance of non-extant object type {}", object_id);
+                return Err(Some(format!("error: tried to create instance of non-extant object type {}", object_id)));
             }
         }
         else
         {
-            panic!("error: tried to use a non-number as an object id");
+            return plainerr("error: tried to use a non-number as an object id");
         }
     }
     pub (crate) fn sim_func_instance_add_variable(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
     {
         if args.len() < 2
         {
-            panic!("error: wrong number of arguments to instance_add_variable(); expected 2 or more, got {}", args.len());
+            return Err(Some(format!("error: wrong number of arguments to instance_add_variable(); expected 2 or more, got {}", args.len())));
         }
         if let Ok(instance_id_f) = self.list_pop_number(&mut args)
         {
@@ -209,7 +337,7 @@ impl Interpreter
             {
                 if !self.global.regex_holder.is_exact(r"[a-zA-Z_][a-zA-Z_0-9]*", &name)
                 {
-                    panic!("error: tried to create a variable with an invalid identifier `{}`\n(note: must exactly match the regex [a-zA-Z_][a-zA-Z_0-9]*)", name, )
+                    return Err(Some(format!("error: tried to create a variable with an invalid identifier `{}`\n(note: must exactly match the regex [a-zA-Z_][a-zA-Z_0-9]*)", name)));
                 }
                 let value : Value;
                 if args.len() == 1
@@ -220,7 +348,7 @@ impl Interpreter
                     }
                     else
                     {
-                        panic!("internal error: argument list was three values long but could not pop from it three times (this should be unreachable!)");
+                        return plainerr("internal error: argument list was three values long but could not pop from it three times (this should be unreachable!)");
                     }
                 }
                 else
@@ -231,23 +359,23 @@ impl Interpreter
                 {
                     if inst.variables.contains_key(&name)
                     {
-                        panic!("error: tried to add variable to instance that already had a variable with that name")
+                        return plainerr("error: tried to add variable to instance that already had a variable with that name")
                     }
                     inst.variables.insert(name, value);
                 }
                 else
                 {
-                    panic!("error: tried to add variable to instance {} that doesn't exist", instance_id);
+                    return Err(Some(format!("error: tried to add variable to instance {} that doesn't exist", instance_id)));
                 }
             }
             else
             {
-                panic!("error: second argument to instance_add_variable() must be a string");
+                return plainerr("error: second argument to instance_add_variable() must be a string");
             }
         }
         else
         {
-            panic!("error: first argument to instance_add_variable() must be a number");
+            return plainerr("error: first argument to instance_add_variable() must be a number");
         }
         Ok((Value::Number(0.0), false))
     }
@@ -255,7 +383,7 @@ impl Interpreter
     {
         if args.len() < 2
         {
-            panic!("error: wrong number of arguments to instance_execute(); expected 2 or more, got {}", args.len());
+            return Err(Some(format!("error: wrong number of arguments to instance_execute(); expected 2 or more, got {}", args.len())));
         }
         if let Ok(instance_id_f) = self.list_pop_number(&mut args)
         {
@@ -264,7 +392,7 @@ impl Interpreter
             {
                 if func.internal
                 {
-                    panic!("error: unsupported: tried to use instance_execute() with an internal function");
+                    return plainerr("error: unsupported: tried to use instance_execute() with an internal function");
                 }
                 if let Some(ref defdata) = func.userdefdata
                 {
@@ -275,22 +403,22 @@ impl Interpreter
                     }
                     else
                     {
-                        panic!("error: tried to add variable to instance {} that doesn't exist", instance_id);
+                        return Err(Some(format!("error: tried to add variable to instance {} that doesn't exist", instance_id)));
                     }
                 }
                 else
                 {
-                    panic!("internal error: funcval was non-internal but had no userdefdata");
+                    return plainerr("internal error: funcval was non-internal but had no userdefdata");
                 }
             }
             else
             {
-                panic!("error: second argument to instance_execute() must be a function");
+                return plainerr("error: second argument to instance_execute() must be a function");
             }
         }
         else
         {
-            panic!("error: first argument to instance_execute() must be a number");
+            return plainerr("error: first argument to instance_execute() must be a number");
         }
         Ok((Value::Number(0.0), true))
     }
@@ -298,7 +426,7 @@ impl Interpreter
     {
         if args.len() != 1
         {
-            panic!("error: wrong number of arguments to parse_text(); expected 1, got {}", args.len());
+            return Err(Some(format!("error: wrong number of arguments to parse_text(); expected 1, got {}", args.len())));
         }
         if let Ok(text) = self.list_pop_text(&mut args)
         {
@@ -312,17 +440,17 @@ impl Interpreter
                 }
                 else
                 {
-                    panic!("error: string failed to parse");
+                    return plainerr("error: string failed to parse");
                 }
             }
             else
             {
-                panic!("error: first argument to parse_text() must be a string");
+                return plainerr("error: first argument to parse_text() must be a string");
             }
         }
         else
         {
-            panic!("error: parser was not loaded into interpreter");
+            return plainerr("error: parser was not loaded into interpreter");
         }
     }
 
@@ -330,7 +458,7 @@ impl Interpreter
     {
         if args.len() != 1
         {
-            panic!("error: wrong number of arguments to compile_ast(); expected 1, got {}", args.len());
+            return Err(Some(format!("error: wrong number of arguments to compile_ast(); expected 1, got {}", args.len())));
         }
         if let Ok(dict) = self.list_pop_dict(&mut args)
         {
@@ -360,7 +488,7 @@ impl Interpreter
         }
         else
         {
-            panic!("error: first argument to compile_ast() must be a dictionary");
+            return plainerr("error: first argument to compile_ast() must be a dictionary");
         }
     }
 
@@ -368,7 +496,7 @@ impl Interpreter
     {
         if args.len() != 1
         {
-            panic!("error: wrong number of arguments to compile_text(); expected 1, got {}", args.len());
+            return Err(Some(format!("error: wrong number of arguments to compile_text(); expected 1, got {}", args.len())));
         }
         if let Ok(text) = self.list_pop_text(&mut args)
         {
@@ -402,17 +530,17 @@ impl Interpreter
                 }
                 else
                 {
-                    panic!("error: string failed to parse");
+                    return plainerr("error: string failed to parse");
                 }
             }
             else
             {
-                panic!("error: first argument to compile_text() must be a string");
+                return plainerr("error: first argument to compile_text() must be a string");
             }
         }
         else
         {
-            panic!("error: parser was not loaded into interpreter");
+            return plainerr("error: parser was not loaded into interpreter");
         }
     }
 }

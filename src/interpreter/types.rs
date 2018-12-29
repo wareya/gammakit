@@ -4,7 +4,7 @@
 
 use crate::interpreter::*;
 
-mod ops;
+pub (crate) mod ops;
 
 pub (crate) use self::ops::*;
 
