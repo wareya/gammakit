@@ -464,7 +464,7 @@ impl Interpreter
         {
             let ast = dict_to_ast(&dict)?;
             
-            let code = compile_bytecode(&ast);
+            let code = compile_bytecode(&ast)?;
             
             // endaddr at the start because Rc::new() moves `code`
             return Ok(
@@ -506,7 +506,7 @@ impl Interpreter
                 let tokens = parser.tokenize(&program_lines, true);
                 if let Some(ref ast) = parser.parse_program(&tokens, &program_lines, true)
                 {
-                    let code = compile_bytecode(ast);
+                    let code = compile_bytecode(ast)?;
                     
                     // endaddr at the start because Rc::new() moves `code`
                     return Ok(

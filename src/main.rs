@@ -43,19 +43,26 @@ fn main() -> std::io::Result<()>
     {
         let code = compile_bytecode(ast);
         
-        if false
+        if let Ok(code) = code
         {
-            let disassembly = disassemble_bytecode(&code, 0, 0);
-            for line in disassembly
+            if false
             {
-                println!("{}", line);
+                let disassembly = disassemble_bytecode(&code, 0, 0);
+                for line in disassembly
+                {
+                    println!("{}", line);
+                }
             }
+            
+            let mut interpreter = Interpreter::new(code, Some(parser));
+            interpreter.insert_default_internal_functions();
+            
+            while interpreter.step().is_ok(){}
         }
-        
-        let mut interpreter = Interpreter::new(code, Some(parser));
-        interpreter.insert_default_internal_functions();
-        
-        while interpreter.step().is_ok(){}
+        else if let Err(err) = code
+        {
+            println!("{}", err.unwrap());
+        }
     }
     
     Ok(())
