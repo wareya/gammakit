@@ -52,12 +52,10 @@ fn main() -> std::io::Result<()>
             }
         }
         
-        let mut global = GlobalState::new(parser.clone());
-        
-        let mut interpreter = Interpreter::new(code);
+        let mut interpreter = Interpreter::new(code, Some(parser));
         interpreter.insert_default_internal_functions();
         
-        while interpreter.step(&mut global){}
+        while interpreter.step(){}
     }
     
     Ok(())

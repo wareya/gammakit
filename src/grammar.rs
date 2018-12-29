@@ -2,7 +2,7 @@ use super::strings::*;
 use super::parser::Parser;
 
 #[derive(Clone)]
-pub enum GrammarToken {
+pub (crate) enum GrammarToken {
     Name(String),
     NameList(String),
     OptionalName(String),
@@ -15,13 +15,13 @@ pub enum GrammarToken {
 }
 
 #[derive(Clone)]
-pub struct GrammarForm {
-    pub tokens : Vec<GrammarToken>
+pub (crate) struct GrammarForm {
+    pub (crate) tokens : Vec<GrammarToken>
 }
 
 impl GrammarForm
 {
-    pub fn new(line : &str, parser : &mut Parser, intoken : bool) -> GrammarForm
+    pub (crate) fn new(line : &str, parser : &mut Parser, intoken : bool) -> GrammarForm
     {
         let re = &mut parser.internal_regexes;
         let mut ret = GrammarForm { tokens : Vec::new() };

@@ -47,7 +47,7 @@ impl Interpreter
             panic!("internal error: no scope in top frame despite just making it in jump_to_function (this error should be unreachable!)");
         }
     }
-    pub (crate) fn call_function(&mut self, global : &mut GlobalState, funcdata : FuncVal, args : Vec<Value>, isexpr : bool)
+    pub (crate) fn call_function(&mut self, funcdata : FuncVal, args : Vec<Value>, isexpr : bool)
     {
         if funcdata.internal
         {
@@ -55,7 +55,7 @@ impl Interpreter
             {
                 if let Some(internal_func) = self.get_internal_function(&name)
                 {
-                    let (ret, moved_frame) = internal_func(self, global, args, isexpr);
+                    let (ret, moved_frame) = internal_func(self, args, isexpr);
                     if isexpr && !self.internal_function_is_noreturn(&name)
                     {
                         let frames_len = self.frames.len(); // for the panic down there (non-lexical borrow lifetimes pls happen soon)
@@ -95,10 +95,10 @@ impl Interpreter
                 }
                 else if defdata.forcecontext != 0
                 {
-                    if let Some(inst) = global.instances.get(&defdata.forcecontext)
+                    if let Some(inst) = self.global.instances.get(&defdata.forcecontext)
                     {
                         // FIXME ?
-                        if !global.objects.contains_key(&inst.objtype)
+                        if !self.global.objects.contains_key(&inst.objtype)
                         {
                             panic!("error: tried to access data from object type {} that no longer exists", inst.objtype);
                         }
@@ -117,9 +117,9 @@ impl Interpreter
                     let inst_copy : Vec<usize> = self.top_frame.instancestack.iter().cloned().rev().collect();
                     for instance in inst_copy
                     {
-                        if let Some(inst) = global.instances.get(&instance)
+                        if let Some(inst) = self.global.instances.get(&instance)
                         {
-                            if !global.objects.contains_key(&inst.objtype)
+                            if !self.global.objects.contains_key(&inst.objtype)
                             {
                                 panic!("error: tried to access data from object type {} that no longer exists", inst.objtype);
                             }

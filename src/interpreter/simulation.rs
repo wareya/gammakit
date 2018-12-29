@@ -5,7 +5,7 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
-    pub (crate) fn get_opfunc(&mut self, op : u8) -> Option<Box<Fn(&mut Interpreter, &mut GlobalState)>>
+    pub (crate) fn get_opfunc(&mut self, op : u8) -> Option<Box<Fn(&mut Interpreter)>>
     {
         macro_rules! enbox {
             ( $x:ident ) =>
@@ -53,40 +53,40 @@ impl Interpreter
     }
     
     #[allow(non_snake_case)] 
-    pub (crate) fn sim_NOP(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_NOP(&mut self)
     {
         
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_PUSHFLT(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_PUSHFLT(&mut self)
     {
         let value = unpack_f64(&self.pull_from_code(8));
         self.stack_push_val(Value::Number(value));
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_PUSHSHORT(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_PUSHSHORT(&mut self)
     {
         let value = unpack_u16(&self.pull_from_code(2));
         self.stack_push_val(Value::Number(value as f64));
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_PUSHSTR(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_PUSHSTR(&mut self)
     {
         let text = self.read_string();
         self.stack_push_val(Value::Text(text));
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_PUSHNAME(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_PUSHNAME(&mut self)
     {
         let text = self.read_string();
         self.stack_push_var(Variable::Direct(DirectVar{name:text}));
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_PUSHVAR(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_PUSHVAR(&mut self)
     {
         let name = self.read_string();
         let dirvar = Variable::Direct(DirectVar{name : name.clone()}); // FIXME suboptimal but helps error message
-        if let Some(val) = self.evaluate_or_store(global, &dirvar, None)
+        if let Some(val) = self.evaluate_or_store(&dirvar, None)
         {
             self.stack_push_val(val);
         }
@@ -96,7 +96,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_DECLVAR(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_DECLVAR(&mut self)
     {
         if self.stack_len() < 1
         {
@@ -124,7 +124,7 @@ impl Interpreter
     }
     
     #[allow(non_snake_case)]
-    pub (crate) fn sim_DECLFAR(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_DECLFAR(&mut self)
     {
         if self.stack_len() < 1
         {
@@ -134,7 +134,7 @@ impl Interpreter
         {
             if let Some(instance_id) = self.top_frame.instancestack.last()
             {
-                if let Some(instance) = global.instances.get_mut(instance_id)
+                if let Some(instance) = self.global.instances.get_mut(instance_id)
                 {
                     if !instance.variables.contains_key(&name)
                     {
@@ -162,7 +162,7 @@ impl Interpreter
     }
     
     #[allow(non_snake_case)]
-    pub (crate) fn sim_INDIRECTION(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_INDIRECTION(&mut self)
     {
         if self.stack_len() < 2
         {
@@ -174,7 +174,7 @@ impl Interpreter
             {
                 let id = left.round() as usize;
                 
-                if global.instances.contains_key(&id)
+                if self.global.instances.contains_key(&id)
                 {
                     self.stack_push_var(Variable::Indirect(IndirectVar{ident : id, name : right}));
                 }
@@ -194,7 +194,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_EVALUATION(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_EVALUATION(&mut self)
     {
         if let Some(var) = self.stack_pop_var()
         {
@@ -203,7 +203,7 @@ impl Interpreter
                 Variable::Indirect(_) |
                 Variable::Array(_) =>
                 {
-                    if let Some(value) = self.evaluate_or_store(global, &var, None)
+                    if let Some(value) = self.evaluate_or_store(&var, None)
                     {
                         self.stack_push_val(value);
                     }
@@ -224,18 +224,18 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_FUNCCALL(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_FUNCCALL(&mut self)
     {
-        self.handle_func_call_or_expr(global, false);
+        self.handle_func_call_or_expr(false);
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_FUNCEXPR(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_FUNCEXPR(&mut self)
     {
-        self.handle_func_call_or_expr(global, true);
+        self.handle_func_call_or_expr(true);
     }
     
     #[allow(non_snake_case)]
-    pub (crate) fn sim_SCOPE(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_SCOPE(&mut self)
     {
         self.top_frame.scopes.push(HashMap::new());
         let here = self.get_pc();
@@ -246,14 +246,14 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_UNSCOPE(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_UNSCOPE(&mut self)
     {
         let immediate = unpack_u16(&self.pull_from_code(2)) as usize;
         
         self.drain_scopes((immediate+1) as u16);
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_BREAK(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_BREAK(&mut self)
     {
         self.pop_controlstack_until_loop();
         
@@ -282,7 +282,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_CONTINUE(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_CONTINUE(&mut self)
     {
         self.pop_controlstack_until_loop();
         
@@ -310,7 +310,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_IF(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_IF(&mut self)
     {
         let exprlen = unpack_u64(&self.pull_from_code(8)) as usize;
         let codelen = unpack_u64(&self.pull_from_code(8)) as usize;
@@ -319,7 +319,7 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : IF, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen), scopes : scopelen, other : None});
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_IFELSE(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_IFELSE(&mut self)
     {
         let exprlen = unpack_u64(&self.pull_from_code(8)) as usize;
         let codelen1 = unpack_u64(&self.pull_from_code(8)) as usize;
@@ -329,7 +329,7 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : IFELSE, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen1, current_pc+exprlen+codelen1+codelen2), scopes : scopelen, other : None});
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_WHILE(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_WHILE(&mut self)
     {
         let exprlen = unpack_u64(&self.pull_from_code(8)) as usize;
         let codelen = unpack_u64(&self.pull_from_code(8)) as usize;
@@ -338,7 +338,7 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : WHILE, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+codelen), scopes : scopelen, other : None});
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_FOR(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_FOR(&mut self)
     {
         let exprlen = unpack_u64(&self.pull_from_code(8)) as usize;
         let postlen = unpack_u64(&self.pull_from_code(8)) as usize;
@@ -348,7 +348,7 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : FOR, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+postlen, current_pc+exprlen+postlen+codelen), scopes : scopelen, other : None});
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_WITH(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_WITH(&mut self)
     {
         if self.stack_len() < 1
         {
@@ -363,13 +363,13 @@ impl Interpreter
             
             let current_pc = self.get_pc();
             
-            if global.instances.contains_key(&other_id)
+            if self.global.instances.contains_key(&other_id)
             {
                 self.top_frame.instancestack.push(other_id);
                 
                 self.top_frame.controlstack.push(ControlData{controltype : WITH, controlpoints : vec!(current_pc, current_pc + codelen as usize), scopes : self.top_frame.scopes.len() as u16, other : Some(VecDeque::new())});
             }
-            else if let Some(instance_id_list) = global.instances_by_type.get(&other_id)
+            else if let Some(instance_id_list) = self.global.instances_by_type.get(&other_id)
             {
                 if let Some(first) = instance_id_list.first()
                 {
@@ -395,7 +395,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_FUNCDEF(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_FUNCDEF(&mut self)
     {
         let (funcname, myfuncspec) = self.read_function();
         if let Some(scope) = self.top_frame.scopes.last_mut()
@@ -414,7 +414,7 @@ impl Interpreter
     }
     
     #[allow(non_snake_case)]
-    pub (crate) fn sim_BINSTATE(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_BINSTATE(&mut self)
     {
         if self.stack_len() < 2
         {
@@ -429,17 +429,17 @@ impl Interpreter
             {
                 if immediate == 0x00
                 {
-                    self.evaluate_or_store(global, &var, Some(value));
+                    self.evaluate_or_store(&var, Some(value));
                 }
                 else if let Some(opfunc) = get_binop_function(immediate)
                 {
-                    if let Some(var_initial_value) = self.evaluate_or_store(global, &var, None)
+                    if let Some(var_initial_value) = self.evaluate_or_store(&var, None)
                     {
                         match opfunc(&var_initial_value, &value)
                         {
                             Ok(var_new_value) =>
                             {
-                                self.evaluate_or_store(global, &var, Some(var_new_value));
+                                self.evaluate_or_store(&var, Some(var_new_value));
                             }
                             Err(text) =>
                             {
@@ -470,7 +470,7 @@ impl Interpreter
     }
     
     #[allow(non_snake_case)]
-    pub (crate) fn sim_BINOP(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_BINOP(&mut self)
     {
         if self.stack_len() < 2
         {
@@ -514,7 +514,7 @@ impl Interpreter
     }
     
     #[allow(non_snake_case)]
-    pub (crate) fn sim_UNOP(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_UNOP(&mut self)
     {
         if self.stack_len() < 1
         {
@@ -550,21 +550,21 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_LAMBDA(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_LAMBDA(&mut self)
     {
         let (captures, myfuncspec) = self.read_lambda();
         self.stack_push_val(Value::new_funcval(false, Some("lambda_self".to_string()), Some(captures), Some(myfuncspec)));
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_OBJDEF(&mut self, global : &mut GlobalState)
+    pub (crate) fn sim_OBJDEF(&mut self)
     {
         let name = self.read_string();
-        if global.objectnames.contains_key(&name)
+        if self.global.objectnames.contains_key(&name)
         {
             panic!("error: redeclared object {}", name);
         }
         
-        let object_id = global.object_id;
+        let object_id = self.global.object_id;
         let numfuncs = unpack_u16(&self.pull_from_code(2));
         
         let mut funcs = HashMap::<String, FuncSpec>::new();
@@ -580,14 +580,14 @@ impl Interpreter
             funcs.insert(funcname, myfuncspec);
         }
         
-        global.objectnames.insert(name.clone(), object_id);
-        global.objects.insert(object_id, ObjSpec { ident : object_id, name, functions : funcs });
-        global.instances_by_type.insert(object_id, Vec::new());
+        self.global.objectnames.insert(name.clone(), object_id);
+        self.global.objects.insert(object_id, ObjSpec { ident : object_id, name, functions : funcs });
+        self.global.instances_by_type.insert(object_id, Vec::new());
         
-        global.object_id += 1;
+        self.global.object_id += 1;
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_COLLECTARRAY(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_COLLECTARRAY(&mut self)
     {
         let numvals = unpack_u16(&self.pull_from_code(2)) as usize;
         if self.stack_len() < numvals
@@ -609,7 +609,7 @@ impl Interpreter
         self.stack_push_val(Value::Array(myarray));
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_COLLECTDICT(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_COLLECTDICT(&mut self)
     {
         let numvals = unpack_u16(&self.pull_from_code(2)) as usize;
         if self.stack_len() < numvals*2
@@ -661,7 +661,7 @@ impl Interpreter
         self.stack_push_val(Value::Dict(mydict));
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_ARRAYEXPR(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_ARRAYEXPR(&mut self)
     {
         if self.stack_len() < 2
         {
@@ -708,7 +708,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_EXIT(&mut self, _global : &mut GlobalState) // an exit is a return with no value
+    pub (crate) fn sim_EXIT(&mut self) // an exit is a return with no value
     {
         if let Some(top_frame) = self.frames.pop()
         {
@@ -726,7 +726,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_RETURN(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_RETURN(&mut self)
     {
         if let Some(old_frame) = self.frames.pop()
         {
@@ -752,7 +752,7 @@ impl Interpreter
         }
     }
     #[allow(non_snake_case)]
-    pub (crate) fn sim_LINENUM(&mut self, _global : &mut GlobalState)
+    pub (crate) fn sim_LINENUM(&mut self)
     {
         self.top_frame.currline = unpack_u64(&self.pull_from_code(8)) as usize;
     }

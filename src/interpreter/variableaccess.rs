@@ -144,7 +144,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
         }
     }
 }
-// FIXME: find a way to check and access without duplicating work and also while satisfying the borrow checker
+
 fn check_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar) -> bool
 {
     // FIXME: do I even want to search up instance stacks rather than just accessing the main one?
@@ -262,13 +262,13 @@ fn access_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &
 }
 impl Interpreter
 {
-    fn evaluate_or_store_of_array(&mut self, global : &mut GlobalState, arrayvar : &ArrayVar, value : Option<Value>) -> Option<Value>
+    fn evaluate_or_store_of_array(&mut self, arrayvar : &ArrayVar, value : Option<Value>) -> Option<Value>
     {
         match &arrayvar.location
         {
             NonArrayVariable::Indirect(ref indirvar) =>
             {
-                if let Some(instance) = global.instances.get_mut(&indirvar.ident)
+                if let Some(instance) = self.global.instances.get_mut(&indirvar.ident)
                 {
                     if let Some(mut var) = instance.variables.get_mut(&indirvar.name)
                     {
@@ -286,22 +286,22 @@ impl Interpreter
             }
             NonArrayVariable::Direct(ref dirvar) =>
             {
-                if check_frame_dirvar_indexed(global, &mut self.top_frame, dirvar)
+                if check_frame_dirvar_indexed(&mut self.global, &mut self.top_frame, dirvar)
                 {
-                    return access_frame_dirvar_indexed(global, &mut self.top_frame, dirvar, value, &arrayvar.indexes[..]);
+                    return access_frame_dirvar_indexed(&mut self.global, &mut self.top_frame, dirvar, value, &arrayvar.indexes[..]);
                 }
                 if !self.top_frame.impassable
                 {
                     for mut frame in self.frames.iter_mut().rev()
                     {
-                        if check_frame_dirvar_indexed(global, &mut frame, dirvar)
+                        if check_frame_dirvar_indexed(&mut self.global, &mut frame, dirvar)
                         {
-                            return access_frame_dirvar_indexed(global, &mut frame, dirvar, value, &arrayvar.indexes[..]);
+                            return access_frame_dirvar_indexed(&mut self.global, &mut frame, dirvar, value, &arrayvar.indexes[..]);
                         }
                         if frame.impassable { break; }
                     }
                 }
-                if global.objectnames.get(&dirvar.name).is_some()
+                if self.global.objectnames.get(&dirvar.name).is_some()
                 {
                     panic!("error: tried to index into object name as though it was an array");
                 }
@@ -324,15 +324,15 @@ impl Interpreter
             }
         }
     }
-    fn evaluate_or_store_of_indirect(&mut self, global : &mut GlobalState, indirvar : &IndirectVar, value : Option<Value>) -> Option<Value>
+    fn evaluate_or_store_of_indirect(&mut self, indirvar : &IndirectVar, value : Option<Value>) -> Option<Value>
     {
-        if let Some(instance) = global.instances.get_mut(&indirvar.ident)
+        if let Some(instance) = self.global.instances.get_mut(&indirvar.ident)
         {
             if let Some(var) = instance.variables.get_mut(&indirvar.name)
             {
                 return assign_or_return(value, var);
             }
-            else if let Some(objspec) = global.objects.get(&instance.objtype)
+            else if let Some(objspec) = self.global.objects.get(&instance.objtype)
             {
                 if let Some(funcdat) = objspec.functions.get(&indirvar.name)
                 {
@@ -362,24 +362,24 @@ impl Interpreter
             panic!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, indirvar.ident);
         }
     }
-    fn evaluate_or_store_of_direct(&mut self, global : &mut GlobalState, dirvar : &DirectVar, value : Option<Value>) -> Option<Value>
+    fn evaluate_or_store_of_direct(&mut self, dirvar : &DirectVar, value : Option<Value>) -> Option<Value>
     {
-        if check_frame_dirvar(global, &mut self.top_frame, dirvar)
+        if check_frame_dirvar(&mut self.global, &mut self.top_frame, dirvar)
         {
-            return access_frame_dirvar(global, &mut self.top_frame, dirvar, value);
+            return access_frame_dirvar(&mut self.global, &mut self.top_frame, dirvar, value);
         }
         if !self.top_frame.impassable
         {
             for mut frame in self.frames.iter_mut().rev()
             {
-                if check_frame_dirvar(global, &mut frame, dirvar)
+                if check_frame_dirvar(&mut self.global, &mut frame, dirvar)
                 {
-                    return access_frame_dirvar(global, &mut frame, dirvar, value);
+                    return access_frame_dirvar(&mut self.global, &mut frame, dirvar, value);
                 }
                 if frame.impassable { break; }
             }
         }
-        if let Some(var) = global.objectnames.get(&dirvar.name)
+        if let Some(var) = self.global.objectnames.get(&dirvar.name)
         {
             if let Some(_value) = value
             {
@@ -399,21 +399,21 @@ impl Interpreter
         panic!("error: unknown identifier `{}`", dirvar.name);
     }
     // if value is None, finds and returns appropriate value; otherwise, stores value and returns None
-    pub (crate) fn evaluate_or_store(&mut self, global : &mut GlobalState, variable : &Variable, value : Option<Value>) -> Option<Value>
+    pub (crate) fn evaluate_or_store(&mut self, variable : &Variable, value : Option<Value>) -> Option<Value>
     {
         match &variable
         {
             Variable::Array(ref arrayvar) =>
             {
-                self.evaluate_or_store_of_array(global, arrayvar, value)
+                self.evaluate_or_store_of_array(arrayvar, value)
             }
             Variable::Indirect(ref indirvar) =>
             {
-                self.evaluate_or_store_of_indirect(global, indirvar, value)
+                self.evaluate_or_store_of_indirect(indirvar, value)
             }
             Variable::Direct(ref dirvar) =>
             {
-                self.evaluate_or_store_of_direct(global, dirvar, value)
+                self.evaluate_or_store_of_direct(dirvar, value)
             }
         }
     }

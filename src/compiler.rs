@@ -810,7 +810,7 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Vec<u8>
     }
 }
 
-pub (crate) fn compile_bytecode(ast : &ASTNode) -> Vec<u8>
+pub fn compile_bytecode(ast : &ASTNode) -> Vec<u8>
 {
     compile_astnode(ast, 0)
 }

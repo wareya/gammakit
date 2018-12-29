@@ -31,17 +31,17 @@ pub struct GlobalState {
     objectnames: HashMap<String, usize>,
     objects: HashMap<usize, ObjSpec>,
     regex_holder: RegexHolder,
-    parser: Parser
+    parser: Option<Parser>
 }
 
 impl GlobalState {
-    pub (crate) fn new(parser : Parser) -> GlobalState
+    pub (crate) fn new(parser : Option<Parser>) -> GlobalState
     {
         GlobalState { instance_id : 1_0000_0000, object_id : 3_0000_0000, instances : HashMap::new(), instances_by_type : HashMap::new(), objectnames : HashMap::new(), objects : HashMap::new() , regex_holder : RegexHolder::new(), parser }
     }
 }
 
-pub type InternalFunction = Fn(&mut Interpreter, &mut GlobalState, Vec<Value>, bool) -> (Value, bool);
+type InternalFunction = Fn(&mut Interpreter, Vec<Value>, bool) -> (Value, bool);
 
 // interpreter state
 pub struct Interpreter {
@@ -50,11 +50,12 @@ pub struct Interpreter {
     doexit: bool,
     suppress_for_expr_end: bool,
     internal_functions: HashMap<String, Rc<InternalFunction>>,
-    internal_functions_noreturn: HashSet<String>
+    internal_functions_noreturn: HashSet<String>,
+    global: GlobalState,
 }
 
 impl Interpreter {
-    pub fn new(code : Vec<u8>) -> Interpreter
+    pub fn new(code : Vec<u8>, parser : Option<Parser>) -> Interpreter
     {
         Interpreter {
             top_frame : Frame::new_root(Rc::new(code)),
@@ -62,10 +63,11 @@ impl Interpreter {
             doexit : false,
             suppress_for_expr_end : false,
             internal_functions : HashMap::new(),
-            internal_functions_noreturn : HashSet::new()
+            internal_functions_noreturn : HashSet::new(),
+            global : GlobalState::new(parser),
         }
     }
-    pub fn step(&mut self, global : &mut GlobalState) -> bool // TODO: return whether there was an error or not
+    pub fn step(&mut self) -> bool // TODO: return whether there was an error or not
     {
         let code = self.get_code();
         
@@ -78,7 +80,7 @@ impl Interpreter {
         
         if let Some(opfunc) = self.get_opfunc(op)
         {
-            opfunc(self, global);
+            opfunc(self);
             self.handle_flow_control();
             return !self.doexit;
         }
