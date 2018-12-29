@@ -73,6 +73,11 @@ pub struct Parser {
     inited: bool,
 }
 
+fn plainerr<T>(mystr : &str) -> Result<T, Option<String>>
+{
+    Err(Some(mystr.to_string()))
+}
+
 impl Parser {
     pub fn new() -> Parser
     {
@@ -85,10 +90,11 @@ impl Parser {
             text_set: HashSet::new(),
             nodetypemap: HashMap::new(),
             internal_regexes: RegexHolder::new(),
-            inited: false }
+            inited: false
+        }
     }
     
-    pub fn init(&mut self, text: &str)
+    pub fn init(&mut self, text: &str) -> Result<(), Option<String>>
     {
         let start_time = Instant::now();
         
@@ -116,7 +122,7 @@ impl Parser {
                 line = pop!();
                 while line != ""
                 {
-                    nodetype.forms.push(GrammarForm::new(&line, self, istoken));
+                    nodetype.forms.push(GrammarForm::new(&line, self, istoken)?);
                     line = pop!();
                 }
                 if !self.nodetypemap.contains_key(&nodetype.name)
@@ -125,12 +131,12 @@ impl Parser {
                 }
                 else
                 {
-                    panic!("error: node type `{}` declared twice", nodetype.name);
+                    return plainerr(&format!("error: node type `{}` declared twice", nodetype.name));
                 }
             }
             else
             {
-                panic!("general syntax error\noffending line:\n{}", line);
+                return plainerr(&format!("general syntax error\noffending line:\n{}", line));
             }
         }
         
@@ -157,14 +163,14 @@ impl Parser {
                     };
                     if name != "" && !self.nodetypemap.contains_key(&name)
                     {
-                        panic!("error: node name {} is used without actually defined", name);
+                        return plainerr(&format!("error: node name {} is used without actually defined", name));
                     }
                 }
             }
         }
         if !self.nodetypemap.contains_key("program")
         {
-            panic!("error: grammar does not define name \"program\"");
+            return plainerr("error: grammar does not define name \"program\"");
         }
         
         self.symbol_list.sort_by_key(|text| -(text.len() as i64));
@@ -173,10 +179,12 @@ impl Parser {
         self.inited = true;
         
         println!("init took {:?}", Instant::now().duration_since(start_time));
+        
+        Ok(())
     }
     
     // FIXME: change it to not be line-based; seek to the next newline instead. necessary for things like strings containing newline literals, which should definitely be supported.
-    pub (crate) fn tokenize(&mut self, lines : &[String], silent: bool) -> VecDeque<LexToken>
+    pub (crate) fn tokenize(&mut self, lines : &[String], silent: bool) -> Result<VecDeque<LexToken>, Option<String>>
     {
         let start_time = Instant::now();
         
@@ -266,7 +274,7 @@ impl Parser {
                     }
                 }
                 if continue_the_while { continue; }
-                panic!("failed to tokenize program\noffending line:\n{}", line);
+                return plainerr(&format!("failed to tokenize program\noffending line:\n{}", line));
             }
             linecount += 1;
         }
@@ -276,15 +284,15 @@ impl Parser {
             println!("lex took {:?}", Instant::now().duration_since(start_time));
         }
         
-        ret
+        Ok(ret)
     }
 
     // attempts to parse a token list as a particular form of a grammar point
-    fn parse_form(&self, tokens : &VecDeque<LexToken>, index : usize, form : &GrammarForm) -> (Option<Vec<ASTNode>>, usize, Option<ParseError>)
+    fn parse_form(&self, tokens : &VecDeque<LexToken>, index : usize, form : &GrammarForm) -> Result<(Option<Vec<ASTNode>>, usize, Option<ParseError>), Option<String>>
     {
         if tokens.len() == 0
         {
-            return (None, 0, None);
+            return Ok((None, 0, None));
         }
         
         let mut nodes : Vec<ASTNode> = Vec::new();
@@ -302,9 +310,9 @@ impl Parser {
                 {
                     if !self.nodetypemap.contains_key(text)
                     {
-                        panic!("internal error: failed to find node type {} used by some grammar form", text);
+                        return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
                     }
-                    let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
+                    let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
                     build_best_error(&mut latesterror, error);
                     if let Some(node) = bit
                     {
@@ -313,27 +321,27 @@ impl Parser {
                     }
                     else
                     {
-                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
                 }
                 GrammarToken::NameList(text) =>
                 {
                     if !self.nodetypemap.contains_key(text)
                     {
-                        panic!("internal error: failed to find node type {} used by some grammar form", text);
+                        return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
                     }
-                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
+                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
                     build_best_error(&mut latesterror, error);
                     if bit.is_none()
                     {
-                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
                     while let Some(node) = bit
                     {
                         nodes.push(node);
                         totalconsumed += consumed;
                         
-                        let tuple = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
+                        let tuple = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
                         bit = tuple.0;
                         consumed = tuple.1;
                         error = tuple.2;
@@ -345,9 +353,9 @@ impl Parser {
                 {
                     if !self.nodetypemap.contains_key(text)
                     {
-                        panic!("internal error: failed to find node type {} used by some grammar form", text);
+                        return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
                     }
-                    let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
+                    let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
                     build_best_error(&mut latesterror, error);
                     if let Some(node) = bit
                     {
@@ -359,16 +367,16 @@ impl Parser {
                 {
                     if !self.nodetypemap.contains_key(text)
                     {
-                        panic!("internal error: failed to find node type {} used by some grammar form", text);
+                        return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
                     }
-                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
+                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
                     build_best_error(&mut latesterror, error);
                     while let Some(node) = bit
                     {
                         nodes.push(node);
                         totalconsumed += consumed;
                         
-                        let tuple = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
+                        let tuple = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
                         bit = tuple.0;
                         consumed = tuple.1;
                         error = tuple.2;
@@ -380,13 +388,13 @@ impl Parser {
                 {
                     if !self.nodetypemap.contains_key(text)
                     {
-                        panic!("internal error: failed to find node type {} used by some grammar form", text);
+                        return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
                     }
-                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
+                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
                     build_best_error(&mut latesterror, error);
                     if bit.is_none()
                     {
-                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
                     while let Some(node) = bit
                     {
@@ -397,7 +405,7 @@ impl Parser {
                         if tokens[index+totalconsumed].text != *separator { break; }
                         totalconsumed += 1;
                         
-                        let tuple = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text]);
+                        let tuple = self.parse(&tokens, index+totalconsumed, &self.nodetypemap[text])?;
                         bit = tuple.0;
                         consumed = tuple.1;
                         error = tuple.2;
@@ -417,7 +425,7 @@ impl Parser {
                     {
                         let error = Some(ParseError::new(index+totalconsumed, &text));
                         build_best_error(&mut latesterror, error);
-                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
                     let token_text = &tokens[index+totalconsumed].text;
                     //println!("comparing {} to {}", token_text, *text);
@@ -430,7 +438,7 @@ impl Parser {
                     {
                         let error = Some(ParseError::new(index+totalconsumed, &text));
                         build_best_error(&mut latesterror, error);
-                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
                 }
                 GrammarToken::Regex(text) =>
@@ -439,7 +447,7 @@ impl Parser {
                     {
                         let error = Some(ParseError::new(index+totalconsumed, &text));
                         build_best_error(&mut latesterror, error);
-                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
                     let token_text = &tokens[index+totalconsumed].text;
                     //println!("regex comparing {} to {}", token_text, *text);
@@ -452,7 +460,7 @@ impl Parser {
                     {
                         let error = Some(ParseError::new(index+totalconsumed, &text));
                         build_best_error(&mut latesterror, error);
-                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
                 }
                 GrammarToken::Op{text, assoc, precedence} =>
@@ -461,7 +469,7 @@ impl Parser {
                     {
                         let error = Some(ParseError::new(index+totalconsumed, &text));
                         build_best_error(&mut latesterror, error);
-                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
                     let token_text = &tokens[index+totalconsumed].text;
                     if token_text == text
@@ -473,7 +481,7 @@ impl Parser {
                     {
                         let error = Some(ParseError::new(index+totalconsumed, &text));
                         build_best_error(&mut latesterror, error);
-                        return (defaultreturn.0, defaultreturn.1, latesterror);
+                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
                 }
                 GrammarToken::RestIsOptional =>
@@ -483,82 +491,90 @@ impl Parser {
             }
         }
         
-        (Some(nodes), totalconsumed, latesterror)
+        Ok((Some(nodes), totalconsumed, latesterror))
     }
 
     // attempts to parse a token list as each form of a grammar point in order and uses the first valid one
-    fn parse(&self, tokens : &VecDeque<LexToken>, index : usize, nodetype : &GrammarPoint) -> (Option<ASTNode>, usize, Option<ParseError>)
+    fn parse(&self, tokens : &VecDeque<LexToken>, index : usize, nodetype : &GrammarPoint) -> Result<(Option<ASTNode>, usize, Option<ParseError>), Option<String>>
     {
         if tokens.len() == 0
         {
-            return (None, 0, None);
+            return Ok((None, 0, None));
         }
         
         let mut latesterror : Option<ParseError> = None;
         
         for form in &nodetype.forms
         {
-            let (nodes, consumed, error) = self.parse_form(&tokens, index, form);
+            let (nodes, consumed, error) = self.parse_form(&tokens, index, form)?;
             build_best_error(&mut latesterror, error);
             if let Some(nodes) = nodes
             {
-                return (Some(ASTNode{text : nodetype.name.clone(), line : tokens[index].line, position : tokens[index].position, isparent : true, children : nodes, opdata : dummy_opdata()}), consumed, latesterror);
+                return Ok((Some(ASTNode{text : nodetype.name.clone(), line : tokens[index].line, position : tokens[index].position, isparent : true, children : nodes, opdata : dummy_opdata()}), consumed, latesterror));
             }
         }
-        (None, 0, latesterror)
+        Ok((None, 0, latesterror))
     }
-    fn rotate(ast : &mut ASTNode)
+    fn rotate(ast : &mut ASTNode) -> Result<(), Option<String>>
     {
-        assert!(ast.isparent && ast.children.len() == 3 && ast.children[2].isparent && ast.children[2].children.len() >= 1);
+        if !(ast.isparent && ast.children.len() == 3 && ast.child(2)?.isparent && ast.child(2)?.children.len() >= 1)
+        {
+            return plainerr("internal error: conditions for AST rotation failed");
+        }
         let mut node_holder = dummy_astnode();
-        std::mem::swap(&mut node_holder, &mut ast.children[2]); // detach right from under left (leaving dummy on left)
-        std::mem::swap(&mut ast.children[2], &mut node_holder.children[0]); // move betweener from right to left (leaving dummy on right)
-        std::mem::swap(ast, &mut node_holder.children[0]); // attach left to under right (leaving dummy on root)
+        // tree rotation around self, child 0, and child 2
+        std::mem::swap(&mut node_holder, ast.child_mut(2)?); // detach right from under left (leaving dummy on left)
+        std::mem::swap(ast.child_mut(2)?, node_holder.child_mut(0)?); // move betweener from right to left (leaving dummy on right)
+        std::mem::swap(ast, node_holder.child_mut(0)?); // attach left to under right (leaving dummy on root)
         std::mem::swap(ast, &mut node_holder); // attach right to root
+        Ok(())
     }
-    fn parse_rotate_associativity_binexpr(&self, ast : &mut ASTNode) -> bool
+    fn parse_rotate_associativity_binexpr(&self, ast : &mut ASTNode) -> Result<bool, Option<String>>
     {
         fn is_rotatable_binexpr(a : &ASTNode) -> bool
         {
             a.isparent && a.children.len() == 3 && a.text.starts_with("binexpr_")
         }
-        fn compatible_associativity(a : &ASTNode, b : &ASTNode) -> bool
+        fn compatible_associativity(a : &ASTNode, b : &ASTNode) -> Result<bool, Option<String>>
         {
+            Ok(
             a.isparent && b.isparent
-            && a.children[0].opdata.isop
-            && b.children[0].opdata.isop
-            && a.children[0].opdata.assoc == 1
-            && b.children[0].opdata.assoc == 1
-            && a.children[0].opdata.precedence == b.children[0].opdata.precedence
+            && a.child(0)?.opdata.isop
+            && b.child(0)?.opdata.isop
+            && a.child(0)?.opdata.assoc == 1
+            && b.child(0)?.opdata.assoc == 1
+            && a.child(0)?.opdata.precedence == b.child(0)?.opdata.precedence
+            )
         }
-        if is_rotatable_binexpr(ast) && is_rotatable_binexpr(&ast.children[2]) && compatible_associativity(&ast.children[1], &ast.children[2].children[1])
+        if is_rotatable_binexpr(ast) && is_rotatable_binexpr(ast.child(2)?) && compatible_associativity(ast.child(1)?, ast.child(2)?.child(1)?)?
         {
-            Parser::rotate(ast);
-            true
+            Parser::rotate(ast)?;
+            Ok(true)
         }
         else
         {
-            false
+            Ok(false)
         }
     }
-    fn parse_fix_associativity(&self, ast : &mut ASTNode)
+    fn parse_fix_associativity(&self, ast : &mut ASTNode) -> Result<(), Option<String>>
     {
         if ast.isparent
         {
-            if self.parse_rotate_associativity_binexpr(ast)
+            if self.parse_rotate_associativity_binexpr(ast)?
             {
-                self.parse_fix_associativity(ast);
+                self.parse_fix_associativity(ast)?;
             }
             else
             {
                 for mut child in &mut ast.children
                 {
-                    self.parse_fix_associativity(&mut child);
+                    self.parse_fix_associativity(&mut child)?;
                 }
             }
         }
+        Ok(())
     }
-    fn parse_tweak_ast(&self, ast : &mut ASTNode)
+    fn parse_tweak_ast(&self, ast : &mut ASTNode) -> Result<(), Option<String>>
     {
         if ast.isparent
         {
@@ -589,26 +605,26 @@ impl Parser {
                 {
                     if ast.children.len() == 1
                     {
-                        self.parse_tweak_ast(&mut ast.children[0]);
-                        if ast.children[0].text == "arrayexpr"
+                        self.parse_tweak_ast(ast.child_mut(0)?)?;
+                        if ast.child(0)?.text == "arrayexpr"
                         {
-                            panic!("error: tried to use array indexing expression as statement");
+                            return plainerr("error: tried to use array indexing expression as statement");
                         }
-                        if ast.children[0].text == "indirection"
+                        if ast.child(0)?.text == "indirection"
                         {
-                            panic!("error: tried to use indirection expression as statement");
+                            return plainerr("error: tried to use indirection expression as statement");
                         }
-                        if ast.children[0].text != "funcexpr"
+                        if ast.child(0)?.text != "funcexpr"
                         {
-                            panic!("error: tried to use unknown expression as statement");
+                            return plainerr("error: tried to use unknown expression as statement");
                         }
                         let mut temp = Vec::new();
-                        std::mem::swap(&mut temp, &mut ast.children[0].children);
+                        std::mem::swap(&mut temp, &mut ast.child_mut(0)?.children);
                         std::mem::swap(&mut temp, &mut ast.children);
                     }
                     while ast.children.len() > 2
                     {
-                        let left = ASTNode{text: "funcexpr".to_string(), line: ast.children[0].line, position: ast.children[0].position, isparent: true, children: ast.children.drain(0..2).collect(), opdata: dummy_opdata()};
+                        let left = ASTNode{text: "funcexpr".to_string(), line: ast.child(0)?.line, position: ast.child(0)?.position, isparent: true, children: ast.children.drain(0..2).collect(), opdata: dummy_opdata()};
                         ast.children.insert(0, left);
                     }
                 }
@@ -616,7 +632,7 @@ impl Parser {
                 {
                     while ast.children.len() > 2
                     {
-                        let left = ASTNode{text: ast.text.clone(), line: ast.children[0].line, position: ast.children[0].position, isparent: true, children: ast.children.drain(0..2).collect(), opdata: dummy_opdata()};
+                        let left = ASTNode{text: ast.text.clone(), line: ast.child(0)?.line, position: ast.child(0)?.position, isparent: true, children: ast.children.drain(0..2).collect(), opdata: dummy_opdata()};
                         ast.children.insert(0, left);
                     }
                 }
@@ -624,44 +640,59 @@ impl Parser {
                 {
                     while ast.children.len() > 2
                     {
-                        let left = ASTNode{text: ast.text.clone(), line: ast.children[0].line, position: ast.children[0].position, isparent: true, children: ast.children.drain(0..2).collect(), opdata: dummy_opdata()};
+                        let left = ASTNode{text: ast.text.clone(), line: ast.child(0)?.line, position: ast.child(0)?.position, isparent: true, children: ast.children.drain(0..2).collect(), opdata: dummy_opdata()};
                         ast.children.insert(0, left);
                     }
                     
-                    assert!(ast.children.len() == 2);
+                    if !(ast.children.len() == 2)
+                    {
+                        return plainerr("internal error: transformed rhunexpr doesn't have exactly two children");
+                    }
                     
-                    if ast.children[1].children[0].text == "funcargs"
+                    if ast.child(1)?.child(0)?.text == "funcargs"
                     {
                         ast.text = "funcexpr".to_string();
                         let mut temp = dummy_astnode();
-                        assert!(ast.children[1].children.len() == 1);
-                        std::mem::swap(&mut temp, &mut ast.children[1].children[0]);
-                        std::mem::swap(&mut temp, &mut ast.children[1]);
+                        if !(ast.child(1)?.children.len() == 1)
+                        {
+                            return plainerr("internal error: right child of transformed rhunexpr doesn't have exactly one child");
+                        }
+                        std::mem::swap(&mut temp, ast.child_mut(1)?.child_mut(0)?);
+                        std::mem::swap(&mut temp, ast.child_mut(1)?);
                     }
-                    else if ast.children[1].children[0].text == "arrayindex"
+                    else if ast.child(1)?.child(0)?.text == "arrayindex"
                     {
                         ast.text = "arrayexpr".to_string();
                         let mut temp = dummy_astnode();
-                        assert!(ast.children[1].children.len() == 1);
-                        std::mem::swap(&mut temp, &mut ast.children[1].children[0]);
-                        std::mem::swap(&mut temp, &mut ast.children[1]);
+                        if !(ast.child(1)?.children.len() == 1)
+                        {
+                            return plainerr("internal error: right child of transformed rhunexpr doesn't have exactly one child");
+                        }
+                        std::mem::swap(&mut temp, ast.child_mut(1)?.child_mut(0)?);
+                        std::mem::swap(&mut temp, ast.child_mut(1)?);
                     }
-                    else if ast.children[1].children[0].text == "indirection"
+                    else if ast.child(1)?.child(0)?.text == "indirection"
                     {
                         ast.text = "indirection".to_string();
                         let mut temp = dummy_astnode();
-                        assert!(ast.children[1].children.len() == 1);
-                        std::mem::swap(&mut temp, &mut ast.children[1].children[0].children[1]);
-                        std::mem::swap(&mut temp, &mut ast.children[1]);
+                        if !(ast.child(1)?.children.len() == 1)
+                        {
+                            return plainerr("internal error: right child of transformed rhunexpr doesn't have exactly one child");
+                        }
+                        std::mem::swap(&mut temp, ast.child_mut(1)?.child_mut(0)?.child_mut(1)?);
+                        std::mem::swap(&mut temp, ast.child_mut(1)?);
                     }
                     else
                     {
-                        panic!("error: rhunexpr doesn't contain funcargs | arrayindex | indirection");
+                        return plainerr("internal error: rhunexpr doesn't contain funcargs | arrayindex | indirection");
                     }
                 }
                 "ifcondition" | "whilecondition" | "withstatement" =>
                 {
-                    assert!(ast.children.len() >= 4);
+                    if !(ast.children.len() >= 4)
+                    {
+                        return plainerr("internal error: if/while/with loop doesn't have at least four children (this includes its parens)");
+                    }
                     ast.children.remove(3);
                     ast.children.remove(1);
                 }
@@ -670,24 +701,25 @@ impl Parser {
             
             for mut child in &mut ast.children
             {
-                self.parse_tweak_ast(&mut child);
+                self.parse_tweak_ast(&mut child)?;
             }
         }
+        Ok(())
     }
     
-    fn verify_ast(&self, ast : &ASTNode)
+    fn verify_ast(&self, ast : &ASTNode) -> Result<(), Option<String>>
     {
         if ast.isparent
         {
             if ast.text == "objdef"
             {
                 assert!(ast.children.len() >= 3);
-                for child in ast.children[3..ast.children.len()-1].iter()
+                for child in ast.child_slice(3, -1)?
                 {
-                    if matches!(child.children[1].children[0].text.as_str(), "create" | "destroy")
-                       && (child.children[3].isparent || child.children[3].text != ")")
+                    if matches!(child.child(1)?.child(0)?.text.as_str(), "create" | "destroy")
+                       && (child.child(3)?.isparent || child.child(3)?.text != ")")
                     {
-                        panic!("error: `{}` function of object must not have any arguments", child.children[1].children[0].text);
+                        return plainerr(&format!("error: `{}` function of object must not have any arguments", child.child(1)?.child(0)?.text));
                     }
                 }
             }
@@ -704,11 +736,12 @@ impl Parser {
             
             for child in &ast.children
             {
-                self.verify_ast(&child);
+                self.verify_ast(&child)?;
             }
         }
+        Ok(())
     }
-    pub fn parse_program(&self, tokens : &VecDeque<LexToken>, lines : &[String], silent: bool) -> Option<ASTNode>
+    pub fn parse_program(&self, tokens : &VecDeque<LexToken>, lines : &[String], silent: bool) -> Result<Option<ASTNode>, Option<String>>
     {
         let start_time = Instant::now();
         
@@ -716,7 +749,7 @@ impl Parser {
         {
             println!("parsing...");
         }
-        let (raw_ast, consumed, latesterror) = self.parse(&tokens, 0, &self.nodetypemap["program"]);
+        let (raw_ast, consumed, latesterror) = self.parse(&tokens, 0, &self.nodetypemap["program"])?;
         if !silent
         {
             println!("successfully parsed {} out of {} tokens", consumed, tokens.len());
@@ -752,34 +785,38 @@ impl Parser {
                 println!("(position {})", tokens.get(consumed).unwrap().position);
             }
             
-            return None;
+            Ok(None)
         }
-        
-        let mut ast = raw_ast.unwrap();
-        
-        if !silent
+        else if let Some(mut ast) = raw_ast
         {
-            println!("fixing associativity...");
+            if !silent
+            {
+                println!("fixing associativity...");
+            }
+            self.parse_fix_associativity(&mut ast)?;
+            
+            if !silent
+            {
+                println!("tweaking AST...");
+            }
+            self.parse_tweak_ast(&mut ast)?;
+            
+            if !silent
+            {
+                println!("verifying AST...");
+            }
+            self.verify_ast(&ast)?;
+            
+            if !silent
+            {
+                println!("all good!");
+            }
+            
+            Ok(Some(ast))
         }
-        self.parse_fix_associativity(&mut ast);
-        
-        if !silent
+        else
         {
-            println!("tweaking AST...");
+            plainerr("failed to unwrap AST despite it failing is_none() check")
         }
-        self.parse_tweak_ast(&mut ast);
-        
-        if !silent
-        {
-            println!("verifying AST...");
-        }
-        self.verify_ast(&ast);
-        
-        if !silent
-        {
-            println!("all good!");
-        }
-        
-        Some(ast)
     }
 }

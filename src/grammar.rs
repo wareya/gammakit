@@ -19,9 +19,14 @@ pub (crate) struct GrammarForm {
     pub (crate) tokens : Vec<GrammarToken>
 }
 
+fn plainerr<T>(mystr : &str) -> Result<T, Option<String>>
+{
+    Err(Some(mystr.to_string()))
+}
+
 impl GrammarForm
 {
-    pub (crate) fn new(line : &str, parser : &mut Parser, intoken : bool) -> GrammarForm
+    pub (crate) fn new(line : &str, parser : &mut Parser, intoken : bool) -> Result<GrammarForm, Option<String>>
     {
         let re = &mut parser.internal_regexes;
         let mut ret = GrammarForm { tokens : Vec::new() };
@@ -62,7 +67,7 @@ impl GrammarForm
                 }
                 else
                 {
-                    panic!("error: separator-list separator is not a symbol");
+                    return plainerr("error: separator-list separator is not a symbol");
                 }
             }
             else if re.is_exact(r"\$.+\$\+", token)
@@ -96,29 +101,29 @@ impl GrammarForm
                             }
                             else
                             {
-                                panic!("error: operator associativity sigil's leftwards token is not a plain text token");
+                                return plainerr("error: operator associativity sigil's leftwards token is not a plain text token");
                             }
                             ret.tokens[0] = GrammarToken::Op{text: optext, assoc: if tokens[1] == r"\l" {1} else {0}, precedence};
-                            return ret;
+                            return Ok(ret);
                         }
                         else
                         {
-                            panic!("error: operator precedence is not an integer\n{}", line);
+                            return plainerr(&format!("error: operator precedence is not an integer\n{}", line));
                         }
                     }
                     else
                     {
-                        panic!("error: operator description line consists of not exactly three tokens");
+                        return plainerr("error: operator description line consists of not exactly three tokens");
                     }
                 }
                 else
                 {
-                    panic!("error: operator description line is malformed (associativity sigil in wrong place)");
+                    return plainerr("error: operator description line is malformed (associativity sigil in wrong place)");
                 }
             }
             else if slice(token, 0, 1) == "$" && token.len() > 1
             {
-                panic!("error: stray $\n{}", line);
+                return plainerr(&format!("error: stray $\n{}", line));
             }
             else
             {
@@ -141,10 +146,10 @@ impl GrammarForm
                 }
                 else
                 {
-                    panic!("error: literal symbol `{}` does not follow the forms [a-zA-Z_][a-zA-Z_0-9]* || [^a-zA-Z0-9_]+\n{}", token, line);
+                    return plainerr(&format!("error: literal symbol `{}` does not follow the forms [a-zA-Z_][a-zA-Z_0-9]* || [^a-zA-Z0-9_]+\n{}", token, line));
                 }
             }
         }
-        ret
+        Ok(ret)
     }
 }

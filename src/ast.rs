@@ -48,6 +48,17 @@ impl ASTNode {
             Ok(&self.children[n])
         }
     }
+    pub (crate) fn child_mut<'a>(&'a mut self, n : usize) -> Result<&'a mut ASTNode, Option<String>>
+    {
+        if n >= self.children.len()
+        {
+            Err(Some(format!("internal error: tried to access child {} (zero-indexed) of ast node that only has {} children", n, self.children.len())))
+        }
+        else
+        {
+            Ok(&mut self.children[n])
+        }
+    }
     pub (crate) fn child_slice<'a>(&'a self, start : isize, end : isize) -> Result<&'a[ASTNode], Option<String>>
     {
         let u_start = if start <  0 {self.children.len() - (-start as usize)} else {start as usize};

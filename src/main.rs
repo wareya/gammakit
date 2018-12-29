@@ -29,41 +29,43 @@ fn main() -> std::io::Result<()>
     file.read_to_string(&mut contents)?;
     
     let mut parser = Parser::new();
-    parser.init(&contents);
-    
-    let mut file2 = File::open("program.txt")?;
-    let mut contents2 = String::new();
-    file2.read_to_string(&mut contents2)?;
-    
-    let program_lines : Vec<String> = contents2.lines().map(|x| x.to_string()).collect();
-    
-    let tokens = parser.tokenize(&program_lines, false);
-    
-    if let Some(ref ast) = parser.parse_program(&tokens, &program_lines, false)
+    if parser.init(&contents).is_ok()
     {
-        let code = compile_bytecode(ast);
+        let mut file2 = File::open("program.txt")?;
+        let mut contents2 = String::new();
+        file2.read_to_string(&mut contents2)?;
         
-        if let Ok(code) = code
+        let program_lines : Vec<String> = contents2.lines().map(|x| x.to_string()).collect();
+        
+        if let Ok(tokens) = parser.tokenize(&program_lines, false)
         {
-            if false
+            if let Ok(Some(ref ast)) = parser.parse_program(&tokens, &program_lines, false)
             {
-                if let Ok(disassembly) = disassemble_bytecode(&code, 0, 0)
+                let code = compile_bytecode(ast);
+                
+                if let Ok(code) = code
                 {
-                    for line in disassembly
+                    if false
                     {
-                        println!("{}", line);
+                        if let Ok(disassembly) = disassemble_bytecode(&code, 0, 0)
+                        {
+                            for line in disassembly
+                            {
+                                println!("{}", line);
+                            }
+                        }
                     }
+                    
+                    let mut interpreter = Interpreter::new(code, Some(parser));
+                    interpreter.insert_default_internal_functions();
+                    
+                    while interpreter.step().is_ok(){}
+                }
+                else if let Err(err) = code
+                {
+                    println!("{}", err.unwrap());
                 }
             }
-            
-            let mut interpreter = Interpreter::new(code, Some(parser));
-            interpreter.insert_default_internal_functions();
-            
-            while interpreter.step().is_ok(){}
-        }
-        else if let Err(err) = code
-        {
-            println!("{}", err.unwrap());
         }
     }
     

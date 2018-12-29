@@ -433,8 +433,8 @@ impl Interpreter
             let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
             if let Some(parser) = &mut self.global.parser
             {
-                let tokens = parser.tokenize(&program_lines, true);
-                if let Some(ref ast) = parser.parse_program(&tokens, &program_lines, true)
+                let tokens = parser.tokenize(&program_lines, true)?;
+                if let Some(ref ast) = parser.parse_program(&tokens, &program_lines, true)?
                 {
                     Ok((ast_to_dict(ast), false))
                 }
@@ -503,8 +503,8 @@ impl Interpreter
             let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
             if let Some(parser) = &mut self.global.parser
             {
-                let tokens = parser.tokenize(&program_lines, true);
-                if let Some(ref ast) = parser.parse_program(&tokens, &program_lines, true)
+                let tokens = parser.tokenize(&program_lines, true)?;
+                if let Some(ref ast) = parser.parse_program(&tokens, &program_lines, true)?
                 {
                     let code = compile_bytecode(ast)?;
                     
