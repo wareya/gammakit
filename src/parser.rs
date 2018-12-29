@@ -5,8 +5,6 @@ use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::time::Instant;
 
-use std::hint::unreachable_unchecked;
-
 use crate::ast::*;
 use crate::grammar::*;
 use crate::regexholder::RegexHolder;
@@ -105,10 +103,10 @@ impl Parser {
         while lines.len() > 0
         {
             macro_rules! pop {
-                () => { unsafe { match lines.pop_front() { Some(x) => x, None => unreachable_unchecked() } } };
+                () => { match lines.pop_front() { Some(x) => Ok(x), None => Err(Some("tried to access past end of program text".to_string())) } };
             }
             
-            let mut line : String = pop!();
+            let mut line : String = pop!()?;
             if line == ""
             {
                 continue;
@@ -119,11 +117,11 @@ impl Parser {
                 let name = slice(&line, if istoken {6} else {0}, -1).to_string();
                 // last line is guaranteed to be "" which means we are unable to pop past the end here
                 let mut nodetype : GrammarPoint = GrammarPoint{name, forms: Vec::new(), istoken};
-                line = pop!();
+                line = pop!()?;
                 while line != ""
                 {
                     nodetype.forms.push(GrammarForm::new(&line, self, istoken)?);
-                    line = pop!();
+                    line = pop!()?;
                 }
                 if !self.nodetypemap.contains_key(&nodetype.name)
                 {
