@@ -28,25 +28,17 @@ pub (crate) fn build_best_error(myself : &mut Option<ParseError>, other : Option
 {
     if let Some(other) = other
     {
-        // guards against borrow of "myself" so that ```*myself = Some(other);``` works
-        if myself.is_some()
+        if let Some(myself) = myself.as_mut()
         {
-            if let Some(myself) = myself.as_mut()
+            if other.token > myself.token
             {
-                if other.token < myself.token
+                *myself = other;
+            }
+            else if other.token == myself.token
+            {
+                for text in other.expected
                 {
-                    return;
-                }
-                else if other.token > myself.token
-                {
-                    *myself = other;
-                }
-                else if other.token == myself.token
-                {
-                    for text in other.expected
-                    {
-                        myself.expected.insert(text);
-                    }
+                    myself.expected.insert(text);
                 }
             }
         }
