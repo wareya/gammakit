@@ -42,66 +42,51 @@ impl Interpreter
     
     pub (super) fn handle_func_call_or_expr(&mut self, isexpr : bool) -> StepResult
     {
-        if let Some(funcdata) = self.stack_pop()
+        let funcdata = self.stack_pop().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR"))?;
+        
+        let argcount_val = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR"))?;
+        
+        if let Value::Number(argcount) = argcount_val
         {
-            if let Some(argcount_val) = self.stack_pop_val()
+            let mut args = Vec::<Value>::new();
+            for _i in 0..(argcount.round() as usize)
             {
-                if let Value::Number(argcount) = argcount_val
+                if let Some(arg) = self.stack_pop_val()
                 {
-                    let mut args = Vec::<Value>::new();
-                    for _i in 0..(argcount.round() as usize)
-                    {
-                        if let Some(arg) = self.stack_pop_val()
-                        {
-                            args.push(arg);
-                        }
-                        else
-                        {
-                            return plainerr("internal error: fewer variables on stack than expected in FUNCEXPR");
-                        }
-                    }
-                    if let StackValue::Var(var) = funcdata
-                    {
-                        if let Some(funcdata_val) = self.evaluate_or_store(&var, None)?
-                        {
-                            if let Value::Func(funcdata) = funcdata_val
-                            {
-                                self.call_function(*funcdata, args, isexpr)?;
-                                Ok(())
-                            }
-                            else
-                            {
-                                plainerr("internal error: variable meant to hold function data in FUNCEXPR was not holding function data")
-                            }
-                        }
-                        else
-                        {
-                            plainerr("internal error: variable meant to hold function data in FUNCEXPR was invalid")
-                        }
-                    }
-                    else if let StackValue::Val(Value::Func(funcdata)) = funcdata
-                    {
-                        self.call_function(*funcdata, args, isexpr)?;
-                        Ok(())
-                    }
-                    else
-                    {
-                        plainerr("internal error: variable meant to hold function data in FUNCEXPR was not holding function data")
-                    }
+                    args.push(arg);
                 }
                 else
                 {
-                    plainerr("internal error: number on stack of arguments to function was not a number")
+                    return plainerr("internal error: fewer variables on stack than expected in FUNCEXPR");
                 }
+            }
+            if let StackValue::Var(var) = funcdata
+            {
+                let funcdata_val = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: variable meant to hold function data in FUNCEXPR was invalid"))?;
+                
+                if let Value::Func(funcdata) = funcdata_val
+                {
+                    self.call_function(*funcdata, args, isexpr)?;
+                    Ok(())
+                }
+                else
+                {
+                    plainerr("internal error: variable meant to hold function data in FUNCEXPR was not holding function data")
+                }
+            }
+            else if let StackValue::Val(Value::Func(funcdata)) = funcdata
+            {
+                self.call_function(*funcdata, args, isexpr)?;
+                Ok(())
             }
             else
             {
-                plainerr("internal error: not enough values on stack to run instruction FUNCEXPR")
+                plainerr("internal error: variable meant to hold function data in FUNCEXPR was not holding function data")
             }
         }
         else
         {
-            plainerr("internal error: not enough values on stack to run instruction FUNCEXPR")
+            plainerr("internal error: number on stack of arguments to function was not a number")
         }
     }
 }
