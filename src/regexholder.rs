@@ -35,20 +35,15 @@ impl RegexHolder {
     }
     pub (crate) fn is_exact_immut(& self, regex_text : &str, text : &str) -> Result<bool, Option<String>>
     {
-        if let Some(regex) = self.exact_regexes.get(regex_text)
+        let regex = self.exact_regexes.get(regex_text).ok_or_else(|| Some("internal error: attempted to use is_exact_immut for a regex that has not yet been cached".to_string()))?;
+        
+        if let Ok(regex) = regex
         {
-            if let Ok(regex) = regex
-            {
-                Ok(regex.is_match(text))
-            }
-            else
-            {
-                Ok(false)
-            }
+            Ok(regex.is_match(text))
         }
         else
         {
-            Err(Some("internal error: attempted to use is_exact_immut for a regex that has not yet been cached".to_string()))
+            Ok(false)
         }
     }
     // regex offsets are bytes:
@@ -61,24 +56,16 @@ impl RegexHolder {
     {
         if let Some(regex) = self.regexes.get(regex_text)
         {
-            if let Ok(regex) = regex
+            let regex = regex.as_ref().ok()?;
+            let my_match = regex.find_at(text, start)?;
+            if my_match.start() == start
             {
-                if let Some(my_match) = regex.find_at(text, start)
-                {
-                    if my_match.start() == start
-                    {
-                        return Some(my_match.as_str().to_string());
-                    }
-                }
+                return Some(my_match.as_str().to_string());
             }
+            return None;
         }
-        else
-        {
-            let regex = Regex::new(regex_text);
-            self.regexes.insert(regex_text.to_string(), regex);
-            return self.match_at(regex_text, text, start);
-        }
-        
-        None
+        let regex = Regex::new(regex_text);
+        self.regexes.insert(regex_text.to_string(), regex);
+        self.match_at(regex_text, text, start)
     }
 }

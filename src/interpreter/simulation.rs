@@ -85,14 +85,8 @@ impl Interpreter
     {
         let name = self.read_string()?;
         let dirvar = Variable::Direct(DirectVar{name : name.clone()}); // FIXME suboptimal but helps error message
-        if let Some(val) = self.evaluate_or_store(&dirvar, None)?
-        {
-            self.stack_push_val(val);
-        }
-        else
-        {
-            return Err(Some(format!("error: tried to evaluate non-extant variable `{}`", name)))
-        }
+        let val = self.evaluate_or_store(&dirvar, None)?.ok_or_else(|| Some(format!("error: tried to evaluate non-extant variable `{}`", name)))?;
+        self.stack_push_val(val);
         Ok(())
     }
     pub (crate) fn sim_DECLVAR(&mut self) -> StepResult
@@ -101,25 +95,15 @@ impl Interpreter
         {
             return plainerr("internal error: DECLVAR instruction requires 1 values on the stack but only found 0");
         }
-        if let Some(name) = self.stack_pop_name()
+        let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to declare a variable with a name of invalid type"))?;
+        let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
+        
+        if scope.contains_key(&name)
         {
-            if let Some(scope) = self.top_frame.scopes.last_mut()
-            {
-                if scope.contains_key(&name)
-                {
-                    return Err(Some(format!("error: redeclared identifier {}", name)))
-                }
-                scope.insert(name, Value::Number(0.0));
-            }
-            else
-            {
-                return plainerr("internal error: there are no scopes in the top frame");
-            }
+            return Err(Some(format!("error: redeclared identifier {}", name)))
         }
-        else
-        {
-            return plainerr("internal error: tried to declare a variable with a name of invalid type");
-        }
+        scope.insert(name, Value::Number(0.0));
+        
         Ok(())
     }
     
@@ -129,35 +113,14 @@ impl Interpreter
         {
             return plainerr("internal error: DECLFAR instruction requires 1 values on the stack but only found 0");
         }
-        if let Some(name) = self.stack_pop_name()
+        let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to declare instance variable with non-var-name type name"))?;
+        let instance_id = self.top_frame.instancestack.last().ok_or_else(|| minierr("error: tried to declare instance variable when not executing within instance scope"))?;
+        let instance = self.global.instances.get_mut(instance_id).ok_or_else(|| Some(format!("error: tried to declare instance variable but instance of current scope ({}) no longer exists", instance_id)))?;
+        if instance.variables.contains_key(&name)
         {
-            if let Some(instance_id) = self.top_frame.instancestack.last()
-            {
-                if let Some(instance) = self.global.instances.get_mut(instance_id)
-                {
-                    if !instance.variables.contains_key(&name)
-                    {
-                        instance.variables.insert(name, Value::Number(0.0));
-                    }
-                    else
-                    {
-                        return Err(Some(format!("error: redeclared identifier {}", name)));
-                    }
-                }
-                else
-                {
-                    return Err(Some(format!("error: tried to declare instance variable but instance of current scope ({}) no longer exists", instance_id)));
-                }
-            }
-            else
-            {
-                return plainerr("error: tried to declare instance variable when not executing within instance scope");
-            }
+            return Err(Some(format!("error: redeclared identifier {}", name)));
         }
-        else
-        {
-            return plainerr("internal error: tried to declare instance variable with non-var-name type name");
-        }
+        instance.variables.insert(name, Value::Number(0.0));
         Ok(())
     }
     
@@ -167,59 +130,36 @@ impl Interpreter
         {
             return Err(Some(format!("internal error: INDIRECTION instruction requires 2 values on the stack but only found {}", self.stack_len())));
         }
-        if let Some(right) = self.stack_pop_name()
+        let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to perform INDIRECTION operation with a right-hand side that wasn't a name"))?;
+        let ident = self.stack_pop_number().ok_or_else(|| minierr("error: tried to use indirection on a type that can't be an identifier (only numbers can be identifiers)"))?.round() as usize;
+        
+        if !self.global.instances.contains_key(&ident)
         {
-            if let Some(left) = self.stack_pop_number()
-            {
-                let id = left.round() as usize;
-                
-                if self.global.instances.contains_key(&id)
-                {
-                    self.stack_push_var(Variable::Indirect(IndirectVar{ident : id, name : right}));
-                }
-                else
-                {
-                    return Err(Some(format!("error: tried to perform indirection on instance {} that doesn't exist", id)));
-                }
-            }
-            else
-            {
-                return plainerr("error: tried to use indirection on a type that can't be an identifier (only numbers can be identifiers)");
-            }
+            return Err(Some(format!("error: tried to perform indirection on instance {} that doesn't exist", ident)));
         }
-        else
-        {
-            return plainerr("internal error: tried to perform INDIRECTION operation with a right-hand side that wasn't a name");
-        }
+        self.stack_push_var(Variable::Indirect(IndirectVar{ident, name}));
+        
         Ok(())
     }
     pub (crate) fn sim_EVALUATION(&mut self) -> StepResult
     {
-        if let Some(var) = self.stack_pop_var()
+        if self.stack_len() < 1
         {
-            match var
-            {
-                Variable::Indirect(_) |
-                Variable::Array(_) =>
-                {
-                    if let Some(value) = self.evaluate_or_store(&var, None)?
-                    {
-                        self.stack_push_val(value);
-                    }
-                    else
-                    {
-                        return plainerr("internal error: evaluate_or_store returned None when just storing a variable");
-                    }
-                }
-                Variable::Direct(var) =>
-                {
-                    return Err(Some(format!("internal error: tried to evaluate direct variable `{}`\n(note: the evaluation instruction is for indirect (id.y) variables and array (arr[0]) variables; bytecode metaprogramming for dynamic direct variable access is unsupported)", var.name)));
-                }
-            }
+            return Err(Some(format!("internal error: EVALUATION instruction requires 1 values on the stack but only found {}", self.stack_len())));
         }
-        else
+        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: failed to find a variable in the stack in EVALUATION"))?;
+        match var
         {
-            return plainerr("internal error: failed to find a variable in the stack in EVALUATION");
+            Variable::Indirect(_) |
+            Variable::Array(_) =>
+            {
+                let value = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just storing a variable"))?;
+                self.stack_push_val(value);
+            }
+            Variable::Direct(var) =>
+            {
+                return Err(Some(format!("internal error: tried to evaluate direct variable `{}`\n(note: the evaluation instruction is for indirect (id.y) variables and array (arr[0]) variables; bytecode metaprogramming for dynamic direct variable access is unsupported)", var.name)));
+            }
         }
         Ok(())
     }
@@ -254,62 +194,44 @@ impl Interpreter
     {
         self.pop_controlstack_until_loop();
         
-        if let Some(controller) = self.top_frame.controlstack.last().cloned()
+        let controller = self.top_frame.controlstack.last().ok_or_else(|| minierr("error: break instruction not inside of loop"))?;
+    
+        let destination_index =
+        match controller.controltype
         {
-            let destination_index =
-            match controller.controltype
-            {
-                WHILE => 2,
-                FOR => 3,
-                _ => return Err(Some(format!("FIXME: unimplemented BREAK out from 0x{:02X} loop", controller.controltype)))
-            };
-            
-            if let Some(destination_address) = controller.controlpoints.get(destination_index)
-            {
-                self.set_pc(*destination_address);
-                self.drain_scopes(controller.scopes);
-                self.top_frame.controlstack.pop();
-            }
-            else
-            {
-                return plainerr("internal error: break instruction found invalid associated destination index")
-            }
-            Ok(())
-        }
-        else
-        {
-            return plainerr("error: break instruction not inside of loop");
-        }
+            WHILE => 2,
+            FOR => 3,
+            _ => return Err(Some(format!("FIXME: unimplemented BREAK out from 0x{:02X} loop", controller.controltype)))
+        };
+        
+        let destination_address = *controller.controlpoints.get(destination_index).ok_or_else(|| minierr("internal error: break instruction found invalid associated destination index"))?;
+        
+        self.drain_scopes(controller.scopes);
+        self.set_pc(destination_address);
+        self.top_frame.controlstack.pop();
+        
+        Ok(())
     }
     pub (crate) fn sim_CONTINUE(&mut self) -> StepResult
     {
         self.pop_controlstack_until_loop();
         
-        if let Some(controller) = self.top_frame.controlstack.last().cloned()
+        let controller = self.top_frame.controlstack.last().ok_or_else(|| minierr("error: continue instruction not inside of loop"))?;
+        
+        let destination_index =
+        match controller.controltype
         {
-            let destination_index =
-            match controller.controltype
-            {
-                WHILE => 0,
-                FOR => {self.suppress_for_expr_end = true; 1},
-                _ => return Err(Some(format!("FIXME: unimplemented CONTINUE out from 0x{:02X} loop", controller.controltype)))
-            };
-            
-            if let Some(destination_address) = controller.controlpoints.get(destination_index)
-            {
-                self.set_pc(*destination_address);
-                self.drain_scopes(controller.scopes);
-            }
-            else
-            {
-                return plainerr("internal error: continue instruction found invalid associated destination index");
-            }
-            Ok(())
-        }
-        else
-        {
-            return plainerr("error: continue instruction not inside of loop");
-        }
+            WHILE => 0,
+            FOR => {self.suppress_for_expr_end = true; 1},
+            _ => return Err(Some(format!("FIXME: unimplemented CONTINUE out from 0x{:02X} loop", controller.controltype)))
+        };
+        
+        let destination_address = *controller.controlpoints.get(destination_index).ok_or_else(|| minierr("internal error: continue instruction found invalid associated destination index"))?;
+        
+        self.drain_scopes(controller.scopes);
+        self.set_pc(destination_address);
+        
+        Ok(())
     }
     pub (crate) fn sim_IF(&mut self) -> StepResult
     {
@@ -356,62 +278,46 @@ impl Interpreter
             return plainerr("internal error: WITH instruction requires 1 values on the stack but found 0");
         }
         // NOTE: for with(), the self.top_frame.scopes.len() >= 0xFFFF error case is handled by SCOPE instruction
-        if let Some(expr) = self.stack_pop_number()
+        let other_id = self.stack_pop_number().ok_or_else(|| minierr("error: tried to use with() on a non-numeric expression (instance ids and object ids are numeric)"))?.round() as usize;
+        
+        let codelen = unpack_u64(&self.pull_from_code(8)?)?;
+        
+        let current_pc = self.get_pc();
+        
+        if self.global.instances.contains_key(&other_id)
         {
-            let other_id = expr.round() as usize;
+            self.top_frame.instancestack.push(other_id);
             
-            let codelen = unpack_u64(&self.pull_from_code(8)?)?;
-            
-            let current_pc = self.get_pc();
-            
-            if self.global.instances.contains_key(&other_id)
-            {
-                self.top_frame.instancestack.push(other_id);
-                
-                self.top_frame.controlstack.push(ControlData{controltype : WITH, controlpoints : vec!(current_pc, current_pc + codelen as usize), scopes : self.top_frame.scopes.len() as u16, other : Some(VecDeque::new())});
-            }
-            else if let Some(instance_id_list) = self.global.instances_by_type.get(&other_id)
-            {
-                if let Some(first) = instance_id_list.first()
-                {
-                    self.top_frame.instancestack.push(*first);
-                    let mut copylist : VecDeque<usize> = instance_id_list.iter().cloned().collect();
-                    copylist.pop_front();
-                    self.top_frame.controlstack.push(ControlData{controltype : WITH, controlpoints : vec!(current_pc, current_pc + codelen as usize), scopes : self.top_frame.scopes.len() as u16, other : Some(copylist)});
-                }
-                else
-                {
-                    // silently skip block if there are no instances of this object type
-                    self.add_pc(codelen as usize);
-                }
-            }
-            else
-            {
-                return plainerr("error: tried to use non-existant instance in with expression");
-            }
+            self.top_frame.controlstack.push(ControlData{controltype : WITH, controlpoints : vec!(current_pc, current_pc + codelen as usize), scopes : self.top_frame.scopes.len() as u16, other : Some(VecDeque::new())});
         }
         else
         {
-            return plainerr("error: tried to use with() on a non-numeric expression (instance ids and object ids are numeric)");
+            let instance_id_list = self.global.instances_by_type.get(&other_id).ok_or_else(|| minierr("error: tried to use non-existant instance in with expression"))?;
+            if let Some(first) = instance_id_list.first()
+            {
+                self.top_frame.instancestack.push(*first);
+                let mut copylist : VecDeque<usize> = instance_id_list.iter().cloned().collect();
+                copylist.pop_front();
+                self.top_frame.controlstack.push(ControlData{controltype : WITH, controlpoints : vec!(current_pc, current_pc + codelen as usize), scopes : self.top_frame.scopes.len() as u16, other : Some(copylist)});
+            }
+            else
+            {
+                // silently skip block if there are no instances of this object type
+                self.add_pc(codelen as usize);
+            }
         }
         Ok(())
     }
     pub (crate) fn sim_FUNCDEF(&mut self) -> StepResult
     {
         let (funcname, myfuncspec) = self.read_function()?;
-        if let Some(scope) = self.top_frame.scopes.last_mut()
+        let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
+        
+        if scope.contains_key(&funcname)
         {
-            if scope.contains_key(&funcname)
-            {
-                return Err(Some(format!("error: redeclared identifier {}", funcname)));
-            }
-            //scope.insert(funcname.clone(), Value::Func(Box::new(FuncVal { internal : false, name : Some(funcname), predefined : None, userdefdata : Some(myfuncspec) })));
-            scope.insert(funcname.clone(), Value::new_funcval(false, Some(funcname), None, Some(myfuncspec)));
+            return Err(Some(format!("error: redeclared identifier {}", funcname)));
         }
-        else
-        {
-            return plainerr("internal error: there are no scopes in the top frame");
-        }
+        scope.insert(funcname.clone(), Value::new_funcval(false, Some(funcname), None, Some(myfuncspec)));
         Ok(())
     }
     
@@ -424,49 +330,22 @@ impl Interpreter
         
         let immediate = self.pull_single_from_code()?;
         
-        if let Some(value) = self.stack_pop_val()
+        let value = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction BINSTATE (this error should be inaccessible)"))?;
+        
+        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: primary argument to BINSTATE could not be found or was not a variable"))?;
+        
+        if immediate == 0x00
         {
-            if let Some(var) = self.stack_pop_var()
-            {
-                if immediate == 0x00
-                {
-                    self.evaluate_or_store(&var, Some(value))?;
-                }
-                else if let Some(opfunc) = get_binop_function(immediate)
-                {
-                    if let Some(var_initial_value) = self.evaluate_or_store(&var, None)?
-                    {
-                        match opfunc(&var_initial_value, &value)
-                        {
-                            Ok(var_new_value) =>
-                            {
-                                self.evaluate_or_store(&var, Some(var_new_value))?;
-                            }
-                            Err(text) =>
-                            {
-                                //panic!("error: disallowed binary statement\n({})\n(line {})", text, self.top_frame.currline);
-                                return Err(Some(format!("error: disallowed binary statement\n({})", text)));
-                            }
-                        }
-                    }
-                    else
-                    {
-                        return plainerr("internal error: evaluate_or_store returned None when just accessing value");
-                    }
-                }
-                else
-                {
-                    return Err(Some(format!("internal error: unknown binary operation 0x{:02X}", immediate)));
-                }
-            }
-            else
-            {
-                return plainerr("internal error: primary argument to BINSTATE could not be found or was not a variable");
-            }
+            self.evaluate_or_store(&var, Some(value))?;
         }
         else
         {
-            return plainerr("internal error: not enough values on stack to run instruction BINSTATE (this error should be inaccessible)");
+            let opfunc = get_binop_function(immediate).ok_or_else(|| Some(format!("internal error: unknown binary operation 0x{:02X}", immediate)))?;
+            
+            let var_initial_value = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just accessing value"))?;
+            
+            let var_new_value = opfunc(&var_initial_value, &value).or_else(|text| Err(Some(format!("error: disallowed binary statement\n({})", text))))?;
+            self.evaluate_or_store(&var, Some(var_new_value))?;
         }
         Ok(())
     }
@@ -480,45 +359,18 @@ impl Interpreter
         
         let immediate = self.pull_single_from_code()?;
         
-        if let Some(right) = self.stack_pop_val()
+        let right = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction BINOP (this error should be inaccessible!)"))?;
+        let left = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction BINOP (this error should be inaccessible!)"))?;
+        
+        let opfunc = get_binop_function(immediate).ok_or_else(|| Some(format!("internal error: unknown binary operation 0x{:02X}", immediate)))?;
+        
+        let new_value = opfunc(&left, &right).or_else(|text|
         {
-            if let Some(left) = self.stack_pop_val()
-            {
-                if let Some(opfunc) = get_binop_function(immediate)
-                {
-                    match opfunc(&left, &right)
-                    {
-                        Ok(new_value) =>
-                        {
-                            self.stack_push_val(new_value);
-                        }
-                        Err(text) =>
-                        {
-                            if let (Some(left_fmt), Some(right_fmt)) = (format_val(&left), format_val(&right))
-                            {
-                                return Err(Some(format!("error: disallowed binary expression\n({})\n(value 1: {})\n(value 2: {})", text, left_fmt, right_fmt)));
-                            }
-                            else
-                            {
-                                return plainerr("internal error: error while trying to format error for disallowed binary expression");
-                            }
-                        }
-                    }
-                }
-                else
-                {
-                    return Err(Some(format!("internal error: unknown binary operation 0x{:02X}", immediate)));
-                }
-            }
-            else
-            {
-                return plainerr("internal error: not enough values on stack to run instruction BINOP (this error should be inaccessible!)");
-            }
-        }
-        else
-        {
-            return plainerr("internal error: not enough values on stack to run instruction BINOP (this error should be inaccessible!)");
-        }
+            let left_fmt = format_val(&left).ok_or_else(|| minierr("internal error: failed to format left value for printing error when creating error for invalid binary expression"))?;
+            let right_fmt = format_val(&right).ok_or_else(|| minierr("internal error: failed to format right value for printing error when creating error for invalid binary expression"))?;
+            Err(Some(format!("error: disallowed binary expression\n({})\n(value 1: {})\n(value 2: {})", text, left_fmt, right_fmt)))
+        })?;
+        self.stack_push_val(new_value);
         Ok(())
     }
     
@@ -531,31 +383,11 @@ impl Interpreter
         
         let immediate = self.pull_single_from_code()?;
         
-        if let Some(value) = self.stack_pop_val()
-        {
-            if let Some(opfunc) = get_unop_function(immediate)
-            {
-                match opfunc(&value)
-                {
-                    Ok(new_value) =>
-                    {
-                        self.stack_push_val(new_value);
-                    }
-                    Err(text) =>
-                    {
-                        return Err(Some(format!("error: disallowed unary expression\n({})", text)));
-                    }
-                }
-            }
-            else
-            {
-                return Err(Some(format!("internal error: unknown binary operation 0x{:02X}", immediate)));
-            }
-        }
-        else
-        {
-            return plainerr("internal error: not enough values on stack to run instruction UNOP (this error should be inaccessible!)");
-        }
+        let value = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction UNOP (this error should be inaccessible!)"))?;
+        let opfunc = get_unop_function(immediate).ok_or_else(|| Some(format!("internal error: unknown binary operation 0x{:02X}", immediate)))?;
+        
+        let new_value = opfunc(&value).or_else(|text| Err(Some(format!("error: disallowed unary expression\n({})", text))))?;
+        self.stack_push_val(new_value);
         Ok(())
     }
     pub (crate) fn sim_LAMBDA(&mut self) -> StepResult
@@ -605,14 +437,8 @@ impl Interpreter
         let mut myarray = VecDeque::<Value>::new();
         for _i in 0..numvals
         {
-            if let Some(val) = self.stack_pop_val()
-            {
-                myarray.push_front(val);
-            }
-            else
-            {
-                return plainerr("internal error: COLLECTARRAY instruction failed to collect values from stack (this error should be unreachable!)");
-            }
+            let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTARRAY instruction failed to collect values from stack (this error should be unreachable!)"))?;
+            myarray.push_front(val);
         }
         self.stack_push_val(Value::Array(myarray));
         Ok(())
@@ -630,35 +456,24 @@ impl Interpreter
         
         for _i in 0..numvals
         {
-            if let Some(val) = self.stack_pop_val()
+            let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTDICT instruction failed to collect values from stack"))?;
+            let key = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTDICT instruction failed to collect values from stack"))?;
+            values.push_front(val);
+            
+            match key
             {
-                if let Some(key) = self.stack_pop_val()
+                Value::Number(number) =>
                 {
-                    values.push_front(val);
-                    match key
-                    {
-                        Value::Number(number) =>
-                        {
-                            names.push_front(HashableValue::Number(number));
-                        }
-                        Value::Text(text) =>
-                        {
-                            names.push_front(HashableValue::Text(text));
-                        }
-                        _ =>
-                        {
-                            return Err(Some(format!("error: dictionary key must be a string or number; was {:?}; line {}", key, self.top_frame.currline)));
-                        }
-                    }
+                    names.push_front(HashableValue::Number(number));
                 }
-                else
+                Value::Text(text) =>
                 {
-                    return plainerr("internal error: COLLECTDICT instruction failed to collect values from stack");
+                    names.push_front(HashableValue::Text(text));
                 }
-            }
-            else
-            {
-                return plainerr("internal error: COLLECTDICT instruction failed to collect values from stack");
+                _ =>
+                {
+                    return Err(Some(format!("error: dictionary key must be a string or number; was {:?}; line {}", key, self.top_frame.currline)));
+                }
             }
         }
         let mut mydict = HashMap::<HashableValue, Value>::new();
@@ -675,44 +490,31 @@ impl Interpreter
         {
             return Err(Some(format!("internal error: ARRAYEXPR instruction requires 2 values on the stack but found {}", self.stack_len())));
         }
-        if let Some(index) = self.stack_pop_val()
+        let index = self.stack_pop_val().ok_or_else(|| minierr("internal error: TODO write error askdgfauiowef"))?;
+        let array = self.stack_pop().ok_or_else(|| minierr("internal error: TODO write error cvbhsrtgaerffd"))?;
+        match array
         {
-            if let Some(array) = self.stack_pop()
+            StackValue::Var(Variable::Array(mut arrayvar)) =>
             {
-                match array
-                {
-                    StackValue::Var(Variable::Array(mut arrayvar)) =>
-                    {
-                        arrayvar.indexes.push(index);
-                        self.stack_push_var(Variable::Array(arrayvar));
-                    }
-                    StackValue::Var(Variable::Direct(dirvar)) =>
-                    {
-                        self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(index).into_iter().collect() } ));
-                    }
-                    StackValue::Var(Variable::Indirect(indirvar)) =>
-                    {
-                        self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(index).into_iter().collect() } ));
-                    }
-                    StackValue::Val(Value::Array(array)) =>
-                    {
-                        self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualArray(array), indexes : vec!(index).into_iter().collect() } ));
-                    }
-                    _ =>
-                    {
-                        //panic!("error: tried to use array indexing on a non-indexable value\n{}", array);
-                        return plainerr("error: tried to use array indexing on a non-indexable value");
-                    }
-                }
+                arrayvar.indexes.push(index);
+                self.stack_push_var(Variable::Array(arrayvar));
             }
-            else
+            StackValue::Var(Variable::Direct(dirvar)) =>
             {
-                return plainerr("internal error: TODO write error askdgfauiowef");
+                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(index).into_iter().collect() } ));
             }
-        }
-        else
-        {
-            return plainerr("internal error: TODO write error askdgfauiowef");
+            StackValue::Var(Variable::Indirect(indirvar)) =>
+            {
+                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(index).into_iter().collect() } ));
+            }
+            StackValue::Val(Value::Array(array)) =>
+            {
+                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualArray(array), indexes : vec!(index).into_iter().collect() } ));
+            }
+            _ =>
+            {
+                return plainerr("error: tried to use array indexing on a non-indexable value");
+            }
         }
         Ok(())
     }
@@ -736,27 +538,16 @@ impl Interpreter
     }
     pub (crate) fn sim_RETURN(&mut self) -> StepResult
     {
-        if let Some(old_frame) = self.frames.pop()
+        let old_frame = self.frames.pop().ok_or_else(|| minierr("error: attempted to return from global code; use exit() instead"))?;
+        
+        let inner_frame_stack_last = self.stack_pop();
+        let frame_was_expr = self.top_frame.isexpr;
+        self.top_frame = old_frame;
+        // exit implies no pushed variable. if the outside expects a value, push it
+        if frame_was_expr
         {
-            let inner_frame_stack_last = self.stack_pop();
-            let frame_was_expr = self.top_frame.isexpr;
-            self.top_frame = old_frame;
-            // exit implies no pushed variable. if the outside expects a value, push it
-            if frame_was_expr
-            {
-                if let Some(val) = inner_frame_stack_last
-                {
-                    self.stack_push(val);
-                }
-                else
-                {
-                    return plainerr("error: RETURN instruction needed a value remaining on the inner frame's stack, but there were none");
-                }
-            }
-        }
-        else
-        {
-            return plainerr("error: attempted to return from global code; use exit() instead");
+            let val = inner_frame_stack_last.ok_or_else(|| minierr("error: RETURN instruction needed a value remaining on the inner frame's stack, but there were none"))?;
+            self.stack_push(val);
         }
         Ok(())
     }
