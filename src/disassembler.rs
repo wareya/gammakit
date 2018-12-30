@@ -4,26 +4,12 @@ use super::bytecode::*;
 fn pull_n<'a>(pc : &mut usize, code : &'a[u8], n : usize) -> Result<&'a[u8], Option<String>>
 {
     *pc += n;
-    if let Some(code) = code.get(*pc-n..*pc)
-    {
-        Ok(code)
-    }
-    else
-    {
-        Err(Some("error: tried to read past end of code".to_string()))
-    }
+    code.get(*pc-n..*pc).ok_or_else(|| Some("error: tried to read past end of code".to_string()))
 }
 fn pull(pc : &mut usize, code : &[u8]) -> Result<u8, Option<String>>
 {
     *pc += 1;
-    if let Some(code) = code.get(*pc-1)
-    {
-        Ok(*code)
-    }
-    else
-    {
-        Err(Some("error: tried to read past end of code".to_string()))
-    }
+    code.get(*pc-1).ok_or_else(|| Some("error: tried to read past end of code".to_string())).map(|c| *c)
 }
 fn put_lit(ret : &mut Vec<String>, mystr : &str)
 {
@@ -40,14 +26,7 @@ fn pull_text(pc : &mut usize, code : &[u8]) -> Result<String, Option<String>>
         c = pull(pc, &code)?;
     }
     
-    if let Ok(res) = std::str::from_utf8(&bytes)
-    {
-        Ok(escape(res))
-    }
-    else
-    {
-        Err(Some("error: tried to decode invalid utf-8".to_string()))
-    }
+    std::str::from_utf8(&bytes).or_else(|_| Err(Some("error: tried to decode invalid utf-8".to_string()))).map(|mystr| escape(mystr))
 }
 fn pull_text_unescaped(pc : &mut usize, code : &[u8]) -> Result<String, Option<String>>
 {
@@ -60,14 +39,7 @@ fn pull_text_unescaped(pc : &mut usize, code : &[u8]) -> Result<String, Option<S
         c = pull(pc, &code)?;
     }
     
-    if let Ok(res) = std::str::from_utf8(&bytes)
-    {
-        Ok(res.to_string())
-    }
-    else
-    {
-        Err(Some("error: tried to decode invalid utf-8".to_string()))
-    }
+    std::str::from_utf8(&bytes).or_else(|_| Err(Some("error: tried to decode invalid utf-8".to_string()))).map(|mystr| mystr.to_string())
 }
 fn disassemble_op(op : u8, code : &[u8], mut pc : usize, ret : &mut Vec<String>) -> Result<usize, Option<String>>
 {
