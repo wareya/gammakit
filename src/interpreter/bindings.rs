@@ -193,7 +193,7 @@ impl Interpreter
     {
         for arg in args
         {
-            let formatted = format_val(&arg).ok_or(minierr("error: tried to print unprintable value"))?;
+            let formatted = format_val(&arg).ok_or_else(|| minierr("error: tried to print unprintable value"))?;
             println!("{}", formatted);
         }
         Ok((Value::Number(0.0), false))
@@ -204,7 +204,7 @@ impl Interpreter
         {
             return Err(Some(format!("error: wrong number of arguments to len(); expected 1, got {}", args.len())));
         }
-        let arg = args.pop().ok_or(minierr("internal error: this should be unreachable"))?;
+        let arg = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
         match arg
         {
             Value::Text(string) =>
@@ -221,7 +221,7 @@ impl Interpreter
             }
             _ =>
             {
-                return plainerr("error: tried to take length of lengthless type");
+                plainerr("error: tried to take length of lengthless type")
             }
         }
     }
@@ -231,7 +231,7 @@ impl Interpreter
         {
             return Err(Some(format!("error: wrong number of arguments to keys(); expected 1, got {}", args.len())));
         }
-        let arg = args.pop().ok_or(minierr("internal error: this should be unreachable"))?;
+        let arg = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
         match arg
         {
             Value::Array(array) =>
@@ -241,7 +241,7 @@ impl Interpreter
                 {
                     list.push_back(Value::Number(i as f64));
                 }
-                return Ok((Value::Array(list), false));
+                Ok((Value::Array(list), false))
             }
             Value::Dict(dict) =>
             {
@@ -250,11 +250,11 @@ impl Interpreter
                 {
                     list.push_back(hashval_to_val(key));
                 }
-                return Ok((Value::Array(list), false));
+                Ok((Value::Array(list), false))
             }
             _ =>
             {
-                return plainerr("error: tried to take length of lengthless type");
+                plainerr("error: tried to take length of lengthless type")
             }
         }
     }
@@ -265,10 +265,10 @@ impl Interpreter
             return Err(Some(format!("error: wrong number of arguments to instance_create(); expected 1, got {}", args.len())));
         }
         
-        let object_id_f = self.list_pop_number(&mut args).or(plainerr("error: tried to use a non-number as an object id"))?;
+        let object_id_f = self.list_pop_number(&mut args).or_else(|_| plainerr("error: tried to use a non-number as an object id"))?;
         let object_id = object_id_f.round() as usize;
         let instance_id = self.global.instance_id as usize;
-        let object = self.global.objects.get(&object_id).ok_or(Some(format!("error: tried to create instance of non-extant object type {}", object_id)))?;
+        let object = self.global.objects.get(&object_id).ok_or_else(|| Some(format!("error: tried to create instance of non-extant object type {}", object_id)))?;
         
         let mut variables = HashMap::new();
         // FIXME configurable default variables?
@@ -306,15 +306,15 @@ impl Interpreter
         {
             return Err(Some(format!("error: wrong number of arguments to instance_add_variable(); expected 2 to 3, got {}", args.len())));
         }
-        let instance_id_f = self.list_pop_number(&mut args).or(plainerr("error: first argument to instance_add_variable() must be a number"))?;
+        let instance_id_f = self.list_pop_number(&mut args).or_else(|_| plainerr("error: first argument to instance_add_variable() must be a number"))?;
         let instance_id = instance_id_f.round() as usize;
-        let name = self.list_pop_text(&mut args).or(plainerr("error: second argument to instance_add_variable() must be a string"))?;
+        let name = self.list_pop_text(&mut args).or_else(|_| plainerr("error: second argument to instance_add_variable() must be a string"))?;
         
         if !self.global.regex_holder.is_exact(r"[a-zA-Z_][a-zA-Z_0-9]*", &name)
         {
             return Err(Some(format!("error: tried to create a variable with an invalid identifier `{}`\n(note: must exactly match the regex [a-zA-Z_][a-zA-Z_0-9]*)", name)));
         }
-        let inst = self.global.instances.get_mut(&instance_id).ok_or(Some(format!("error: tried to add variable to instance {} that doesn't exist", instance_id)))?;
+        let inst = self.global.instances.get_mut(&instance_id).ok_or_else(|| Some(format!("error: tried to add variable to instance {} that doesn't exist", instance_id)))?;
         if inst.variables.contains_key(&name)
         {
             return plainerr("error: tried to add variable to instance that already had a variable with that name")
@@ -329,17 +329,17 @@ impl Interpreter
         {
             return Err(Some(format!("error: wrong number of arguments to instance_execute(); expected 2 or more, got {}", args.len())));
         }
-        let instance_id_f = self.list_pop_number(&mut args).or(plainerr("error: first argument to instance_execute() must be a number"))?;
+        let instance_id_f = self.list_pop_number(&mut args).or_else(|_| plainerr("error: first argument to instance_execute() must be a number"))?;
         let instance_id = instance_id_f.round() as usize;
-        let func = self.list_pop_func(&mut args).or(plainerr("error: second argument to instance_execute() must be a function"))?;
+        let func = self.list_pop_func(&mut args).or_else(|_| plainerr("error: second argument to instance_execute() must be a function"))?;
         
         if func.internal
         {
             return plainerr("error: unsupported: tried to use instance_execute() with an internal function");
         }
-        let defdata = func.userdefdata.as_ref().ok_or(minierr("internal error: funcval was non-internal but had no userdefdata"))?;
+        let defdata = func.userdefdata.as_ref().ok_or_else(|| minierr("internal error: funcval was non-internal but had no userdefdata"))?;
         
-        self.global.instances.get_mut(&instance_id).ok_or(Some(format!("error: tried to execute function with instance {} that doesn't exist", instance_id)))?;
+        self.global.instances.get_mut(&instance_id).ok_or_else(|| Some(format!("error: tried to execute function with instance {} that doesn't exist", instance_id)))?;
         
         self.jump_to_function(defdata, args.into_iter().rev().collect(), isexpr, &func)?;
         self.top_frame.instancestack.push(instance_id);
@@ -353,13 +353,13 @@ impl Interpreter
             return Err(Some(format!("error: wrong number of arguments to parse_text(); expected 1, got {}", args.len())));
         }
         
-        let text = self.list_pop_text(&mut args).or(plainerr("error: first argument to parse_text() must be a string"))?;
-        let parser = self.global.parser.as_mut().ok_or(minierr("error: parser was not loaded into interpreter"))?;
+        let text = self.list_pop_text(&mut args).or_else(|_| plainerr("error: first argument to parse_text() must be a string"))?;
+        let parser = self.global.parser.as_mut().ok_or_else(|| minierr("error: parser was not loaded into interpreter"))?;
         
         let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
         let tokens = parser.tokenize(&program_lines, true)?;
         
-        let ast = parser.parse_program(&tokens, &program_lines, true)?.ok_or(minierr("error: string failed to parse"))?;
+        let ast = parser.parse_program(&tokens, &program_lines, true)?.ok_or_else(|| minierr("error: string failed to parse"))?;
         
         Ok((ast_to_dict(&ast), false))
     }
@@ -371,12 +371,12 @@ impl Interpreter
             return Err(Some(format!("error: wrong number of arguments to compile_ast(); expected 1, got {}", args.len())));
         }
         
-        let dict = self.list_pop_dict(&mut args).or(plainerr("error: first argument to compile_ast() must be a dictionary"))?;
+        let dict = self.list_pop_dict(&mut args).or_else(|_| plainerr("error: first argument to compile_ast() must be a dictionary"))?;
         let ast = dict_to_ast(&dict)?;
         let code = compile_bytecode(&ast)?;
         
         // endaddr at the start because Rc::new() moves `code`
-        return Ok(
+        Ok(
         ( Value::new_funcval
           ( false,
             None,
@@ -393,7 +393,7 @@ impl Interpreter
               impassable : true,
             }
             )), false)
-        );
+        )
     }
 
     pub (crate) fn sim_func_compile_text(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
@@ -402,18 +402,18 @@ impl Interpreter
         {
             return Err(Some(format!("error: wrong number of arguments to compile_text(); expected 1, got {}", args.len())));
         }
-        let text = self.list_pop_text(&mut args).or(plainerr("error: first argument to compile_text() must be a string"))?;
+        let text = self.list_pop_text(&mut args).or_else(|_| plainerr("error: first argument to compile_text() must be a string"))?;
         
         let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
-        let parser = self.global.parser.as_mut().ok_or(minierr("error: parser was not loaded into interpreter"))?;
+        let parser = self.global.parser.as_mut().ok_or_else(|| minierr("error: parser was not loaded into interpreter"))?;
         
         let tokens = parser.tokenize(&program_lines, true)?;
-        let ast = parser.parse_program(&tokens, &program_lines, true)?.ok_or(minierr("error: string failed to parse"))?;
+        let ast = parser.parse_program(&tokens, &program_lines, true)?.ok_or_else(|| minierr("error: string failed to parse"))?;
         
         let code = compile_bytecode(&ast)?;
         
         // endaddr at the start because Rc::new() moves `code`
-        return Ok(
+        Ok(
         ( Value::new_funcval
           ( false,
             None,
@@ -430,6 +430,6 @@ impl Interpreter
               impassable : true
             }
             )), false)
-        );
+        )
     }
 }
