@@ -90,7 +90,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
             }
             Value::Text(ref mut text) =>
             {
-                if new_indexes.len() != 0
+                if !new_indexes.is_empty()
                 {
                     plainerr("error: tried to index into the value at another index in a string (i.e. tried to do something like \"asdf\"[0][0])")
                 }
@@ -281,7 +281,7 @@ fn access_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &
             }
         }
     }
-    Err(Some(format!("internal error: tried to assign to a variable that could not be found")))
+    plainerr("internal error: tried to assign to a variable that could not be found")
 }
 impl Interpreter
 {

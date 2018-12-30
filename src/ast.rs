@@ -37,11 +37,11 @@ pub struct ASTNode {
 }
 
 impl ASTNode {
-    pub (crate) fn last_child<'a>(&'a self) -> Result<&'a ASTNode, Option<String>>
+    pub (crate) fn last_child(&'_ self) -> Result<&'_ ASTNode, Option<String>>
     {
         self.child(self.children.len()-1)
     }
-    pub (crate) fn child<'a>(&'a self, n : usize) -> Result<&'a ASTNode, Option<String>>
+    pub (crate) fn child(&'_ self, n : usize) -> Result<&'_ ASTNode, Option<String>>
     {
         if let Some(child) = self.children.get(n)
         {
@@ -49,7 +49,7 @@ impl ASTNode {
         }
         Err(Some(format!("internal error: tried to access child {} (zero-indexed) of ast node that only has {} children", n, self.children.len())))
     }
-    pub (crate) fn child_mut<'a>(&'a mut self, n : usize) -> Result<&'a mut ASTNode, Option<String>>
+    pub (crate) fn child_mut(&'_ mut self, n : usize) -> Result<&'_ mut ASTNode, Option<String>>
     {
         let len = self.children.len();
         if let Some(child) = self.children.get_mut(n)
@@ -58,7 +58,7 @@ impl ASTNode {
         }
         Err(Some(format!("internal error: tried to access child {} (zero-indexed) of ast node that only has {} children", n, len)))
     }
-    pub (crate) fn child_slice<'a>(&'a self, start : isize, end : isize) -> Result<&'a[ASTNode], Option<String>>
+    pub (crate) fn child_slice(&'_ self, start : isize, end : isize) -> Result<&'_[ASTNode], Option<String>>
     {
         let u_start = if start <  0 {self.children.len() - (-start as usize)} else {start as usize};
         let u_end   = if end   <= 0 {self.children.len() - (-end   as usize)} else {end   as usize};
@@ -79,7 +79,7 @@ pub (crate) fn dummy_astnode() -> ASTNode
 pub (crate) fn textualize_ast_node(ast : &ASTNode, depth : usize) -> Result<Vec<String>, Option<String>>
 {
     let mut ret = Vec::new();
-    let prefix = format!("{}", " ".repeat(depth));
+    let prefix = " ".repeat(depth).to_string();
     if ast.isparent
     {
         if ast.text == "name"

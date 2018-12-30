@@ -76,6 +76,9 @@ fn plainerr<T>(mystr : &str) -> Result<T, Option<String>>
     Err(Some(mystr.to_string()))
 }
 
+type ParseInfo = (Option<ASTNode>, usize, Option<ParseError>);
+type ParseVecInfo = (Option<Vec<ASTNode>>, usize, Option<ParseError>);
+
 impl Parser {
     pub fn new() -> Parser
     {
@@ -289,7 +292,7 @@ impl Parser {
     }
 
     // attempts to parse a token list as a particular form of a grammar point
-    fn parse_form(&self, tokens : &VecDeque<LexToken>, index : usize, form : &GrammarForm) -> Result<(Option<Vec<ASTNode>>, usize, Option<ParseError>), Option<String>>
+    fn parse_form(&self, tokens : &VecDeque<LexToken>, index : usize, form : &GrammarForm) -> Result<ParseVecInfo, Option<String>>
     {
         if tokens.len() == 0
         {
@@ -515,7 +518,7 @@ impl Parser {
     }
 
     // attempts to parse a token list as each form of a grammar point in order and uses the first valid one
-    fn parse(&self, tokens : &VecDeque<LexToken>, index : usize, nodetype : &GrammarPoint) -> Result<(Option<ASTNode>, usize, Option<ParseError>), Option<String>>
+    fn parse(&self, tokens : &VecDeque<LexToken>, index : usize, nodetype : &GrammarPoint) -> Result<ParseInfo, Option<String>>
     {
         if tokens.len() == 0
         {
@@ -674,7 +677,7 @@ impl Parser {
                         ast.children.insert(0, left);
                     }
                     
-                    if !(ast.children.len() == 2)
+                    if ast.children.len() != 2
                     {
                         return plainerr("internal error: transformed rhunexpr doesn't have exactly two children");
                     }
@@ -683,7 +686,7 @@ impl Parser {
                     {
                         ast.text = "funcexpr".to_string();
                         let mut temp = dummy_astnode();
-                        if !(ast.child(1)?.children.len() == 1)
+                        if ast.child(1)?.children.len() != 1
                         {
                             return plainerr("internal error: right child of transformed rhunexpr doesn't have exactly one child");
                         }
@@ -694,7 +697,7 @@ impl Parser {
                     {
                         ast.text = "arrayexpr".to_string();
                         let mut temp = dummy_astnode();
-                        if !(ast.child(1)?.children.len() == 1)
+                        if ast.child(1)?.children.len() != 1
                         {
                             return plainerr("internal error: right child of transformed rhunexpr doesn't have exactly one child");
                         }
@@ -705,7 +708,7 @@ impl Parser {
                     {
                         ast.text = "indirection".to_string();
                         let mut temp = dummy_astnode();
-                        if !(ast.child(1)?.children.len() == 1)
+                        if ast.child(1)?.children.len() != 1
                         {
                             return plainerr("internal error: right child of transformed rhunexpr doesn't have exactly one child");
                         }
@@ -719,7 +722,7 @@ impl Parser {
                 }
                 "ifcondition" | "whilecondition" | "withstatement" =>
                 {
-                    if !(ast.children.len() >= 4)
+                    if ast.children.len() < 4
                     {
                         return plainerr("internal error: if/while/with loop doesn't have at least four children (this includes its parens)");
                     }
@@ -743,7 +746,7 @@ impl Parser {
         {
             if ast.text == "objdef"
             {
-                if !(ast.children.len() >= 3)
+                if ast.children.len() < 3
                 {
                     return plainerr("internal error: objdef AST node does not have at least 3 children");
                 }

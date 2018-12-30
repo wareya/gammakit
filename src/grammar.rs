@@ -26,6 +26,7 @@ fn plainerr<T>(mystr : &str) -> Result<T, Option<String>>
 
 impl GrammarForm
 {
+    #[allow(clippy::new_ret_no_self)]
     pub (crate) fn new(line : &str, parser : &mut Parser, intoken : bool) -> Result<GrammarForm, Option<String>>
     {
         let re = &mut parser.internal_regexes;

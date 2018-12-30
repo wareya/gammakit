@@ -272,7 +272,7 @@ impl Interpreter
             }
             else
             {
-                return Err(Some(format!("internal error: break instruction found invalid associated destination index")))
+                return plainerr("internal error: break instruction found invalid associated destination index")
             }
             Ok(())
         }
@@ -302,7 +302,7 @@ impl Interpreter
             }
             else
             {
-                return Err(Some(format!("internal error: continue instruction found invalid associated destination index")))
+                return plainerr("internal error: continue instruction found invalid associated destination index");
             }
             Ok(())
         }

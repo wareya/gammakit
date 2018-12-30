@@ -767,7 +767,7 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, Option
     if !ast.isparent
     {
         // panic!() fixme
-        return plainerr("error: tried to compile non-parent ast node");
+        plainerr("error: tried to compile non-parent ast node")
         //println!("error: tried to compile non-parent ast node");
         //print_ast(ast);
         //assert!(false);

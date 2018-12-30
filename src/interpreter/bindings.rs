@@ -1,4 +1,5 @@
 #![allow(clippy::type_complexity)]
+#![allow(clippy::cast_lossless)]
 
 use crate::interpreter::*;
 use crate::interpreter::types::ops::{float_booly, bool_floaty};

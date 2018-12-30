@@ -114,8 +114,7 @@ impl Interpreter
                 else
                 {
                     // FIXME ?
-                    let inst_copy : Vec<usize> = self.top_frame.instancestack.iter().cloned().rev().collect();
-                    for instance in inst_copy
+                    if let Some(instance) = self.top_frame.instancestack.last().cloned()
                     {
                         if let Some(inst) = self.global.instances.get(&instance)
                         {
@@ -127,13 +126,13 @@ impl Interpreter
                             {
                                 return Err(Some(format!("error: tried to call function from object type {} in the context of an instance of object type {}", defdata.parentobj, inst.objtype)));
                             }
-                            self.jump_to_function(&defdata, args, isexpr, &funcdata)?;
+                            self.jump_to_function(&defdata, args, isexpr, &funcdata)?; // opens a new frame, changing top_frame to a clean slate
                             self.top_frame.instancestack.push(instance);
                             return Ok(());
                         }
                         else
                         {
-                            return plainerr("TODO error aidsfgojaedfouajiefjfbdgnwru");
+                            return plainerr("internal error: tried to look for a variable inside of an instance that no longer exists (this might not be an error state!)");
                         }
                     }
                 }
