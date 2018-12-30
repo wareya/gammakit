@@ -25,9 +25,13 @@ use self::types::*;
 pub type StepResult = Result<(), Option<String>>;
 type InternalFunction = Fn(&mut Interpreter, Vec<Value>, bool) -> Result<(Value, bool), Option<String>>;
 
+fn minierr(mystr : &'static str) -> Option<String>
+{
+    Some(mystr.to_string())
+}
 fn plainerr<T>(mystr : &'static str) -> Result<T, Option<String>>
 {
-    Err(Some(mystr.to_string()))
+    Err(minierr(mystr))
 }
 
 // global interpreter data
