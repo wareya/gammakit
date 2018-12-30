@@ -19,9 +19,14 @@ pub (crate) struct GrammarForm {
     pub (crate) tokens : Vec<GrammarToken>
 }
 
+fn minierr(mystr : &str) -> Option<String>
+{
+    Some(mystr.to_string())
+}
+
 fn plainerr<T>(mystr : &str) -> Result<T, Option<String>>
 {
-    Err(Some(mystr.to_string()))
+    Err(minierr(mystr))
 }
 
 impl GrammarForm
@@ -96,24 +101,16 @@ impl GrammarForm
                 {
                     if tokens.len() != 3
                     {
-                        return plainerr("error: operator description line consists of not exactly three tokens");
+                        return plainerr("error: operator description line must consist of exactly three tokens");
                     }
-                    if let (Some(token), Some(sigil)) = (tokens.get(2), tokens.get(1))
-                    {
-                        if let Ok(precedence) = token.parse::<i32>()
-                        {
-                            ret.tokens = vec!(GrammarToken::Op{text: left.to_string(), assoc: if *sigil == r"\l" {1} else {0}, precedence});
-                            return Ok(ret);
-                        }
-                        else
-                        {
-                            return plainerr(&format!("error: operator precedence is not an integer\n{}", line));
-                        }
-                    }
-                    else
-                    {
-                        return plainerr("internal error: failed to get tokens 2 and 1 (third and second) of token list that supposedly had three tokens");
-                    }
+                    
+                    let sigil = tokens.get(1).ok_or_else(|| minierr("internal error: failed to get tokens 2 and 1 (third and second) of token list that supposedly had three tokens"))?;
+                    let token = tokens.get(2).ok_or_else(|| minierr("internal error: failed to get tokens 2 and 1 (third and second) of token list that supposedly had three tokens"))?;
+                    
+                    let precedence = token.parse::<i32>().or_else(|_| plainerr(&format!("error: operator precedence is not an integer\n{}", line)))?;
+                    
+                    ret.tokens = vec!(GrammarToken::Op{text: left.to_string(), assoc: if *sigil == r"\l" {1} else {0}, precedence});
+                    return Ok(ret);
                 }
                 else
                 {
