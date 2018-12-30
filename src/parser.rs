@@ -63,9 +63,14 @@ pub struct Parser {
     inited: bool,
 }
 
+fn minierr(mystr : &str) -> Option<String>
+{
+    Some(mystr.to_string())
+}
+
 fn plainerr<T>(mystr : &str) -> Result<T, Option<String>>
 {
-    Err(Some(mystr.to_string()))
+    Err(minierr(mystr))
 }
 
 type ParseInfo = (Option<ASTNode>, usize, Option<ParseError>);
@@ -98,7 +103,7 @@ impl Parser {
         while lines.len() > 0
         {
             macro_rules! pop {
-                () => { lines.pop_front().ok_or(Some("tried to access past end of program text".to_string())) };
+                () => { lines.pop_front().ok_or_else(|| Some("tried to access past end of program text".to_string())) };
             }
             
             let mut line : String = pop!()?;
@@ -304,131 +309,106 @@ impl Parser {
             {
                 GrammarToken::Name(text) =>
                 {
-                    if let Some(kind) = self.nodetypemap.get(text)
+                    let kind = self.nodetypemap.get(text).ok_or_else(|| minierr(&format!("internal error: failed to find node type {} used by some grammar form", text)))?;
+                    
+                    let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, kind)?;
+                    build_best_error(&mut latesterror, error);
+                    if let Some(node) = bit
                     {
-                        let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, kind)?;
-                        build_best_error(&mut latesterror, error);
-                        if let Some(node) = bit
-                        {
-                            nodes.push(node);
-                            totalconsumed += consumed;
-                        }
-                        else
-                        {
-                            return Ok((defaultreturn.0, defaultreturn.1, latesterror));
-                        }
+                        nodes.push(node);
+                        totalconsumed += consumed;
                     }
                     else
                     {
-                        return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
+                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
                 }
                 GrammarToken::NameList(text) =>
                 {
-                    if let Some(kind) = self.nodetypemap.get(text)
+                    let kind = self.nodetypemap.get(text).ok_or_else(|| minierr(&format!("internal error: failed to find node type {} used by some grammar form", text)))?;
+                    
+                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, kind)?;
+                    build_best_error(&mut latesterror, error);
+                    if bit.is_none()
                     {
-                        let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, kind)?;
-                        build_best_error(&mut latesterror, error);
-                        if bit.is_none()
-                        {
-                            return Ok((defaultreturn.0, defaultreturn.1, latesterror));
-                        }
-                        while let Some(node) = bit
-                        {
-                            nodes.push(node);
-                            totalconsumed += consumed;
-                            
-                            let tuple = self.parse(&tokens, index+totalconsumed, kind)?;
-                            bit = tuple.0;
-                            consumed = tuple.1;
-                            error = tuple.2;
-                            
-                            build_best_error(&mut latesterror, error);
-                        }
+                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
-                    else
+                    while let Some(node) = bit
                     {
-                        return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
+                        nodes.push(node);
+                        totalconsumed += consumed;
+                        
+                        let tuple = self.parse(&tokens, index+totalconsumed, kind)?;
+                        bit = tuple.0;
+                        consumed = tuple.1;
+                        error = tuple.2;
+                        
+                        build_best_error(&mut latesterror, error);
                     }
                 }
                 GrammarToken::OptionalName(text) =>
                 {
-                    if let Some(kind) = self.nodetypemap.get(text)
+                    let kind = self.nodetypemap.get(text).ok_or_else(|| minierr(&format!("internal error: failed to find node type {} used by some grammar form", text)))?;
+                    
+                    let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, kind)?;
+                    build_best_error(&mut latesterror, error);
+                    if let Some(node) = bit
                     {
-                        let (bit, consumed, error) = self.parse(&tokens, index+totalconsumed, kind)?;
-                        build_best_error(&mut latesterror, error);
-                        if let Some(node) = bit
-                        {
-                            nodes.push(node);
-                            totalconsumed += consumed;
-                        }
-                    }
-                    else
-                    {
-                        return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
+                        nodes.push(node);
+                        totalconsumed += consumed;
                     }
                 }
                 GrammarToken::OptionalNameList(text) =>
                 {
-                    if let Some(kind) = self.nodetypemap.get(text)
+                    let kind = self.nodetypemap.get(text).ok_or_else(|| minierr(&format!("internal error: failed to find node type {} used by some grammar form", text)))?;
+                    
+                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, kind)?;
+                    build_best_error(&mut latesterror, error);
+                    while let Some(node) = bit
                     {
-                        let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, kind)?;
+                        nodes.push(node);
+                        totalconsumed += consumed;
+                        
+                        let tuple = self.parse(&tokens, index+totalconsumed, kind)?;
+                        bit = tuple.0;
+                        consumed = tuple.1;
+                        error = tuple.2;
+                        
                         build_best_error(&mut latesterror, error);
-                        while let Some(node) = bit
-                        {
-                            nodes.push(node);
-                            totalconsumed += consumed;
-                            
-                            let tuple = self.parse(&tokens, index+totalconsumed, kind)?;
-                            bit = tuple.0;
-                            consumed = tuple.1;
-                            error = tuple.2;
-                            
-                            build_best_error(&mut latesterror, error);
-                        }
-                    }
-                    else
-                    {
-                        return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
                     }
                 }
                 GrammarToken::SeparatorNameList{text, separator} =>
                 {
-                    if let Some(kind) = self.nodetypemap.get(text)
+                    let kind = self.nodetypemap.get(text).ok_or_else(|| minierr(&format!("internal error: failed to find node type {} used by some grammar form", text)))?;
+                    
+                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, kind)?;
+                    build_best_error(&mut latesterror, error);
+                    if bit.is_none()
                     {
-                        let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, kind)?;
-                        build_best_error(&mut latesterror, error);
-                        if bit.is_none()
+                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
+                    }
+                    while let Some(node) = bit
+                    {
+                        nodes.push(node);
+                        totalconsumed += consumed;
+                        
+                        if let Some(check_separator) = tokens.get(index+totalconsumed)
                         {
-                            return Ok((defaultreturn.0, defaultreturn.1, latesterror));
-                        }
-                        while let Some(node) = bit
-                        {
-                            nodes.push(node);
-                            totalconsumed += consumed;
-                            
-                            if let Some(check_separator) = tokens.get(index+totalconsumed)
+                            if check_separator.text == *separator
                             {
-                                if check_separator.text == *separator
+                                totalconsumed += 1;
+                                
+                                let tuple = self.parse(&tokens, index+totalconsumed, kind)?;
+                                bit = tuple.0;
+                                consumed = tuple.1;
+                                error = tuple.2;
+                                
+                                build_best_error(&mut latesterror, error);
+                                
+                                // undo separator drain if right-hand rule parse failed
+                                if bit.is_none()
                                 {
-                                    totalconsumed += 1;
-                                    
-                                    let tuple = self.parse(&tokens, index+totalconsumed, kind)?;
-                                    bit = tuple.0;
-                                    consumed = tuple.1;
-                                    error = tuple.2;
-                                    
-                                    build_best_error(&mut latesterror, error);
-                                    
-                                    // undo separator drain if right-hand rule parse failed
-                                    if bit.is_none()
-                                    {
-                                        totalconsumed -= 1;
-                                    }
-                                }
-                                else
-                                {
-                                    break;
+                                    totalconsumed -= 1;
                                 }
                             }
                             else
@@ -436,68 +416,56 @@ impl Parser {
                                 break;
                             }
                         }
-                    }
-                    else
-                    {
-                        return plainerr(&format!("internal error: failed to find node type {} used by some grammar form", text));
+                        else
+                        {
+                            break;
+                        }
                     }
                 }
                 GrammarToken::Plain(text) =>
                 {
-                    let mut done = false;
                     if let Some(token) = tokens.get(index+totalconsumed)
                     {
                         if token.text == *text
                         {
                             nodes.push(ASTNode{text : token.text.to_string(), line : token.line, position : token.position, isparent: false, children : Vec::new(), opdata : dummy_opdata()});
                             totalconsumed += 1;
-                            done = true;
+                            continue;
                         }
                     }
-                    if !done
-                    {
-                        let error = Some(ParseError::new(index+totalconsumed, &text));
-                        build_best_error(&mut latesterror, error);
-                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
-                    }
+                    let error = Some(ParseError::new(index+totalconsumed, &text));
+                    build_best_error(&mut latesterror, error);
+                    return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
                 GrammarToken::Regex(text) =>
                 {
-                    let mut done = false;
                     if let Some(token) = tokens.get(index+totalconsumed)
                     {
                         if self.internal_regexes.is_exact_immut(text, &token.text)?
                         {
                             nodes.push(ASTNode{text : token.text.to_string(), line : token.line, position : token.position, isparent: false, children : Vec::new(), opdata : dummy_opdata()});
                             totalconsumed += 1;
-                            done = true;
+                            continue;
                         }
                     }
-                    if !done
-                    {
-                        let error = Some(ParseError::new(index+totalconsumed, &text));
-                        build_best_error(&mut latesterror, error);
-                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
-                    }
+                    let error = Some(ParseError::new(index+totalconsumed, &text));
+                    build_best_error(&mut latesterror, error);
+                    return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
                 GrammarToken::Op{text, assoc, precedence} =>
                 {
-                    let mut done = false;
                     if let Some(token) = tokens.get(index+totalconsumed)
                     {
                         if token.text == *text
                         {
                             nodes.push(ASTNode{text : token.text.to_string(), line : token.line, position : token.position, isparent: false, children : Vec::new(), opdata : OpData{isop : true, assoc: *assoc, precedence: *precedence}});
                             totalconsumed += 1;
-                            done = true;
+                            continue;
                         }
                     }
-                    if !done
-                    {
-                        let error = Some(ParseError::new(index+totalconsumed, &text));
-                        build_best_error(&mut latesterror, error);
-                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
-                    }
+                    let error = Some(ParseError::new(index+totalconsumed, &text));
+                    build_best_error(&mut latesterror, error);
+                    return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
                 GrammarToken::RestIsOptional =>
                 {
@@ -537,14 +505,14 @@ impl Parser {
     {
         if !(ast.isparent && ast.children.len() == 3 && ast.child(2)?.isparent && ast.child(2)?.children.len() >= 1)
         {
-            return plainerr("internal error: conditions for AST rotation failed");
+            return plainerr("internal error: attempted to rotate AST node for which the conditions of AST rotation were not satisfied");
         }
         let mut node_holder = dummy_astnode();
         // tree rotation around self, child 0, and child 2
         std::mem::swap(&mut node_holder, ast.child_mut(2)?); // detach right from under left (leaving dummy on left)
         std::mem::swap(ast.child_mut(2)?, node_holder.child_mut(0)?); // move betweener from right to left (leaving dummy on right)
         std::mem::swap(ast, node_holder.child_mut(0)?); // attach left to under right (leaving dummy on root)
-        std::mem::swap(ast, &mut node_holder); // attach right to root
+        std::mem::swap(ast, &mut node_holder); // attach right to root (leaving dummy on node_holder)
         Ok(())
     }
     fn parse_rotate_associativity_binexpr(&self, ast : &mut ASTNode) -> Result<bool, Option<String>>
@@ -605,14 +573,8 @@ impl Parser {
                 // FIXME no idea if this works lol
                 let mut temp = Vec::new();
                 std::mem::swap(&mut temp, &mut ast.children);
-                if let Some(dummy) = temp.get_mut(0)
-                {
-                    std::mem::swap(ast, dummy);
-                }
-                else
-                {
-                    return plainerr("internal error: could not access child that was supposed to be there in expression summarization");
-                }
+                let dummy = temp.get_mut(0).ok_or_else(|| minierr("internal error: could not access child that was supposed to be there in expression summarization"))?;
+                std::mem::swap(ast, dummy);
             }
             match ast.text.as_str()
             {
@@ -714,9 +676,9 @@ impl Parser {
                 }
                 "ifcondition" | "whilecondition" | "withstatement" =>
                 {
-                    if ast.children.len() < 4
+                    if ast.children.len() < 5
                     {
-                        return plainerr("internal error: if/while/with loop doesn't have at least four children (this includes its parens)");
+                        return plainerr("internal error: if/while/with loop doesn't have at least 5 children (this includes its parens) (it should have a token, paren, expr, paren, block)");
                     }
                     ast.children.remove(3);
                     ast.children.remove(1);
@@ -876,7 +838,7 @@ impl Parser {
         }
         else
         {
-            plainerr("internal error: grammar does not define \"program\" node type")
+            plainerr("error: grammar does not define \"program\" node type")
         }
     }
 }
