@@ -224,14 +224,8 @@ impl std::hash::Hash for HashableValue {
     {
         match self
         {
-            HashableValue::Number(num) =>
-            {
-                pun_f64_as_u64(*num).hash(state);
-            }
-            HashableValue::Text(text) =>
-            {
-                text.hash(state);
-            }
+            HashableValue::Number(num) => pun_f64_as_u64(*num).hash(state),
+            HashableValue::Text(text) => text.hash(state)
         }
     }
 }
@@ -240,15 +234,9 @@ impl std::cmp::PartialEq for HashableValue {
     {
         match (self, other)
         {
-            (HashableValue::Number(left), HashableValue::Number(right)) =>
-            {
-                pun_f64_as_u64(*left) == pun_f64_as_u64(*right)
-            }
-            (HashableValue::Text(left), HashableValue::Text(right)) =>
-            {
-                left == right
-            }
-            _ => { false }
+            (HashableValue::Number(left), HashableValue::Number(right)) => pun_f64_as_u64(*left) == pun_f64_as_u64(*right),
+            (HashableValue::Text(left), HashableValue::Text(right)) => left == right,
+            _ => false
         }
     }
 }
