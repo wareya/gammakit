@@ -4,11 +4,11 @@ use std::fs::File;
 use std::io::Read;
 use std::vec::Vec;
 
+#[macro_use]
+mod matches;
 mod strings;
 mod regexholder;
 mod ast;
-#[macro_use]
-mod matches;
 mod parser;
 mod bytecode;
 mod grammar;

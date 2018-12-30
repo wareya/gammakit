@@ -98,7 +98,7 @@ impl Parser {
         while lines.len() > 0
         {
             macro_rules! pop {
-                () => { match lines.pop_front() { Some(x) => Ok(x), None => Err(Some("tried to access past end of program text".to_string())) } };
+                () => { lines.pop_front().ok_or(Some("tried to access past end of program text".to_string())) };
             }
             
             let mut line : String = pop!()?;
@@ -641,7 +641,7 @@ impl Parser {
                         }
                         if ast.child(0)?.text != "funcexpr"
                         {
-                            return plainerr("error: tried to use unknown expression as statement");
+                            return plainerr("error: tried to use unknown right-handed-expansion expression as statement");
                         }
                         let mut temp = Vec::new();
                         std::mem::swap(&mut temp, &mut ast.child_mut(0)?.children);

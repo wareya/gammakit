@@ -43,31 +43,19 @@ impl ASTNode {
     }
     pub (crate) fn child(&'_ self, n : usize) -> Result<&'_ ASTNode, Option<String>>
     {
-        if let Some(child) = self.children.get(n)
-        {
-            return Ok(child);
-        }
-        Err(Some(format!("internal error: tried to access child {} (zero-indexed) of ast node that only has {} children", n, self.children.len())))
+        self.children.get(n).ok_or(Some(format!("internal error: tried to access child {} (zero-indexed) of ast node that only has {} children", n, self.children.len())))
     }
     pub (crate) fn child_mut(&'_ mut self, n : usize) -> Result<&'_ mut ASTNode, Option<String>>
     {
         let len = self.children.len();
-        if let Some(child) = self.children.get_mut(n)
-        {
-            return Ok(child);
-        }
-        Err(Some(format!("internal error: tried to access child {} (zero-indexed) of ast node that only has {} children", n, len)))
+        self.children.get_mut(n).ok_or(Some(format!("internal error: tried to access child {} (zero-indexed) of ast node that only has {} children", n, len)))
     }
     pub (crate) fn child_slice(&'_ self, start : isize, end : isize) -> Result<&'_[ASTNode], Option<String>>
     {
         let u_start = if start <  0 {self.children.len() - (-start as usize)} else {start as usize};
         let u_end   = if end   <= 0 {self.children.len() - (-end   as usize)} else {end   as usize};
         
-        if let Some(children) = self.children.get(u_start..u_end)
-        {
-            return Ok(children);
-        }
-        Err(Some(format!("internal error: tried to access child range {} to {} (zero-indexed) of ast node that only has {} children", u_start, u_end, self.children.len())))
+        self.children.get(u_start..u_end).ok_or(Some(format!("internal error: tried to access child range {} to {} (zero-indexed) of ast node that only has {} children", u_start, u_end, self.children.len())))
     }
 }
 
@@ -82,17 +70,9 @@ pub (crate) fn textualize_ast_node(ast : &ASTNode, depth : usize) -> Result<Vec<
     let prefix = " ".repeat(depth).to_string();
     if ast.isparent
     {
-        if ast.text == "name"
+        if matches!(ast.text.as_str(), "name" | "number" | "string")
         {
-            ret.push(format!("{}name({})", prefix, ast.child(0)?.text));
-        }
-        else if ast.text == "number"
-        {
-            ret.push(format!("{}number({})", prefix, ast.child(0)?.text));
-        }
-        else if ast.text == "string"
-        {
-            ret.push(format!("{}string({})", prefix, ast.child(0)?.text));
+            ret.push(format!("{}{}({})", prefix, ast.text, ast.child(0)?.text));
         }
         else
         {
@@ -117,17 +97,11 @@ pub (crate) fn textualize_ast(ast : &ASTNode) -> Result<Vec<String>, Option<Stri
 
 pub (crate) fn print_ast_node(ast : &ASTNode, depth : usize) -> Result<(), Option<String>>
 {
-    for line in textualize_ast_node(ast, depth)?
-    {
-        println!("{}", line);
-    }
+    println!("{}", textualize_ast_node(ast, depth)?.join("\n"));
     Ok(())
 }
 pub (crate) fn print_ast(ast : &ASTNode) -> Result<(), Option<String>>
 {
-    for line in textualize_ast(ast)?
-    {
-        println!("{}", line);
-    }
+    println!("{}", textualize_ast(ast)?.join("\n"));
     Ok(())
 }
