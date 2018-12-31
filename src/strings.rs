@@ -3,17 +3,10 @@ use std::collections::VecDeque;
 pub (crate) fn slice(text : &str, start : i64, end : i64) -> String
 {
     let chars : Vec<char> = text.chars().collect();
-    let u_start = if start < 0 {chars.len() - (-start as usize)} else {start as usize};
+    let u_start = if start <  0 {chars.len() - (-start as usize)} else {start as usize};
     let u_end   = if end   <= 0 {chars.len() - (-end   as usize)} else {end   as usize};
     
-    if let Some(chars) = chars.get(u_start..u_end)
-    {
-        chars.into_iter().collect()
-    }
-    else
-    {
-        "".to_string()
-    }
+    chars.get(u_start..u_end).map(|chars| chars.into_iter().collect()).unwrap_or("".to_string())
 }
 
 pub (crate) fn unescape(text: &str) -> String
@@ -50,11 +43,11 @@ pub (crate) fn escape(text: &str) -> String
     {
         match c
         {
-            '\\' => {ret.push('\\');ret.push('\\');}
-            '\n' => {ret.push('\\');ret.push('n');}
-            '\r' => {ret.push('\\');ret.push('r');}
-            '\t' => {ret.push('\\');ret.push('t');}
-            '\"' => {ret.push('\\');ret.push('"');}
+            '\\' => {ret.push('\\'); ret.push('\\');}
+            '\n' => {ret.push('\\'); ret.push('n');}
+            '\r' => {ret.push('\\'); ret.push('r');}
+            '\t' => {ret.push('\\'); ret.push('t');}
+            '\"' => {ret.push('\\'); ret.push('"');}
             _ => {ret.push(c);}
         }
     }

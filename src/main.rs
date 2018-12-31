@@ -44,7 +44,7 @@ fn main() -> std::io::Result<()>
                 
                 if let Ok(code) = code
                 {
-                    if false
+                    if true
                     {
                         if let Ok(disassembly) = disassemble_bytecode(&code, 0, 0)
                         {

@@ -235,40 +235,40 @@ impl Interpreter
     }
     pub (crate) fn sim_IF(&mut self) -> StepResult
     {
-        let exprlen = unpack_u64(&self.pull_from_code(8)?)? as usize;
-        let codelen = unpack_u64(&self.pull_from_code(8)?)? as usize;
+        let exprlen = self.read_u64()?;
+        let codelen = self.read_u64()?;
         let current_pc = self.get_pc();
-        let scopelen = self.top_frame.scopes.len() as u16;
-        self.top_frame.controlstack.push(ControlData{controltype : IF, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen), scopes : scopelen, other : None});
+        let scopes = self.top_frame.scopes.len() as u16;
+        self.top_frame.controlstack.push(ControlData{controltype : IF, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen), scopes, other : None});
         Ok(())
     }
     pub (crate) fn sim_IFELSE(&mut self) -> StepResult
     {
-        let exprlen = unpack_u64(&self.pull_from_code(8)?)? as usize;
-        let codelen1 = unpack_u64(&self.pull_from_code(8)?)? as usize;
-        let codelen2 = unpack_u64(&self.pull_from_code(8)?)? as usize;
+        let exprlen = self.read_u64()?;
+        let codelen1 = self.read_u64()?;
+        let codelen2 = self.read_u64()?;
         let current_pc = self.get_pc();
-        let scopelen = self.top_frame.scopes.len() as u16;
-        self.top_frame.controlstack.push(ControlData{controltype : IFELSE, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen1, current_pc+exprlen+codelen1+codelen2), scopes : scopelen, other : None});
+        let scopes = self.top_frame.scopes.len() as u16;
+        self.top_frame.controlstack.push(ControlData{controltype : IFELSE, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen1, current_pc+exprlen+codelen1+codelen2), scopes, other : None});
         Ok(())
     }
     pub (crate) fn sim_WHILE(&mut self) -> StepResult
     {
-        let exprlen = unpack_u64(&self.pull_from_code(8)?)? as usize;
-        let codelen = unpack_u64(&self.pull_from_code(8)?)? as usize;
+        let exprlen = self.read_u64()?;
+        let codelen = self.read_u64()?;
         let current_pc = self.get_pc();
-        let scopelen = self.top_frame.scopes.len() as u16;
-        self.top_frame.controlstack.push(ControlData{controltype : WHILE, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+codelen), scopes : scopelen, other : None});
+        let scopes = self.top_frame.scopes.len() as u16;
+        self.top_frame.controlstack.push(ControlData{controltype : WHILE, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+codelen), scopes, other : None});
         Ok(())
     }
     pub (crate) fn sim_FOR(&mut self) -> StepResult
     {
-        let exprlen = unpack_u64(&self.pull_from_code(8)?)? as usize;
-        let postlen = unpack_u64(&self.pull_from_code(8)?)? as usize;
-        let codelen = unpack_u64(&self.pull_from_code(8)?)? as usize;
+        let exprlen = self.read_u64()?;
+        let postlen = self.read_u64()?;
+        let codelen = self.read_u64()?;
         let current_pc = self.get_pc();
-        let scopelen = self.top_frame.scopes.len() as u16;
-        self.top_frame.controlstack.push(ControlData{controltype : FOR, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+postlen, current_pc+exprlen+postlen+codelen), scopes : scopelen, other : None});
+        let scopes = self.top_frame.scopes.len() as u16;
+        self.top_frame.controlstack.push(ControlData{controltype : FOR, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+postlen, current_pc+exprlen+postlen+codelen), scopes, other : None});
         Ok(())
     }
     pub (crate) fn sim_WITH(&mut self) -> StepResult
@@ -280,7 +280,7 @@ impl Interpreter
         // NOTE: for with(), the self.top_frame.scopes.len() >= 0xFFFF error case is handled by SCOPE instruction
         let other_id = self.stack_pop_number().ok_or_else(|| minierr("error: tried to use with() on a non-numeric expression (instance ids and object ids are numeric)"))?.round() as usize;
         
-        let codelen = unpack_u64(&self.pull_from_code(8)?)?;
+        let codelen = self.read_u64()?;
         
         let current_pc = self.get_pc();
         
@@ -288,7 +288,7 @@ impl Interpreter
         {
             self.top_frame.instancestack.push(other_id);
             
-            self.top_frame.controlstack.push(ControlData{controltype : WITH, controlpoints : vec!(current_pc, current_pc + codelen as usize), scopes : self.top_frame.scopes.len() as u16, other : Some(VecDeque::new())});
+            self.top_frame.controlstack.push(ControlData{controltype : WITH, controlpoints : vec!(current_pc, current_pc + codelen), scopes : self.top_frame.scopes.len() as u16, other : Some(VecDeque::new())});
         }
         else
         {
@@ -298,12 +298,12 @@ impl Interpreter
                 self.top_frame.instancestack.push(*first);
                 let mut copylist : VecDeque<usize> = instance_id_list.iter().cloned().collect();
                 copylist.pop_front();
-                self.top_frame.controlstack.push(ControlData{controltype : WITH, controlpoints : vec!(current_pc, current_pc + codelen as usize), scopes : self.top_frame.scopes.len() as u16, other : Some(copylist)});
+                self.top_frame.controlstack.push(ControlData{controltype : WITH, controlpoints : vec!(current_pc, current_pc + codelen), scopes : self.top_frame.scopes.len() as u16, other : Some(copylist)});
             }
             else
             {
                 // silently skip block if there are no instances of this object type
-                self.add_pc(codelen as usize);
+                self.add_pc(codelen);
             }
         }
         Ok(())
@@ -553,7 +553,7 @@ impl Interpreter
     }
     pub (crate) fn sim_LINENUM(&mut self) -> StepResult
     {
-        self.top_frame.currline = unpack_u64(&self.pull_from_code(8)?)? as usize;
+        self.top_frame.currline = self.read_u64()?;
         Ok(())
     }
 }

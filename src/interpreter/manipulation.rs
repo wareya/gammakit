@@ -75,6 +75,11 @@ impl Interpreter
         list_pop_generic!(args, Dict)
     }
     
+    pub (crate) fn read_u64(&mut self) -> Result<usize, Option<String>>
+    {
+        Ok(unpack_u64(&self.pull_from_code(8)?)? as usize)
+    }
+    
     pub (crate) fn read_string(&mut self) -> Result<String, Option<String>>
     {
         let code = self.get_code();

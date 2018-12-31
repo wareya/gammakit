@@ -240,7 +240,6 @@ impl Parser {
                         break;
                     }
                 }
-                
                 if continue_the_while { continue; }
                 for text in &self.symbol_list
                 {
@@ -627,15 +626,15 @@ impl Parser {
                     {
                         return plainerr("internal error: transformed rhunexpr doesn't have exactly two children");
                     }
+                    if ast.child(1)?.children.len() != 1
+                    {
+                        return plainerr("internal error: right child of transformed rhunexpr doesn't have exactly one child");
+                    }
                     
                     if ast.child(1)?.child(0)?.text == "funcargs"
                     {
                         ast.text = "funcexpr".to_string();
                         let mut temp = dummy_astnode();
-                        if ast.child(1)?.children.len() != 1
-                        {
-                            return plainerr("internal error: right child of transformed rhunexpr doesn't have exactly one child");
-                        }
                         std::mem::swap(&mut temp, ast.child_mut(1)?.child_mut(0)?);
                         std::mem::swap(&mut temp, ast.child_mut(1)?);
                     }
@@ -643,10 +642,6 @@ impl Parser {
                     {
                         ast.text = "arrayexpr".to_string();
                         let mut temp = dummy_astnode();
-                        if ast.child(1)?.children.len() != 1
-                        {
-                            return plainerr("internal error: right child of transformed rhunexpr doesn't have exactly one child");
-                        }
                         std::mem::swap(&mut temp, ast.child_mut(1)?.child_mut(0)?);
                         std::mem::swap(&mut temp, ast.child_mut(1)?);
                     }
@@ -654,10 +649,6 @@ impl Parser {
                     {
                         ast.text = "indirection".to_string();
                         let mut temp = dummy_astnode();
-                        if ast.child(1)?.children.len() != 1
-                        {
-                            return plainerr("internal error: right child of transformed rhunexpr doesn't have exactly one child");
-                        }
                         std::mem::swap(&mut temp, ast.child_mut(1)?.child_mut(0)?.child_mut(1)?);
                         std::mem::swap(&mut temp, ast.child_mut(1)?);
                     }
@@ -709,13 +700,7 @@ impl Parser {
             if matches!(ast.text.as_str(), "funccall" | "funcexpr" | "arrayref")
                && ast.children.len() != 2
             {
-                // panic!() fixme
                 return plainerr("broken ast node");
-                //println!("broken ast node");
-                //println!("-----");
-                //print_ast_node(ast, 0);
-                //println!("-----");
-                //assert!(false);
             }
             
             for child in &ast.children

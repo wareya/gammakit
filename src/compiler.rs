@@ -101,39 +101,23 @@ fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
                 }
                 else
                 {
-                    // panic!() fixme
                     return plainerr("internal error: broken return instruction");
-                    //println!("internal error: broken return instruction");
-                    //print_ast(ast);
-                    //assert!(false);
                 }
                 code.push(RETURN);
             }
             else
             {
-                // panic!() fixme
                 return plainerr("internal error: unhandled type of instruction");
-                //println!("internal error: unhandled type of instruction");
-                //print_ast(ast);
-                //assert!(false);
             }
         }
         else
         {
-            // panic!() fixme
             return plainerr("internal error: unhandled type of statement");
-            //println!("internal error: unhandled type of statement");
-            //print_ast(ast);
-            //assert!(false);
         }
     }
     else
     {
-        // panic!() fixme
         return plainerr("internal error: statement child is not itself a parent/named node");
-        //println!("internal error: statement child is not itself a parent/named node");
-        //print_ast(ast);
-        //assert!(false);
     }
     Ok(())
 }
