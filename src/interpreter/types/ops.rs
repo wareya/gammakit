@@ -85,59 +85,35 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
 
 fn value_op_add(left : &Value, right : &Value) -> Result<Value, String>
 {
+    // TODO: string and array concatenation
     match (left, right)
     {
-        (Value::Number(left), Value::Number(right)) =>
-        {
-            Ok(Value::Number(left+right))
-        }
-        // TODO: string and array concatenation
-        _ =>
-        {
-            Err("types incompatible with addition".to_string())
-        }
+        (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left+right)),
+        _ => Err("types incompatible with addition".to_string())
     }
 }
 fn value_op_subtract(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
-        (Value::Number(left), Value::Number(right)) =>
-        {
-            Ok(Value::Number(left-right))
-        }
-        _ =>
-        {
-            Err("types incompatible with subtraction".to_string())
-        }
+        (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left-right)),
+        _ => Err("types incompatible with subtraction".to_string())
     }
 }
 fn value_op_multiply(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
-        (Value::Number(left), Value::Number(right)) =>
-        {
-            Ok(Value::Number(left*right))
-        }
-        _ =>
-        {
-            Err("types incompatible with multiplication".to_string())
-        }
+        (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left*right)),
+        _ => Err("types incompatible with multiplication".to_string())
     }
 }
 fn value_op_divide(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
-        (Value::Number(left), Value::Number(right)) =>
-        {
-            Ok(Value::Number(left/right))
-        }
-        _ =>
-        {
-            Err("types incompatible with division".to_string())
-        }
+        (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left/right)),
+        _ => Err("types incompatible with division".to_string())
     }
 }
 fn value_op_modulo(left : &Value, right : &Value) -> Result<Value, String>
@@ -156,10 +132,7 @@ fn value_op_modulo(left : &Value, right : &Value) -> Result<Value, String>
             let outval = ((left%right)+right)%right;
             Ok(Value::Number(outval))
         }
-        _ =>
-        {
-            Err("types incompatible with modulo".to_string())
-        }
+        _ => Err("types incompatible with modulo".to_string())
     }
 }
 pub (crate) fn float_booly(f : f64) -> bool
@@ -170,134 +143,76 @@ pub (crate) fn bool_floaty(b : bool) -> f64
 {
     if b {1.0} else {0.0}
 }
+// TODO string comparison
 fn value_op_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
-        (Value::Number(left), Value::Number(right)) =>
-        {
-            Ok(Value::Number(bool_floaty(left==right)))
-        }
-        (Value::Text(left), Value::Text(right)) =>
-        {
-            Ok(Value::Number(bool_floaty(left==right)))
-        }
-        _ =>
-        {
-            Err("types incompatible with equal".to_string())
-        }
+        (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left==right))),
+        (Value::Text(left), Value::Text(right)) => Ok(Value::Number(bool_floaty(left==right))),
+        _ => Err("types incompatible with equal".to_string())
     }
 }
+// TODO string comparison
 fn value_op_not_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
-        (Value::Number(left), Value::Number(right)) =>
-        {
-            Ok(Value::Number(bool_floaty(left != right)))
-        }
-        (Value::Text(left), Value::Text(right)) =>
-        {
-            Ok(Value::Number(bool_floaty(left != right)))
-        }
-        // TODO string comparison
-        _ =>
-        {
-            Err("types incompatible with equal".to_string())
-        }
+        (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left != right))),
+        (Value::Text(left), Value::Text(right)) => Ok(Value::Number(bool_floaty(left != right))),
+        _ => Err("types incompatible with equal".to_string()),
     }
 }
 fn value_op_greater_or_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
-        (Value::Number(left), Value::Number(right)) =>
-        {
-            Ok(Value::Number(bool_floaty(left >= right)))
-        }
-        // TODO string comparison
-        _ =>
-        {
-            Err("types incompatible with greater than or equal".to_string())
-        }
+        (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left >= right))),
+        _ => Err("types incompatible with greater than or equal".to_string())
     }
 }
 fn value_op_less_or_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
-        (Value::Number(left), Value::Number(right)) =>
-        {
-            Ok(Value::Number(bool_floaty(left <= right)))
-        }
-        // TODO string comparison
-        _ =>
-        {
-            Err("types incompatible with less than or equal".to_string())
-        }
+        (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left <= right))),
+        _ => Err("types incompatible with less than or equal".to_string())
     }
 }
 fn value_op_greater(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
-        (Value::Number(left), Value::Number(right)) =>
-        {
-            Ok(Value::Number(bool_floaty(left > right)))
-        }
-        // TODO string comparison
-        _ =>
-        {
-            Err("types incompatible with greater than".to_string())
-        }
+        (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left > right))),
+        _ => Err("types incompatible with greater than".to_string())
     }
 }
 fn value_op_less(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
-        (Value::Number(left), Value::Number(right)) =>
-        {
-            Ok(Value::Number(bool_floaty(left < right)))
-        }
-        // TODO string comparison
-        _ =>
-        {
-            Err("types incompatible with less than".to_string())
-        }
+        (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left < right))),
+        _ => Err("types incompatible with less than".to_string())
     }
 }
+// TODO dicts
 fn value_op_and(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
-        (Value::Number(left), Value::Number(right)) =>
-        {
-            Ok(Value::Number(bool_floaty(float_booly(*left)&&float_booly(*right))))
-        }
-        // TODO dicts
-        _ =>
-        {
-            Err("types incompatible with logical and".to_string())
-        }
+        (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(float_booly(*left)&&float_booly(*right)))),
+        _ => Err("types incompatible with logical and".to_string())
     }
 }
+// TODO dicts
 fn value_op_or(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
-        (Value::Number(left), Value::Number(right)) =>
-        {
-            Ok(Value::Number(bool_floaty(float_booly(*left)||float_booly(*right))))
-        }
-        // TODO dicts
-        _ =>
-        {
-            Err("types incompatible with logical or".to_string())
-        }
+        (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(float_booly(*left)||float_booly(*right)))),
+        _ => Err("types incompatible with logical or".to_string())
     }
 }
-
 
 /*
 BINOP_TYPES = \
@@ -319,12 +234,7 @@ BINOP_TYPES = \
 
 pub (crate) fn get_binop_function(op : u8) -> Option<Box<Fn(&Value, &Value) -> Result<Value, String>>>
 {
-    macro_rules! enbox {
-        ( $x:ident ) =>
-        {
-            Some(Box::new($x))
-        }
-    }
+    macro_rules! enbox { ( $x:ident ) => { Some(Box::new($x)) } }
     match op
     {
         0x10 => enbox!(value_op_and),
@@ -348,53 +258,30 @@ fn value_op_negative(value : &Value) -> Result<Value, String>
 {
     match value
     {
-        Value::Number(value) =>
-        {
-            Ok(Value::Number(-value))
-        }
-        _ =>
-        {
-            Err("type incompatible with negation".to_string())
-        }
+        Value::Number(value) => Ok(Value::Number(-value)),
+        _ => Err("type incompatible with negation".to_string())
     }
 }
 fn value_op_positive(value : &Value) -> Result<Value, String>
 {
     match value
     {
-        Value::Number(value) =>
-        {
-            Ok(Value::Number(*value))
-        }
-        _ =>
-        {
-            Err("type incompatible with positive".to_string())
-        }
+        Value::Number(value) => Ok(Value::Number(*value)),
+        _ => Err("type incompatible with positive".to_string())
     }
 }
 fn value_op_not(value : &Value) -> Result<Value, String>
 {
     match value
     {
-        Value::Number(value) =>
-        {
-            Ok(Value::Number(bool_floaty(!float_booly(*value))))
-        }
-        _ =>
-        {
-            Err("type incompatible with positive".to_string())
-        }
+        Value::Number(value) => Ok(Value::Number(bool_floaty(!float_booly(*value)))),
+        _ => Err("type incompatible with not operator".to_string())
     }
 }
 
 pub (crate) fn get_unop_function(op : u8) -> Option<Box<Fn(&Value) -> Result<Value, String>>>
 {
-    macro_rules! enbox {
-        ( $x:ident ) =>
-        {
-            Some(Box::new($x))
-        }
-    }
+    macro_rules! enbox { ( $x:ident ) => { Some(Box::new($x)) } }
     match op
     {
         0x10 => enbox!(value_op_negative),
@@ -409,13 +296,7 @@ pub (crate) fn value_truthy(imm : &Value) -> bool
 {
     match imm
     {
-        Value::Number(value) =>
-        {
-            float_booly(*value)
-        }
-        _ =>
-        {
-            true
-        }
+        Value::Number(value) => float_booly(*value),
+        _ => true
     }
 }

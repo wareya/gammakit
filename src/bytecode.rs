@@ -2,11 +2,7 @@
 
 fn get(vec : &[u8], n : usize) -> Result<u8, Option<String>>
 {
-    match vec.get(n)
-    {
-        Some(r) => Ok(*r),
-        None => Err(Some("tried to unpack past range of buffer".to_string()))
-    }
+    vec.get(n).cloned().ok_or_else(|| Some("tried to unpack past range of buffer".to_string()))
 }
 
 pub (crate) fn pack_u16(num : u16) -> Vec<u8>
