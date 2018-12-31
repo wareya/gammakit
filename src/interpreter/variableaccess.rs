@@ -45,14 +45,8 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
             {
                 if let Value::Number(indexnum) = index
                 {
-                    if let Some(mut newvar) = var.get_mut(indexnum.round() as usize)
-                    {
-                        assign_or_return_indexed(value, &mut newvar, new_indexes)
-                    }
-                    else
-                    {
-                        Err(Some(format!("error: tried to access non-extant index {} of an array", indexnum)))
-                    }
+                    let mut newvar = var.get_mut(indexnum.round() as usize).ok_or_else(|| Some(format!("error: tried to access non-extant index {} of an array", indexnum)))?;
+                    assign_or_return_indexed(value, &mut newvar, new_indexes)
                 }
                 else
                 {
@@ -63,25 +57,13 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
             {
                 if let Value::Number(indexnum) = index
                 {
-                    if let Some(mut newvar) = var.get_mut(&HashableValue::Number(*indexnum))
-                    {
-                        assign_or_return_indexed(value, &mut newvar, new_indexes)
-                    }
-                    else
-                    {
-                        Err(Some(format!("error: tried to access non-extant index {} of a dict", indexnum)))
-                    }
+                    let mut newvar = var.get_mut(&HashableValue::Number(*indexnum)).ok_or_else(|| Some(format!("error: tried to access non-extant index {} of a dict", indexnum)))?;
+                    assign_or_return_indexed(value, &mut newvar, new_indexes)
                 }
                 else if let Value::Text(indexstr) = index
                 {
-                    if let Some(mut newvar) = var.get_mut(&HashableValue::Text(indexstr.clone()))
-                    {
-                        assign_or_return_indexed(value, &mut newvar, new_indexes)
-                    }
-                    else
-                    {
-                        Err(Some(format!("error: tried to access non-extant index {} of a dict", indexstr)))
-                    }
+                    let mut newvar = var.get_mut(&HashableValue::Text(indexstr.clone())).ok_or_else(|| Some(format!("error: tried to access non-extant index {} of a dict", indexstr)))?;
+                    assign_or_return_indexed(value, &mut newvar, new_indexes)
                 }
                 else
                 {
@@ -102,29 +84,17 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                     {
                         if let Value::Text(mychar) = value
                         {
-                            if mychar.len() == 1
+                            if mychar.chars().count() == 1
                             {
-                                if let Some(mychar) = mychar.chars().next()
-                                {
-                                    // turn into array of codepoints, then modify
-                                    let mut codepoints = text.chars().collect::<Vec<char>>();
-                                    if let Some(codepoint) = codepoints.get_mut(realindex)
-                                    {
-                                        *codepoint = mychar;
-                                    }
-                                    else
-                                    {
-                                        return plainerr("error: tried to assign to a character index that was past the end of a string");
-                                    }
-                                    // turn array of codepoints back into string
-                                    let newstr : String = codepoints.iter().collect();
-                                    *text = newstr;
-                                    Ok(None)
-                                }
-                                else
-                                {
-                                    plainerr("internal error: failed to get first character of a string of length 0")
-                                }
+                                let mychar = mychar.chars().next().ok_or_else(|| minierr("internal error: failed to get first character of a string of length 1"))?;
+                                // turn into array of codepoints, then modify
+                                let mut codepoints = text.chars().collect::<Vec<char>>();
+                                let codepoint = codepoints.get_mut(realindex).ok_or_else(|| minierr("error: tried to assign to a character index that was past the end of a string"))?;
+                                *codepoint = mychar;
+                                // turn array of codepoints back into string
+                                let newstr : String = codepoints.iter().collect();
+                                *text = newstr;
+                                Ok(None)
                             }
                             else
                             {
@@ -139,16 +109,11 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                     else
                     {
                         let codepoints = text.chars().collect::<Vec<char>>();
-                        if let Some(codepoint) = codepoints.get(realindex)
-                        {
-                            let mut newstr = String::new();
-                            newstr.push(*codepoint);
-                            Ok(Some(Value::Text(newstr)))
-                        }
-                        else
-                        {
-                            return plainerr("error: tried to evaluate a character from an index that was past the end of a string");
-                        }
+                        let codepoint = codepoints.get(realindex).ok_or_else(|| minierr("error: tried to evaluate a character from an index that was past the end of a string"))?;
+                        
+                        let mut newstr = String::new();
+                        newstr.push(*codepoint);
+                        Ok(Some(Value::Text(newstr)))
                     }
                 }
                 else
@@ -291,21 +256,11 @@ impl Interpreter
         {
             NonArrayVariable::Indirect(ref indirvar) =>
             {
-                if let Some(instance) = self.global.instances.get_mut(&indirvar.ident)
-                {
-                    if let Some(mut var) = instance.variables.get_mut(&indirvar.name)
-                    {
-                        return assign_or_return_indexed(value, &mut var, &arrayvar.indexes);
-                    }
-                    else
-                    {
-                        Err(Some(format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident)))
-                    }
-                }
-                else
-                {
-                    Err(Some(format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, indirvar.ident)))
-                }
+                let instance = self.global.instances.get_mut(&indirvar.ident).ok_or_else(|| Some(format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, indirvar.ident)))?;
+                
+                let mut var = instance.variables.get_mut(&indirvar.name).ok_or_else(|| Some(format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident)))?;
+                
+                return assign_or_return_indexed(value, &mut var, &arrayvar.indexes);
             }
             NonArrayVariable::Direct(ref dirvar) =>
             {
@@ -349,40 +304,28 @@ impl Interpreter
     }
     fn evaluate_or_store_of_indirect(&mut self, indirvar : &IndirectVar, value : Option<Value>) -> Result<Option<Value>, Option<String>>
     {
-        if let Some(instance) = self.global.instances.get_mut(&indirvar.ident)
+        let instance = self.global.instances.get_mut(&indirvar.ident).ok_or_else(|| Some(format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, indirvar.ident)))?;
+        
+        if let Some(var) = instance.variables.get_mut(&indirvar.name)
         {
-            if let Some(var) = instance.variables.get_mut(&indirvar.name)
-            {
-                assign_or_return(value, var)
-            }
-            else if let Some(objspec) = self.global.objects.get(&instance.objtype)
-            {
-                if let Some(funcdat) = objspec.functions.get(&indirvar.name)
-                {
-                    if let Some(_value) = value
-                    {
-                        Err(Some(format!("error: tried to assign to function `{}` in instance of object type `{}`", indirvar.name, objspec.name)))
-                    }
-                    else
-                    {
-                        let mut mydata = funcdat.clone();
-                        mydata.forcecontext = indirvar.ident;
-                        Ok(Some(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata))))
-                    }
-                }
-                else
-                {
-                    Err(Some(format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident)))
-                }
-            }
-            else
-            {
-                Err(Some(format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident)))
-            }
+            assign_or_return(value, var)
         }
         else
         {
-            Err(Some(format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, indirvar.ident)))
+            let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| Some(format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident)))?;
+            
+            let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| Some(format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident)))?;
+            
+            if value.is_some()
+            {
+                Err(Some(format!("error: tried to assign to function `{}` in instance of object type `{}`", indirvar.name, objspec.name)))
+            }
+            else
+            {
+                let mut mydata = funcdat.clone();
+                mydata.forcecontext = indirvar.ident;
+                Ok(Some(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata))))
+            }
         }
     }
     fn evaluate_or_store_of_direct(&mut self, dirvar : &DirectVar, value : Option<Value>) -> Result<Option<Value>, Option<String>>
@@ -404,7 +347,7 @@ impl Interpreter
         }
         if let Some(var) = self.global.objectnames.get(&dirvar.name)
         {
-            if let Some(_value) = value
+            if value.is_some()
             {
                 return Err(Some(format!("error: tried to assign to read-only object name `{}`", dirvar.name)));
             }
@@ -414,7 +357,7 @@ impl Interpreter
             }
         }
         // TODO: Store actual function pointer instead?
-        if let Some(_internal_func) = self.get_internal_function(&dirvar.name)
+        if self.get_internal_function(&dirvar.name).is_some()
         {
             return Ok(Some(Value::new_funcval(true, Some(dirvar.name.clone()), None, None)));
         }
