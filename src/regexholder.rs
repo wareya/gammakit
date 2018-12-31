@@ -15,19 +15,18 @@ impl RegexHolder {
     }
     pub (crate) fn prepare_exact(&mut self, regex_text : &str)
     {
-        if self.exact_regexes.contains_key(regex_text)
+        if !self.exact_regexes.contains_key(regex_text)
         {
-            return;
+            let regex = Regex::new(&format!("^{}$", regex_text));
+            self.exact_regexes.insert(regex_text.to_string(), regex);
         }
-        let regex = Regex::new(&format!("^{}$", regex_text));
-        self.exact_regexes.insert(regex_text.to_string(), regex);
     }
     #[allow(clippy::wrong_self_convention)]
     pub (crate) fn is_exact(&mut self, regex_text : &str, text : &str) -> bool
     {
         if let Some(regex) = self.exact_regexes.get(regex_text)
         {
-            return match regex { Ok(regex) => regex.is_match(text), Err(_) => false };
+            return regex.as_ref().map(|r| r.is_match(text)).unwrap_or(false);
         }
         let regex = Regex::new(&format!("^{}$", regex_text));
         self.exact_regexes.insert(regex_text.to_string(), regex);
@@ -37,14 +36,7 @@ impl RegexHolder {
     {
         let regex = self.exact_regexes.get(regex_text).ok_or_else(|| Some("internal error: attempted to use is_exact_immut for a regex that has not yet been cached".to_string()))?;
         
-        if let Ok(regex) = regex
-        {
-            Ok(regex.is_match(text))
-        }
-        else
-        {
-            Ok(false)
-        }
+        Ok(regex.as_ref().map(|r| r.is_match(text)).unwrap_or(false))
     }
     // regex offsets are bytes:
     // let mystr = "あそこだよっ！";

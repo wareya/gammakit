@@ -240,6 +240,7 @@ impl Parser {
                         break;
                     }
                 }
+                
                 if continue_the_while { continue; }
                 for text in &self.symbol_list
                 {
@@ -410,16 +411,10 @@ impl Parser {
                                 {
                                     totalconsumed -= 1;
                                 }
-                            }
-                            else
-                            {
-                                break;
+                                continue;
                             }
                         }
-                        else
-                        {
-                            break;
-                        }
+                        break;
                     }
                 }
                 GrammarToken::Plain(text) =>
@@ -433,8 +428,7 @@ impl Parser {
                             continue;
                         }
                     }
-                    let error = Some(ParseError::new(index+totalconsumed, &text));
-                    build_best_error(&mut latesterror, error);
+                    build_best_error(&mut latesterror, Some(ParseError::new(index+totalconsumed, &text)));
                     return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
                 GrammarToken::Regex(text) =>
@@ -448,8 +442,7 @@ impl Parser {
                             continue;
                         }
                     }
-                    let error = Some(ParseError::new(index+totalconsumed, &text));
-                    build_best_error(&mut latesterror, error);
+                    build_best_error(&mut latesterror, Some(ParseError::new(index+totalconsumed, &text)));
                     return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
                 GrammarToken::Op{text, assoc, precedence} =>
@@ -463,8 +456,7 @@ impl Parser {
                             continue;
                         }
                     }
-                    let error = Some(ParseError::new(index+totalconsumed, &text));
-                    build_best_error(&mut latesterror, error);
+                    build_best_error(&mut latesterror, Some(ParseError::new(index+totalconsumed, &text)));
                     return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
                 GrammarToken::RestIsOptional =>
