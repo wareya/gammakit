@@ -4,6 +4,11 @@ use super::strings::*;
 use super::ast::*;
 use super::bytecode::*;
 
+fn minierr(mystr : &str) -> Option<String>
+{
+    Some(mystr.to_string())
+}
+
 fn plainerr<T>(mystr : &str) -> Result<T, Option<String>>
 {
     Err(Some(mystr.to_string()))
@@ -33,18 +38,8 @@ fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
         code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
         code.extend(compile_astnode(ast.child(2)?, scopedepth)?);
         code.push(BINSTATE);
-        if let Some(op) = get_assignment_type(operator)
-        {
-            code.push(op);
-        }
-        else
-        {
-            // panic!() fixme
-            return plainerr(&format!("internal error: unhandled or unsupported type of binary statement {}", operator));
-            //println!("internal error: unhandled or unsupported type of binary statement {}", operator);
-            //print_ast(ast);
-            //assert!(false);
-        }
+        let op = get_assignment_type(operator).ok_or_else(|| minierr(&format!("internal error: unhandled or unsupported type of binary statement {}", operator)))?;
+        code.push(op);
     }
     else if ast.child(0)?.isparent
     {
@@ -638,14 +633,9 @@ fn compile_objdef(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Re
     for child in funcs.iter()
     {
         let code = compile_astnode(child, scopedepth)?;
-        if let Some(without_first_byte) = code.get(1..) // cut off the FUNCDEF byte
-        {
-            childcode.extend(without_first_byte);
-        }
-        else
-        {
-            return plainerr("internal error: compile_astnode for child function of objdef somehow didn't have even a single byte of code");
-        }
+        // cut off the FUNCDEF byte
+        let without_first_byte = code.get(1..).ok_or_else(|| minierr("internal error: compile_astnode for child function of objdef somehow didn't have even a single byte of code"))?;
+        childcode.extend(without_first_byte);
     }
     code.push(OBJDEF);
     code.extend(ast.child(1)?.child(0)?.text.bytes());
@@ -729,11 +719,7 @@ fn compile_lhunop(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Re
 {
     if ast.children.len() == 0
     {
-        // panic!() fixme
         return plainerr("internal error: lhunop has no children");
-        //println!("internal error: lhunop has no children");
-        //print_ast(ast);
-        //assert!(false);
     }
     else if ast.children.len() == 1
     {
@@ -746,18 +732,8 @@ fn compile_lhunop(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Re
         code.extend(compile_astnode(ast.child(1)?, scopedepth)?);
         code.push(UNOP);
         
-        if let Some(op) = get_unop_type(slice(&operator, 0, 1).as_str())
-        {
-            code.push(op);
-        }
-        else
-        {
-            // panic!() fixme
-            return plainerr("internal error: unhandled type of unary expression");
-            //println!("internal error: unhandled type of unary expression");
-            //print_ast(ast);
-            //assert!(false);
-        }
+        let op = get_unop_type(slice(&operator, 0, 1).as_str()).ok_or_else(|| minierr("internal error: unhandled type of unary expression"))?;
+        code.push(op);
     }
     
     Ok(())
@@ -766,11 +742,7 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, Option
 {
     if !ast.isparent
     {
-        // panic!() fixme
         plainerr("error: tried to compile non-parent ast node")
-        //println!("error: tried to compile non-parent ast node");
-        //print_ast(ast);
-        //assert!(false);
     }
     else
     {
@@ -782,18 +754,8 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, Option
             code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
             code.extend(compile_astnode(ast.child(2)?, scopedepth)?);
             code.push(BINOP);
-            if let Some(op) = get_binop_type(ast.child(1)?.child(0)?.text.as_str())
-            {
-                code.push(op);
-            }
-            else
-            {
-                // panic!() fixme
-                return plainerr("internal error: unhandled type of binary expression");
-                //println!("internal error: unhandled type of binary expression");
-                //print_ast(ast);
-                //assert!(false);
-            }
+            let op = get_binop_type(ast.child(1)?.child(0)?.text.as_str()).ok_or_else(|| minierr("internal error: unhandled type of binary expression"))?;
+            code.push(op);
         }
         else
         {
@@ -808,97 +770,49 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, Option
                     code.push(EXIT);
                 }
                 "statement" | "barestatement" =>
-                {
-                    compile_statement(ast, &mut code, scopedepth)?;
-                }
+                    compile_statement(ast, &mut code, scopedepth)?,
                 "declaration" =>
-                {
-                    compile_declaration(ast, &mut code, scopedepth)?;
-                }
+                    compile_declaration(ast, &mut code, scopedepth)?,
                 "name" =>
-                {
-                    compile_name(ast, &mut code, scopedepth)?;
-                }
+                    compile_name(ast, &mut code, scopedepth)?,
                 "funccall" | "funcexpr" =>
-                {
-                    compile_function(ast, &mut code, scopedepth)?;
-                }
+                    compile_function(ast, &mut code, scopedepth)?,
                 "ifcondition" =>
-                {
-                    compile_ifcondition(ast, &mut code, scopedepth)?;
-                }
+                    compile_ifcondition(ast, &mut code, scopedepth)?,
                 "whilecondition" =>
-                {
-                    compile_whilecondition(ast, &mut code, scopedepth)?;
-                }
+                    compile_whilecondition(ast, &mut code, scopedepth)?,
                 "forcondition" =>
-                {
-                    compile_forcondition(ast, &mut code, scopedepth)?;
-                }
+                    compile_forcondition(ast, &mut code, scopedepth)?,
                 "expr" =>
-                {
-                    compile_expr(ast, &mut code, scopedepth)?;
-                }
+                    compile_expr(ast, &mut code, scopedepth)?,
                 "simplexpr" =>
-                {
-                    compile_simplexpr(ast, &mut code, scopedepth)?;
-                }
+                    compile_simplexpr(ast, &mut code, scopedepth)?,
                 "number" =>
-                {
-                    compile_number(ast, &mut code, scopedepth)?;
-                }
+                    compile_number(ast, &mut code, scopedepth)?,
                 "string" =>
-                {
-                    compile_string(ast, &mut code, scopedepth)?;
-                }
+                    compile_string(ast, &mut code, scopedepth)?,
                 "lvar" =>
-                {
-                    compile_lvar(ast, &mut code, scopedepth)?;
-                }
+                    compile_lvar(ast, &mut code, scopedepth)?,
                 "rvar" =>
-                {
-                    compile_rvar(ast, &mut code, scopedepth)?;
-                }
+                    compile_rvar(ast, &mut code, scopedepth)?,
                 "funcdef" =>
-                {
-                    compile_funcdef(ast, &mut code, scopedepth)?;
-                }
+                    compile_funcdef(ast, &mut code, scopedepth)?,
                 "lambda" =>
-                {
-                    compile_lambda(ast, &mut code, scopedepth)?;
-                }
+                    compile_lambda(ast, &mut code, scopedepth)?,
                 "objdef" =>
-                {
-                    compile_objdef(ast, &mut code, scopedepth)?;
-                }
+                    compile_objdef(ast, &mut code, scopedepth)?,
                 "arraybody" =>
-                {
-                    compile_arraybody(ast, &mut code, scopedepth)?;
-                }
+                    compile_arraybody(ast, &mut code, scopedepth)?,
                 "dictbody" =>
-                {
-                    compile_dictbody(ast, &mut code, scopedepth)?;
-                }
+                    compile_dictbody(ast, &mut code, scopedepth)?,
                 "arrayexpr" =>
-                {
-                    compile_arrayexpr(ast, &mut code, scopedepth)?;
-                }
+                    compile_arrayexpr(ast, &mut code, scopedepth)?,
                 "indirection" =>
-                {
-                    compile_indirection(ast, &mut code, scopedepth)?;
-                }
+                    compile_indirection(ast, &mut code, scopedepth)?,
                 "lhunop" =>
-                {
-                    compile_lhunop(ast, &mut code, scopedepth)?;
-                }
+                    compile_lhunop(ast, &mut code, scopedepth)?,
                 _ =>
-                {
-                    // panic!() fixme
-                    return plainerr("internal error: unhandled ast node type in compiler");
-                    //println!("internal error: unhandled ast node type in compiler");
-                    //print_ast(ast);
-                    //assert!(false);
-                }
+                    plainerr("internal error: unhandled ast node type in compiler")?,
             }
         }
         Ok(code)
