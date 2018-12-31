@@ -42,27 +42,15 @@ impl Interpreter
     
     pub (crate) fn pull_from_code(&mut self, n : usize) -> Result<Vec<u8>, Option<String>>
     {
-        if let Some(vec) = self.get_code().get(self.get_pc()..self.get_pc()+n)
-        {
-            self.add_pc(n);
-            Ok(vec.to_vec())
-        }
-        else
-        {
-            return Err(Some("error: tried to access past end of code".to_string()))
-        }
+        let vec = self.get_code().get(self.get_pc()..self.get_pc()+n).map(|v| v.to_vec()).ok_or_else(|| minierr("error: tried to access past end of code"))?;
+        self.add_pc(n);
+        Ok(vec)
     }
     pub (crate) fn pull_single_from_code(&mut self) -> Result<u8, Option<String>>
     {
-        if let Some(byte) = self.get_code().get(self.get_pc())
-        {
-            self.add_pc(1);
-            Ok(*byte)
-        }
-        else
-        {
-            return Err(Some("error: tried to access past end of code".to_string()))
-        }
+        let byte = self.get_code().get(self.get_pc()).cloned().ok_or_else(|| minierr("error: tried to access past end of code"))?;
+        self.add_pc(1);
+        Ok(byte)
     }
     
     // second val: 0: no value on stack; 1: value on stack was of the wrong type
@@ -104,14 +92,8 @@ impl Interpreter
             c = self.pull_single_from_code()?;
         }
         
-        if let Ok(res) = std::str::from_utf8(&bytes)
-        {
-            Ok(res.to_string())
-        }
-        else
-        {
-            Err(Some("error: tried to decode a string that was not utf-8".to_string()))
-        }
+        let res = std::str::from_utf8(&bytes).or_else(|_| plainerr("error: tried to decode a string that was not utf-8"))?;
+        Ok(res.to_string())
     }
     pub (crate) fn read_function(&mut self) -> Result<(String, FuncSpec), Option<String>>
     {
@@ -149,25 +131,14 @@ impl Interpreter
         let mut captures = HashMap::<String, Value>::new();
         for _i in 0..capturecount
         {
-            if let Some(val) = self.stack_pop_val()
+            let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: read_lambda failed to collect capture value from stack"))?;
+            let name = self.stack_pop_text().ok_or_else(|| minierr("internal error: read_lambda failed to collect capture name from stack"))?;
+            
+            if captures.contains_key(&name)
             {
-                if let Some(name) = self.stack_pop_text()
-                {
-                    if captures.contains_key(&name)
-                    {
-                        return Err(Some(format!("error: duplicate capture variable name `{}` in lambda capture expression", name)));
-                    }
-                    captures.insert(name, val);
-                }
-                else
-                {
-                    return Err(Some("internal error: read_lambda failed to collect capture name from stack".to_string()));
-                }
+                return Err(Some(format!("error: duplicate capture variable name `{}` in lambda capture expression", name)));
             }
-            else
-            {
-                return Err(Some("internal error: read_lambda failed to collect capture value from stack".to_string()));
-            }
+            captures.insert(name, val);
         }
         
         let argcount = unpack_u16(&self.pull_from_code(2)?)?;
@@ -221,20 +192,16 @@ impl Interpreter
     }
     pub (crate) fn pop_controlstack_until_loop(&mut self)
     {
-        let mut foundloop = false;
-        
-        if let Some(controller) = self.top_frame.controlstack.last()
+        while let Some(controller) = self.top_frame.controlstack.last()
         {
-            if controller.controltype == WHILE || controller.controltype == FOR // TODO: let WITH support break/continue
+            if matches!(controller.controltype, WHILE | FOR) // TODO: let WITH support break/continue
             {
-                foundloop = true;
+                break;
             }
-        }
-        
-        if !foundloop
-        {
-            self.top_frame.controlstack.pop();
-            self.pop_controlstack_until_loop();
+            else
+            {
+                self.top_frame.controlstack.pop();
+            }
         }
     }
 }
