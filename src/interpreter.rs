@@ -22,13 +22,14 @@ mod control;
 use self::types::*;
 
 pub type StepResult = Result<(), Option<String>>;
-type InternalFunction = Fn(&mut Interpreter, Vec<Value>, bool) -> Result<(Value, bool), Option<String>>;
+type OpResult = Result<(), String>;
+type InternalFunction = Fn(&mut Interpreter, Vec<Value>, bool) -> Result<(Value, bool), String>;
 
-fn minierr(mystr : &'static str) -> Option<String>
+fn minierr(mystr : &'static str) -> String
 {
-    Some(mystr.to_string())
+    mystr.to_string()
 }
-fn plainerr<T>(mystr : &'static str) -> Result<T, Option<String>>
+fn plainerr<T>(mystr : &'static str) -> Result<T, String>
 {
     Err(minierr(mystr))
 }
@@ -98,13 +99,13 @@ impl Interpreter {
     {
         if self.get_pc() < self.top_frame.startpc || self.get_pc() > self.top_frame.endpc
         {
-            return plainerr("internal error: simulation stepped while outside of the range of the frame it was in");
+            return Err(Some(minierr("internal error: simulation stepped while outside of the range of the frame it was in")));
         }
         let op = self.pull_single_from_code()?;
         
         let opfunc = match_or_err!(self.get_opfunc(op), Some(opfunc) => opfunc, Some(format!("internal error: unknown operation 0x{:02X}\nline: {}", op, self.top_frame.currline)))?;
         
-        opfunc(self)?;
+        opfunc(self).map_err(|err| Some(err))?;
         self.handle_flow_control()?;
         if self.doexit
         {

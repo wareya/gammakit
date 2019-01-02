@@ -2,7 +2,7 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
-    pub (crate) fn jump_to_function(&mut self, function : &FuncSpec, mut args : Vec<Value>, isexpr : bool, funcdata : &FuncVal) -> StepResult
+    pub (crate) fn jump_to_function(&mut self, function : &FuncSpec, mut args : Vec<Value>, isexpr : bool, funcdata : &FuncVal) -> OpResult
     {
         if function.varnames.len() > args.len()
         {
@@ -38,7 +38,7 @@ impl Interpreter
         
         Ok(())
     }
-    pub (crate) fn call_function(&mut self, funcdata : FuncVal, args : Vec<Value>, isexpr : bool) -> StepResult
+    pub (crate) fn call_function(&mut self, funcdata : FuncVal, args : Vec<Value>, isexpr : bool) -> OpResult
     {
         if funcdata.internal
         {
@@ -55,7 +55,7 @@ impl Interpreter
                 }
                 else
                 {
-                    let frame = self.frames.last_mut().ok_or_else(|| Some(format!("internal error: couldn't find old frame after calling function `{}` that moves the frame", name)))?;
+                    let frame = self.frames.last_mut().ok_or_else(|| format!("internal error: couldn't find old frame after calling function `{}` that moves the frame", name))?;
                     frame.push_val(ret);
                 }
             }
@@ -77,11 +77,11 @@ impl Interpreter
                     // FIXME ?
                     if !self.global.objects.contains_key(&inst.objtype)
                     {
-                        return Err(Some(format!("error: tried to access data from object type {} that no longer exists", inst.objtype)));
+                        return Err(format!("error: tried to access data from object type {} that no longer exists", inst.objtype));
                     }
                     if defdata.parentobj != inst.objtype
                     {
-                        return Err(Some(format!("error: tried to call function from object type {} in the context of an instance of object type {}", defdata.parentobj, inst.objtype)));
+                        return Err(format!("error: tried to call function from object type {} in the context of an instance of object type {}", defdata.parentobj, inst.objtype));
                     }
                     self.jump_to_function(&defdata, args, isexpr, &funcdata)?;
                     self.top_frame.instancestack.push(defdata.forcecontext);
@@ -97,11 +97,11 @@ impl Interpreter
                     
                     if !self.global.objects.contains_key(&inst.objtype)
                     {
-                        return Err(Some(format!("error: tried to access data from object type {} that no longer exists", inst.objtype)));
+                        return Err(format!("error: tried to access data from object type {} that no longer exists", inst.objtype));
                     }
                     if defdata.parentobj != inst.objtype
                     {
-                        return Err(Some(format!("error: tried to call function from object type {} in the context of an instance of object type {}", defdata.parentobj, inst.objtype)));
+                        return Err(format!("error: tried to call function from object type {} in the context of an instance of object type {}", defdata.parentobj, inst.objtype));
                     }
                     self.jump_to_function(&defdata, args, isexpr, &funcdata)?; // opens a new frame, changing top_frame to a clean slate
                     self.top_frame.instancestack.push(instance);

@@ -30,16 +30,16 @@ pub (crate) fn ast_to_dict(ast : &ASTNode) -> Value
     Value::Dict(astdict)
 }
 
-pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTNode, Option<String>>
+pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTNode, String>
 {
     let mut ast = dummy_astnode();
     
     macro_rules! get { ( $as:ident, $dict:expr, $str:expr ) =>
     {
-        match $dict.get(&HashableValue::Text($str.to_string())).ok_or_else(|| Some(format!("error: tried to turn dict into ast, but dict lacked {} field", $str)))?
+        match $dict.get(&HashableValue::Text($str.to_string())).ok_or_else(|| format!("error: tried to turn dict into ast, but dict lacked {} field", $str))?
         {
             Value::$as(this) => Ok(this),
-            _ => Err(Some(format!("error: tried to turn dict into ast, but dict's {} field was of the wrong type", $str)))
+            _ => Err(format!("error: tried to turn dict into ast, but dict's {} field was of the wrong type", $str))
         }
     } }
     
@@ -107,7 +107,7 @@ impl Interpreter
     }
     // last argument is isexpr - as of the time of writing this comment, it's used exclusively by instance_execute
     // second return value is whether the frame was moved - necessary for weird functions like instance_create that implicly call user defined functions, because moving the frame to call user defined functions also moves the original stack
-    pub (crate) fn sim_func_print(&mut self, args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
+    pub (crate) fn sim_func_print(&mut self, args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
     {
         for arg in args
         {
@@ -116,11 +116,11 @@ impl Interpreter
         }
         Ok((Value::Number(0.0), false))
     }
-    pub (crate) fn sim_func_len(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
+    pub (crate) fn sim_func_len(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
     {
         if args.len() != 1
         {
-            return Err(Some(format!("error: wrong number of arguments to len(); expected 1, got {}", args.len())));
+            return Err(format!("error: wrong number of arguments to len(); expected 1, got {}", args.len()));
         }
         let arg = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
         match arg
@@ -131,11 +131,11 @@ impl Interpreter
             _ => plainerr("error: tried to take length of lengthless type")
         }
     }
-    pub (crate) fn sim_func_keys(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
+    pub (crate) fn sim_func_keys(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
     {
         if args.len() != 1
         {
-            return Err(Some(format!("error: wrong number of arguments to keys(); expected 1, got {}", args.len())));
+            return Err(format!("error: wrong number of arguments to keys(); expected 1, got {}", args.len()));
         }
         let arg = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
         match arg
@@ -153,17 +153,17 @@ impl Interpreter
             _ => plainerr("error: tried to take length of lengthless type")
         }
     }
-    pub (crate) fn sim_func_instance_create(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
+    pub (crate) fn sim_func_instance_create(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
     {
         if args.len() != 1
         {
-            return Err(Some(format!("error: wrong number of arguments to instance_create(); expected 1, got {}", args.len())));
+            return Err(format!("error: wrong number of arguments to instance_create(); expected 1, got {}", args.len()));
         }
         
         let object_id_f = self.list_pop_number(&mut args).or_else(|_| plainerr("error: tried to use a non-number as an object id"))?;
         let object_id = object_id_f.round() as usize;
         let instance_id = self.global.instance_id as usize;
-        let object = self.global.objects.get(&object_id).ok_or_else(|| Some(format!("error: tried to create instance of non-extant object type {}", object_id)))?;
+        let object = self.global.objects.get(&object_id).ok_or_else(|| format!("error: tried to create instance of non-extant object type {}", object_id))?;
         
         let mut variables = HashMap::new();
         // FIXME configurable default variables?
@@ -195,11 +195,11 @@ impl Interpreter
             Ok((Value::Number(instance_id as f64), false))
         }
     }
-    pub (crate) fn sim_func_instance_add_variable(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
+    pub (crate) fn sim_func_instance_add_variable(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
     {
         if args.len() < 2 || args.len() > 3
         {
-            return Err(Some(format!("error: wrong number of arguments to instance_add_variable(); expected 2 to 3, got {}", args.len())));
+            return Err(format!("error: wrong number of arguments to instance_add_variable(); expected 2 to 3, got {}", args.len()));
         }
         let instance_id_f = self.list_pop_number(&mut args).or_else(|_| plainerr("error: first argument to instance_add_variable() must be a number"))?;
         let instance_id = instance_id_f.round() as usize;
@@ -207,9 +207,9 @@ impl Interpreter
         
         if !self.global.regex_holder.is_exact(r"[a-zA-Z_][a-zA-Z_0-9]*", &name)
         {
-            return Err(Some(format!("error: tried to create a variable with an invalid identifier `{}`\n(note: must exactly match the regex [a-zA-Z_][a-zA-Z_0-9]*)", name)));
+            return Err(format!("error: tried to create a variable with an invalid identifier `{}`\n(note: must exactly match the regex [a-zA-Z_][a-zA-Z_0-9]*)", name));
         }
-        let inst = self.global.instances.get_mut(&instance_id).ok_or_else(|| Some(format!("error: tried to add variable to instance {} that doesn't exist", instance_id)))?;
+        let inst = self.global.instances.get_mut(&instance_id).ok_or_else(|| format!("error: tried to add variable to instance {} that doesn't exist", instance_id))?;
         if inst.variables.contains_key(&name)
         {
             return plainerr("error: tried to add variable to instance that already had a variable with that name")
@@ -218,11 +218,11 @@ impl Interpreter
         
         Ok((Value::Number(0.0), false))
     }
-    pub (crate) fn sim_func_instance_execute(&mut self, mut args : Vec<Value>, isexpr : bool) -> Result<(Value, bool), Option<String>>
+    pub (crate) fn sim_func_instance_execute(&mut self, mut args : Vec<Value>, isexpr : bool) -> Result<(Value, bool), String>
     {
         if args.len() < 2
         {
-            return Err(Some(format!("error: wrong number of arguments to instance_execute(); expected 2 or more, got {}", args.len())));
+            return Err(format!("error: wrong number of arguments to instance_execute(); expected 2 or more, got {}", args.len()));
         }
         let instance_id_f = self.list_pop_number(&mut args).or_else(|_| plainerr("error: first argument to instance_execute() must be a number"))?;
         let instance_id = instance_id_f.round() as usize;
@@ -234,18 +234,18 @@ impl Interpreter
         }
         let defdata = func.userdefdata.as_ref().ok_or_else(|| minierr("internal error: funcval was non-internal but had no userdefdata"))?;
         
-        self.global.instances.get_mut(&instance_id).ok_or_else(|| Some(format!("error: tried to execute function with instance {} that doesn't exist", instance_id)))?;
+        self.global.instances.get_mut(&instance_id).ok_or_else(|| format!("error: tried to execute function with instance {} that doesn't exist", instance_id))?;
         
         self.jump_to_function(defdata, args.into_iter().rev().collect(), isexpr, &func)?;
         self.top_frame.instancestack.push(instance_id);
         
         Ok((Value::Number(0.0), true))
     }
-    pub (crate) fn sim_func_parse_text(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
+    pub (crate) fn sim_func_parse_text(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
     {
         if args.len() != 1
         {
-            return Err(Some(format!("error: wrong number of arguments to parse_text(); expected 1, got {}", args.len())));
+            return Err(format!("error: wrong number of arguments to parse_text(); expected 1, got {}", args.len()));
         }
         
         let text = self.list_pop_text(&mut args).or_else(|_| plainerr("error: first argument to parse_text() must be a string"))?;
@@ -259,11 +259,11 @@ impl Interpreter
         Ok((ast_to_dict(&ast), false))
     }
 
-    pub (crate) fn sim_func_compile_ast(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
+    pub (crate) fn sim_func_compile_ast(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
     {
         if args.len() != 1
         {
-            return Err(Some(format!("error: wrong number of arguments to compile_ast(); expected 1, got {}", args.len())));
+            return Err(format!("error: wrong number of arguments to compile_ast(); expected 1, got {}", args.len()));
         }
         
         let dict = self.list_pop_dict(&mut args).or_else(|_| plainerr("error: first argument to compile_ast() must be a dictionary"))?;
@@ -290,11 +290,11 @@ impl Interpreter
         )
     }
 
-    pub (crate) fn sim_func_compile_text(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
+    pub (crate) fn sim_func_compile_text(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
     {
         if args.len() != 1
         {
-            return Err(Some(format!("error: wrong number of arguments to compile_text(); expected 1, got {}", args.len())));
+            return Err(format!("error: wrong number of arguments to compile_text(); expected 1, got {}", args.len()));
         }
         let text = self.list_pop_text(&mut args).or_else(|_| plainerr("error: first argument to compile_text() must be a string"))?;
         

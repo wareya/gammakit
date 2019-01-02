@@ -44,7 +44,7 @@ fn main() -> std::io::Result<()>
                 
                 if let Ok(code) = code
                 {
-                    if true
+                    if false
                     {
                         if let Ok(disassembly) = disassemble_bytecode(&code, 0, 0)
                         {
@@ -60,7 +60,7 @@ fn main() -> std::io::Result<()>
                     
                     while interpreter.step().is_ok(){}
                 }
-                else if let Err(Some(err)) = code
+                else if let Err(err) = code
                 {
                     println!("{}", err);
                 }

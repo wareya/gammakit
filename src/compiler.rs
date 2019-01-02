@@ -4,17 +4,17 @@ use super::strings::*;
 use super::ast::*;
 use super::bytecode::*;
 
-fn minierr(mystr : &str) -> Option<String>
+fn minierr(mystr : &str) -> String
 {
-    Some(mystr.to_string())
+    mystr.to_string()
 }
 
-fn plainerr<T>(mystr : &str) -> Result<T, Option<String>>
+fn plainerr<T>(mystr : &str) -> Result<T, String>
 {
-    Err(Some(mystr.to_string()))
+    Err(mystr.to_string())
 }
 
-fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     code.push(LINENUM);
     code.extend(pack_u64(ast.line as u64));
@@ -122,7 +122,7 @@ fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
     Ok(())
 }
 
-fn compile_declaration(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_declaration(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     for child in ast.child_slice(1, 0)?
     {
@@ -155,7 +155,7 @@ fn compile_declaration(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) 
     Ok(())
 }
 
-fn compile_function(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_function(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     if ast.child(1)?.children.len() > 0
     {
@@ -190,7 +190,7 @@ fn compile_function(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> 
     Ok(())
 }
 
-fn compile_ifcondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_ifcondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     let expr = compile_astnode(ast.child(1)?, scopedepth)?;
     let sentinel = &ast.child(2)?.child(0)?.child(0)?;
@@ -249,7 +249,7 @@ fn compile_ifcondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) 
     }
     Ok(())
 }
-fn compile_whilecondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_whilecondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     let expr = compile_astnode(ast.child(1)?, scopedepth)?;
     // FIXME: make this a subroutine lmao
@@ -274,7 +274,7 @@ fn compile_whilecondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usiz
     code.extend(block);
     Ok(())
 }
-fn compile_forcondition(ast : &ASTNode, code : &mut Vec<u8>, mut scopedepth : usize) -> Result<(), Option<String>>
+fn compile_forcondition(ast : &ASTNode, code : &mut Vec<u8>, mut scopedepth : usize) -> Result<(), String>
 {
     // FIXME make this not disgusting
     let mut header_node_0 = None;
@@ -355,7 +355,7 @@ fn compile_forcondition(ast : &ASTNode, code : &mut Vec<u8>, mut scopedepth : us
     }
     Ok(())
 }
-fn compile_expr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_expr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     if ast.children.len() == 1
     {
@@ -371,7 +371,7 @@ fn compile_expr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Resu
     }
     Ok(())
 }
-fn compile_simplexpr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_simplexpr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     if ast.children.len() == 3 && !ast.child(0)?.isparent && !ast.child(2)?.isparent && ast.child(0)?.text == "(" && ast.child(2)?.text == ")"
     { 
@@ -387,7 +387,7 @@ fn compile_simplexpr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
     }
     Ok(())
 }
-fn compile_number(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), Option<String>>
+fn compile_number(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), String>
 {
     if ast.children.len() == 1
     {
@@ -415,7 +415,7 @@ fn compile_number(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> R
     }
     Ok(())
 }
-fn compile_string(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), Option<String>>
+fn compile_string(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), String>
 {
     if ast.children.len() == 1
     {
@@ -435,7 +435,7 @@ fn compile_string(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> R
     }
     Ok(())
 }
-fn compile_name(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), Option<String>>
+fn compile_name(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), String>
 {
     if ast.children.len() == 1
     {
@@ -454,7 +454,7 @@ fn compile_name(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Res
     Ok(())
 }
 
-fn compile_lvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_lvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     if ast.children.len() == 1
     {
@@ -479,7 +479,7 @@ fn compile_lvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Resu
     }
     Ok(())
 }
-fn compile_rvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_rvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     if ast.children.len() == 1
     {
@@ -508,7 +508,7 @@ fn compile_rvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Resu
     }
     Ok(())
 }
-fn compile_funcdef(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), Option<String>>
+fn compile_funcdef(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), String>
 {
     let name = &ast.child(1)?.child(0)?.text;
     
@@ -556,7 +556,7 @@ fn compile_funcdef(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> 
     
     Ok(())
 }
-fn compile_lambda(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_lambda(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     let mut captures = Vec::<&ASTNode>::new();
     for child in ast.child(0)?.child_slice(1, -1)?
@@ -610,7 +610,7 @@ fn compile_lambda(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Re
     
     Ok(())
 }
-fn compile_objdef(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_objdef(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     let funcs = ast.child_slice(3, -1)?;
     let mut childcode = Vec::<u8>::new();
@@ -629,7 +629,7 @@ fn compile_objdef(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Re
     
     Ok(())
 }
-fn compile_arraybody(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_arraybody(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     let mut elementcount = 0;
     let mut childexprs = Vec::<u8>::new();
@@ -648,7 +648,7 @@ fn compile_arraybody(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
     
     Ok(())
 }
-fn compile_dictbody(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_dictbody(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     let mut elementcount = 0;
     let mut childexprs = Vec::<u8>::new();
@@ -668,7 +668,7 @@ fn compile_dictbody(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> 
     
     Ok(())
 }
-fn compile_arrayexpr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_arrayexpr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     if ast.child(0)?.isparent && ast.child(0)?.text == "name"
     {
@@ -685,7 +685,7 @@ fn compile_arrayexpr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
     
     Ok(())
 }
-fn compile_indirection(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_indirection(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
     if ast.child(0)?.text == "indirection"
@@ -699,7 +699,7 @@ fn compile_indirection(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) 
     
     Ok(())
 }
-fn compile_lhunop(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), Option<String>>
+fn compile_lhunop(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     if ast.children.len() == 0
     {
@@ -722,7 +722,7 @@ fn compile_lhunop(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Re
     
     Ok(())
 }
-fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, Option<String>>
+fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String>
 {
     if !ast.isparent
     {
@@ -803,7 +803,7 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, Option
     }
 }
 
-pub fn compile_bytecode(ast : &ASTNode) -> Result<Vec<u8>, Option<String>>
+pub fn compile_bytecode(ast : &ASTNode) -> Result<Vec<u8>, String>
 {
     compile_astnode(ast, 0)
 }

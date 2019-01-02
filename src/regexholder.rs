@@ -32,9 +32,9 @@ impl RegexHolder {
         self.exact_regexes.insert(regex_text.to_string(), regex);
         self.is_exact(regex_text, text)
     }
-    pub (crate) fn is_exact_immut(& self, regex_text : &str, text : &str) -> Result<bool, Option<String>>
+    pub (crate) fn is_exact_immut(& self, regex_text : &str, text : &str) -> Result<bool, String>
     {
-        let regex = self.exact_regexes.get(regex_text).ok_or_else(|| Some("internal error: attempted to use is_exact_immut for a regex that has not yet been cached".to_string()))?;
+        let regex = self.exact_regexes.get(regex_text).ok_or_else(|| "internal error: attempted to use is_exact_immut for a regex that has not yet been cached".to_string())?;
         
         Ok(regex.as_ref().map(|r| r.is_match(text)).unwrap_or(false))
     }

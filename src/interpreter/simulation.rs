@@ -6,7 +6,7 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
-    pub (crate) fn get_opfunc(&mut self, op : u8) -> Option<Box<Fn(&mut Interpreter) -> StepResult>>
+    pub (crate) fn get_opfunc(&mut self, op : u8) -> Option<Box<Fn(&mut Interpreter) -> OpResult>>
     {
         macro_rules! enbox { ( $x:ident ) => { Some(Box::new(Interpreter::$x)) } }
         match op
@@ -48,43 +48,43 @@ impl Interpreter
         }
     }
     
-    pub (crate) fn sim_NOP(&mut self) -> StepResult
+    pub (crate) fn sim_NOP(&mut self) -> OpResult
     {
         Ok(())
     }
-    pub (crate) fn sim_PUSHFLT(&mut self) -> StepResult
+    pub (crate) fn sim_PUSHFLT(&mut self) -> OpResult
     {
         let value = unpack_f64(&self.pull_from_code(8)?)?;
         self.stack_push_val(Value::Number(value));
         Ok(())
     }
-    pub (crate) fn sim_PUSHSHORT(&mut self) -> StepResult
+    pub (crate) fn sim_PUSHSHORT(&mut self) -> OpResult
     {
         let value = unpack_u16(&self.pull_from_code(2)?)?;
         self.stack_push_val(Value::Number(value as f64));
         Ok(())
     }
-    pub (crate) fn sim_PUSHSTR(&mut self) -> StepResult
+    pub (crate) fn sim_PUSHSTR(&mut self) -> OpResult
     {
         let text = self.read_string()?;
         self.stack_push_val(Value::Text(text));
         Ok(())
     }
-    pub (crate) fn sim_PUSHNAME(&mut self) -> StepResult
+    pub (crate) fn sim_PUSHNAME(&mut self) -> OpResult
     {
         let text = self.read_string()?;
         self.stack_push_var(Variable::Direct(DirectVar{name:text}));
         Ok(())
     }
-    pub (crate) fn sim_PUSHVAR(&mut self) -> StepResult
+    pub (crate) fn sim_PUSHVAR(&mut self) -> OpResult
     {
         let name = self.read_string()?;
         let dirvar = Variable::Direct(DirectVar{name : name.clone()}); // FIXME suboptimal but helps error message
-        let val = self.evaluate_or_store(&dirvar, None)?.ok_or_else(|| Some(format!("error: tried to evaluate non-extant variable `{}`", name)))?;
+        let val = self.evaluate_or_store(&dirvar, None)?.ok_or_else(|| format!("error: tried to evaluate non-extant variable `{}`", name))?;
         self.stack_push_val(val);
         Ok(())
     }
-    pub (crate) fn sim_DECLVAR(&mut self) -> StepResult
+    pub (crate) fn sim_DECLVAR(&mut self) -> OpResult
     {
         if self.stack_len() < 1
         {
@@ -95,14 +95,14 @@ impl Interpreter
         
         if scope.contains_key(&name)
         {
-            return Err(Some(format!("error: redeclared identifier {}", name)))
+            return Err(format!("error: redeclared identifier {}", name))
         }
         scope.insert(name, Value::Number(0.0));
         
         Ok(())
     }
     
-    pub (crate) fn sim_DECLFAR(&mut self) -> StepResult
+    pub (crate) fn sim_DECLFAR(&mut self) -> OpResult
     {
         if self.stack_len() < 1
         {
@@ -110,37 +110,37 @@ impl Interpreter
         }
         let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to declare instance variable with non-var-name type name"))?;
         let instance_id = self.top_frame.instancestack.last().ok_or_else(|| minierr("error: tried to declare instance variable when not executing within instance scope"))?;
-        let instance = self.global.instances.get_mut(instance_id).ok_or_else(|| Some(format!("error: tried to declare instance variable but instance of current scope ({}) no longer exists", instance_id)))?;
+        let instance = self.global.instances.get_mut(instance_id).ok_or_else(|| format!("error: tried to declare instance variable but instance of current scope ({}) no longer exists", instance_id))?;
         if instance.variables.contains_key(&name)
         {
-            return Err(Some(format!("error: redeclared identifier {}", name)));
+            return Err(format!("error: redeclared identifier {}", name));
         }
         instance.variables.insert(name, Value::Number(0.0));
         Ok(())
     }
     
-    pub (crate) fn sim_INDIRECTION(&mut self) -> StepResult
+    pub (crate) fn sim_INDIRECTION(&mut self) -> OpResult
     {
         if self.stack_len() < 2
         {
-            return Err(Some(format!("internal error: INDIRECTION instruction requires 2 values on the stack but only found {}", self.stack_len())));
+            return Err(format!("internal error: INDIRECTION instruction requires 2 values on the stack but only found {}", self.stack_len()));
         }
         let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to perform INDIRECTION operation with a right-hand side that wasn't a name"))?;
         let ident = self.stack_pop_number().ok_or_else(|| minierr("error: tried to use indirection on a type that can't be an identifier (only numbers can be identifiers)"))?.round() as usize;
         
         if !self.global.instances.contains_key(&ident)
         {
-            return Err(Some(format!("error: tried to perform indirection on instance {} that doesn't exist", ident)));
+            return Err(format!("error: tried to perform indirection on instance {} that doesn't exist", ident));
         }
         self.stack_push_var(Variable::Indirect(IndirectVar{ident, name}));
         
         Ok(())
     }
-    pub (crate) fn sim_EVALUATION(&mut self) -> StepResult
+    pub (crate) fn sim_EVALUATION(&mut self) -> OpResult
     {
         if self.stack_len() < 1
         {
-            return Err(Some(format!("internal error: EVALUATION instruction requires 1 values on the stack but only found {}", self.stack_len())));
+            return Err(format!("internal error: EVALUATION instruction requires 1 values on the stack but only found {}", self.stack_len()));
         }
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: failed to find a variable in the stack in EVALUATION"))?;
         match var
@@ -153,39 +153,39 @@ impl Interpreter
             }
             Variable::Direct(var) =>
             {
-                return Err(Some(format!("internal error: tried to evaluate direct variable `{}`\n(note: the evaluation instruction is for indirect (id.y) variables and array (arr[0]) variables; bytecode metaprogramming for dynamic direct variable access is unsupported)", var.name)));
+                return Err(format!("internal error: tried to evaluate direct variable `{}`\n(note: the evaluation instruction is for indirect (id.y) variables and array (arr[0]) variables; bytecode metaprogramming for dynamic direct variable access is unsupported)", var.name));
             }
         }
         Ok(())
     }
-    pub (crate) fn sim_FUNCCALL(&mut self) -> StepResult
+    pub (crate) fn sim_FUNCCALL(&mut self) -> OpResult
     {
         self.handle_func_call_or_expr(false)
     }
-    pub (crate) fn sim_FUNCEXPR(&mut self) -> StepResult
+    pub (crate) fn sim_FUNCEXPR(&mut self) -> OpResult
     {
         self.handle_func_call_or_expr(true)
     }
     
-    pub (crate) fn sim_SCOPE(&mut self) -> StepResult
+    pub (crate) fn sim_SCOPE(&mut self) -> OpResult
     {
         self.top_frame.scopes.push(HashMap::new());
         let here = self.get_pc();
         self.top_frame.scopestarts.push(here);
         if self.top_frame.scopes.len() >= 0x10000
         {
-            return Err(Some(format!("error: scope recursion limit of 0x10000 reached at line {}\n(note: use more functions!)", self.top_frame.currline)));
+            return Err(format!("error: scope recursion limit of 0x10000 reached at line {}\n(note: use more functions!)", self.top_frame.currline));
         }
         Ok(())
     }
-    pub (crate) fn sim_UNSCOPE(&mut self) -> StepResult
+    pub (crate) fn sim_UNSCOPE(&mut self) -> OpResult
     {
         let immediate = unpack_u16(&self.pull_from_code(2)?)? as usize;
         
         self.drain_scopes((immediate+1) as u16);
         Ok(())
     }
-    pub (crate) fn sim_BREAK(&mut self) -> StepResult
+    pub (crate) fn sim_BREAK(&mut self) -> OpResult
     {
         self.pop_controlstack_until_loop();
         
@@ -196,7 +196,7 @@ impl Interpreter
         {
             WHILE => 2,
             FOR => 3,
-            _ => return Err(Some(format!("FIXME: unimplemented BREAK out from 0x{:02X} loop", controller.controltype)))
+            _ => return Err(format!("FIXME: unimplemented BREAK out from 0x{:02X} loop", controller.controltype))
         };
         
         let destination_address = *controller.controlpoints.get(destination_index).ok_or_else(|| minierr("internal error: break instruction found invalid associated destination index"))?;
@@ -207,7 +207,7 @@ impl Interpreter
         
         Ok(())
     }
-    pub (crate) fn sim_CONTINUE(&mut self) -> StepResult
+    pub (crate) fn sim_CONTINUE(&mut self) -> OpResult
     {
         self.pop_controlstack_until_loop();
         
@@ -218,7 +218,7 @@ impl Interpreter
         {
             WHILE => 0,
             FOR => {self.suppress_for_expr_end = true; 1},
-            _ => return Err(Some(format!("FIXME: unimplemented CONTINUE out from 0x{:02X} loop", controller.controltype)))
+            _ => return Err(format!("FIXME: unimplemented CONTINUE out from 0x{:02X} loop", controller.controltype))
         };
         
         let destination_address = *controller.controlpoints.get(destination_index).ok_or_else(|| minierr("internal error: continue instruction found invalid associated destination index"))?;
@@ -228,7 +228,7 @@ impl Interpreter
         
         Ok(())
     }
-    pub (crate) fn sim_IF(&mut self) -> StepResult
+    pub (crate) fn sim_IF(&mut self) -> OpResult
     {
         let exprlen = self.read_u64()?;
         let codelen = self.read_u64()?;
@@ -237,7 +237,7 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : IF, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen), scopes, other : None});
         Ok(())
     }
-    pub (crate) fn sim_IFELSE(&mut self) -> StepResult
+    pub (crate) fn sim_IFELSE(&mut self) -> OpResult
     {
         let exprlen = self.read_u64()?;
         let codelen1 = self.read_u64()?;
@@ -247,7 +247,7 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : IFELSE, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen1, current_pc+exprlen+codelen1+codelen2), scopes, other : None});
         Ok(())
     }
-    pub (crate) fn sim_WHILE(&mut self) -> StepResult
+    pub (crate) fn sim_WHILE(&mut self) -> OpResult
     {
         let exprlen = self.read_u64()?;
         let codelen = self.read_u64()?;
@@ -256,7 +256,7 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : WHILE, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+codelen), scopes, other : None});
         Ok(())
     }
-    pub (crate) fn sim_FOR(&mut self) -> StepResult
+    pub (crate) fn sim_FOR(&mut self) -> OpResult
     {
         let exprlen = self.read_u64()?;
         let postlen = self.read_u64()?;
@@ -266,7 +266,7 @@ impl Interpreter
         self.top_frame.controlstack.push(ControlData{controltype : FOR, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+postlen, current_pc+exprlen+postlen+codelen), scopes, other : None});
         Ok(())
     }
-    pub (crate) fn sim_WITH(&mut self) -> StepResult
+    pub (crate) fn sim_WITH(&mut self) -> OpResult
     {
         if self.stack_len() < 1
         {
@@ -303,24 +303,24 @@ impl Interpreter
         }
         Ok(())
     }
-    pub (crate) fn sim_FUNCDEF(&mut self) -> StepResult
+    pub (crate) fn sim_FUNCDEF(&mut self) -> OpResult
     {
         let (funcname, myfuncspec) = self.read_function()?;
         let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
         
         if scope.contains_key(&funcname)
         {
-            return Err(Some(format!("error: redeclared identifier {}", funcname)));
+            return Err(format!("error: redeclared identifier {}", funcname));
         }
         scope.insert(funcname.clone(), Value::new_funcval(false, Some(funcname), None, Some(myfuncspec)));
         Ok(())
     }
     
-    pub (crate) fn sim_BINSTATE(&mut self) -> StepResult
+    pub (crate) fn sim_BINSTATE(&mut self) -> OpResult
     {
         if self.stack_len() < 2
         {
-            return Err(Some(format!("internal error: BINSTATE instruction requires 2 values on the stack but found {}", self.stack_len())));
+            return Err(format!("internal error: BINSTATE instruction requires 2 values on the stack but found {}", self.stack_len()));
         }
         
         let immediate = self.pull_single_from_code()?;
@@ -335,21 +335,21 @@ impl Interpreter
         }
         else
         {
-            let opfunc = get_binop_function(immediate).ok_or_else(|| Some(format!("internal error: unknown binary operation 0x{:02X}", immediate)))?;
+            let opfunc = get_binop_function(immediate).ok_or_else(|| format!("internal error: unknown binary operation 0x{:02X}", immediate))?;
             
             let var_initial_value = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just accessing value"))?;
             
-            let var_new_value = opfunc(&var_initial_value, &value).or_else(|text| Err(Some(format!("error: disallowed binary statement\n({})", text))))?;
+            let var_new_value = opfunc(&var_initial_value, &value).or_else(|text| Err(format!("error: disallowed binary statement\n({})", text)))?;
             self.evaluate_or_store(&var, Some(var_new_value))?;
         }
         Ok(())
     }
     
-    pub (crate) fn sim_BINOP(&mut self) -> StepResult
+    pub (crate) fn sim_BINOP(&mut self) -> OpResult
     {
         if self.stack_len() < 2
         {
-            return Err(Some(format!("internal error: BINOP instruction requires 2 values on the stack but found {}", self.stack_len())));
+            return Err(format!("internal error: BINOP instruction requires 2 values on the stack but found {}", self.stack_len()));
         }
         
         let immediate = self.pull_single_from_code()?;
@@ -357,46 +357,46 @@ impl Interpreter
         let right = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction BINOP (this error should be inaccessible!)"))?;
         let left = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction BINOP (this error should be inaccessible!)"))?;
         
-        let opfunc = get_binop_function(immediate).ok_or_else(|| Some(format!("internal error: unknown binary operation 0x{:02X}", immediate)))?;
+        let opfunc = get_binop_function(immediate).ok_or_else(|| format!("internal error: unknown binary operation 0x{:02X}", immediate))?;
         
         let new_value = opfunc(&left, &right).or_else(|text|
         {
             let left_fmt = format_val(&left).ok_or_else(|| minierr("internal error: failed to format left value for printing error when creating error for invalid binary expression"))?;
             let right_fmt = format_val(&right).ok_or_else(|| minierr("internal error: failed to format right value for printing error when creating error for invalid binary expression"))?;
-            Err(Some(format!("error: disallowed binary expression\n({})\n(value 1: {})\n(value 2: {})", text, left_fmt, right_fmt)))
+            Err(format!("error: disallowed binary expression\n({})\n(value 1: {})\n(value 2: {})", text, left_fmt, right_fmt))
         })?;
         self.stack_push_val(new_value);
         Ok(())
     }
     
-    pub (crate) fn sim_UNOP(&mut self) -> StepResult
+    pub (crate) fn sim_UNOP(&mut self) -> OpResult
     {
         if self.stack_len() < 1
         {
-            return Err(Some(format!("internal error: UNOP instruction requires 1 values on the stack but found {}", self.stack_len())))
+            return Err(format!("internal error: UNOP instruction requires 1 values on the stack but found {}", self.stack_len()))
         }
         
         let immediate = self.pull_single_from_code()?;
         
         let value = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction UNOP (this error should be inaccessible!)"))?;
-        let opfunc = get_unop_function(immediate).ok_or_else(|| Some(format!("internal error: unknown binary operation 0x{:02X}", immediate)))?;
+        let opfunc = get_unop_function(immediate).ok_or_else(|| format!("internal error: unknown binary operation 0x{:02X}", immediate))?;
         
-        let new_value = opfunc(&value).or_else(|text| Err(Some(format!("error: disallowed unary expression\n({})", text))))?;
+        let new_value = opfunc(&value).or_else(|text| Err(format!("error: disallowed unary expression\n({})", text)))?;
         self.stack_push_val(new_value);
         Ok(())
     }
-    pub (crate) fn sim_LAMBDA(&mut self) -> StepResult
+    pub (crate) fn sim_LAMBDA(&mut self) -> OpResult
     {
         let (captures, myfuncspec) = self.read_lambda()?;
         self.stack_push_val(Value::new_funcval(false, Some("lambda_self".to_string()), Some(captures), Some(myfuncspec)));
         Ok(())
     }
-    pub (crate) fn sim_OBJDEF(&mut self) -> StepResult
+    pub (crate) fn sim_OBJDEF(&mut self) -> OpResult
     {
         let name = self.read_string()?;
         if self.global.objectnames.contains_key(&name)
         {
-            return Err(Some(format!("error: redeclared object {}", name)));
+            return Err(format!("error: redeclared object {}", name));
         }
         
         let object_id = self.global.object_id;
@@ -410,7 +410,7 @@ impl Interpreter
             myfuncspec.parentobj = object_id;
             if funcs.contains_key(&funcname)
             {
-                return Err(Some(format!("error: redeclared function {} in object {}", funcname, name)));
+                return Err(format!("error: redeclared function {} in object {}", funcname, name));
             }
             funcs.insert(funcname, myfuncspec);
         }
@@ -422,12 +422,12 @@ impl Interpreter
         self.global.object_id += 1;
         Ok(())
     }
-    pub (crate) fn sim_COLLECTARRAY(&mut self) -> StepResult
+    pub (crate) fn sim_COLLECTARRAY(&mut self) -> OpResult
     {
         let numvals = unpack_u16(&self.pull_from_code(2)?)? as usize;
         if self.stack_len() < numvals
         {
-            return Err(Some(format!("internal error: not enough values on stack for COLLECTARRAY instruction to build array (need {}, have {})", numvals, self.stack_len())));
+            return Err(format!("internal error: not enough values on stack for COLLECTARRAY instruction to build array (need {}, have {})", numvals, self.stack_len()));
         }
         let mut myarray = VecDeque::<Value>::new();
         for _i in 0..numvals
@@ -438,12 +438,12 @@ impl Interpreter
         self.stack_push_val(Value::Array(myarray));
         Ok(())
     }
-    pub (crate) fn sim_COLLECTDICT(&mut self) -> StepResult
+    pub (crate) fn sim_COLLECTDICT(&mut self) -> OpResult
     {
         let numvals = unpack_u16(&self.pull_from_code(2)?)? as usize;
         if self.stack_len() < numvals*2
         {
-            return Err(Some(format!("internal error: not enough values on stack for COLLECTDICT instruction to build dict (need {}, have {})", numvals*2, self.stack_len())));
+            return Err(format!("internal error: not enough values on stack for COLLECTDICT instruction to build dict (need {}, have {})", numvals*2, self.stack_len()));
         }
         
         let mut names = VecDeque::<HashableValue>::new();
@@ -459,7 +459,7 @@ impl Interpreter
             {
                 Value::Number(number) => names.push_front(HashableValue::Number(number)),
                 Value::Text(text) => names.push_front(HashableValue::Text(text)),
-                _ => return Err(Some(format!("error: dictionary key must be a string or number; was {:?}; line {}", key, self.top_frame.currline)))
+                _ => return Err(format!("error: dictionary key must be a string or number; was {:?}; line {}", key, self.top_frame.currline))
             }
         }
         let mut mydict = HashMap::<HashableValue, Value>::new();
@@ -470,11 +470,11 @@ impl Interpreter
         self.stack_push_val(Value::Dict(mydict));
         Ok(())
     }
-    pub (crate) fn sim_ARRAYEXPR(&mut self) -> StepResult
+    pub (crate) fn sim_ARRAYEXPR(&mut self) -> OpResult
     {
         if self.stack_len() < 2
         {
-            return Err(Some(format!("internal error: ARRAYEXPR instruction requires 2 values on the stack but found {}", self.stack_len())));
+            return Err(format!("internal error: ARRAYEXPR instruction requires 2 values on the stack but found {}", self.stack_len()));
         }
         let index = self.stack_pop_val().ok_or_else(|| minierr("internal error: TODO write error askdgfauiowef"))?;
         let array = self.stack_pop().ok_or_else(|| minierr("internal error: TODO write error cvbhsrtgaerffd"))?;
@@ -496,7 +496,7 @@ impl Interpreter
         }
         Ok(())
     }
-    pub (crate) fn sim_EXIT(&mut self) -> StepResult // an exit is a return with no value
+    pub (crate) fn sim_EXIT(&mut self) -> OpResult // an exit is a return with no value
     {
         if let Some(top_frame) = self.frames.pop()
         {
@@ -514,7 +514,7 @@ impl Interpreter
         }
         Ok(())
     }
-    pub (crate) fn sim_RETURN(&mut self) -> StepResult
+    pub (crate) fn sim_RETURN(&mut self) -> OpResult
     {
         let old_frame = self.frames.pop().ok_or_else(|| minierr("error: attempted to return from global code; use exit() instead"))?;
         
@@ -529,7 +529,7 @@ impl Interpreter
         }
         Ok(())
     }
-    pub (crate) fn sim_LINENUM(&mut self) -> StepResult
+    pub (crate) fn sim_LINENUM(&mut self) -> OpResult
     {
         self.top_frame.currline = self.read_u64()?;
         Ok(())

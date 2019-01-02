@@ -31,7 +31,7 @@ impl Interpreter
         self.top_frame.push(stackvalue)
     }
     
-    pub (super) fn handle_func_call_or_expr(&mut self, isexpr : bool) -> StepResult
+    pub (super) fn handle_func_call_or_expr(&mut self, isexpr : bool) -> OpResult
     {
         let funcdata = self.stack_pop().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR"))?;
         

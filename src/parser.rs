@@ -63,12 +63,12 @@ pub struct Parser {
     inited: bool,
 }
 
-fn minierr(mystr : &str) -> Option<String>
+fn minierr(mystr : &str) -> String
 {
-    Some(mystr.to_string())
+    mystr.to_string()
 }
 
-fn plainerr<T>(mystr : &str) -> Result<T, Option<String>>
+fn plainerr<T>(mystr : &str) -> Result<T, String>
 {
     Err(minierr(mystr))
 }
@@ -92,7 +92,7 @@ impl Parser {
         }
     }
     
-    pub fn init(&mut self, text: &str) -> Result<(), Option<String>>
+    pub fn init(&mut self, text: &str) -> Result<(), String>
     {
         let start_time = Instant::now();
         
@@ -103,7 +103,7 @@ impl Parser {
         while lines.len() > 0
         {
             macro_rules! pop {
-                () => { lines.pop_front().ok_or_else(|| Some("tried to access past end of program text".to_string())) };
+                () => { lines.pop_front().ok_or_else(|| "tried to access past end of program text".to_string()) };
             }
             
             let mut line : String = pop!()?;
@@ -182,7 +182,7 @@ impl Parser {
     }
     
     // FIXME: change it to not be line-based; seek to the next newline instead. necessary for things like strings containing newline literals, which should definitely be supported.
-    pub (crate) fn tokenize(&mut self, lines : &[String], silent: bool) -> Result<VecDeque<LexToken>, Option<String>>
+    pub (crate) fn tokenize(&mut self, lines : &[String], silent: bool) -> Result<VecDeque<LexToken>, String>
     {
         let start_time = Instant::now();
         
@@ -289,7 +289,7 @@ impl Parser {
     }
 
     // attempts to parse a token list as a particular form of a grammar point
-    fn parse_form(&self, tokens : &VecDeque<LexToken>, index : usize, form : &GrammarForm) -> Result<ParseVecInfo, Option<String>>
+    fn parse_form(&self, tokens : &VecDeque<LexToken>, index : usize, form : &GrammarForm) -> Result<ParseVecInfo, String>
     {
         if tokens.len() == 0
         {
@@ -469,7 +469,7 @@ impl Parser {
     }
 
     // attempts to parse a token list as each form of a grammar point in order and uses the first valid one
-    fn parse(&self, tokens : &VecDeque<LexToken>, index : usize, nodetype : &GrammarPoint) -> Result<ParseInfo, Option<String>>
+    fn parse(&self, tokens : &VecDeque<LexToken>, index : usize, nodetype : &GrammarPoint) -> Result<ParseInfo, String>
     {
         if tokens.len() == 0
         {
@@ -492,7 +492,7 @@ impl Parser {
         }
         Ok((None, 0, latesterror))
     }
-    fn rotate(ast : &mut ASTNode) -> Result<(), Option<String>>
+    fn rotate(ast : &mut ASTNode) -> Result<(), String>
     {
         if !(ast.isparent && ast.children.len() == 3 && ast.child(2)?.isparent && ast.child(2)?.children.len() >= 1)
         {
@@ -506,13 +506,13 @@ impl Parser {
         std::mem::swap(ast, &mut node_holder); // attach right to root (leaving dummy on node_holder)
         Ok(())
     }
-    fn parse_rotate_associativity_binexpr(&self, ast : &mut ASTNode) -> Result<bool, Option<String>>
+    fn parse_rotate_associativity_binexpr(&self, ast : &mut ASTNode) -> Result<bool, String>
     {
         fn is_rotatable_binexpr(a : &ASTNode) -> bool
         {
             a.isparent && a.children.len() == 3 && a.text.starts_with("binexpr_")
         }
-        fn compatible_associativity(a : &ASTNode, b : &ASTNode) -> Result<bool, Option<String>>
+        fn compatible_associativity(a : &ASTNode, b : &ASTNode) -> Result<bool, String>
         {
             Ok(
             a.isparent && b.isparent
@@ -533,7 +533,7 @@ impl Parser {
             Ok(false)
         }
     }
-    fn parse_fix_associativity(&self, ast : &mut ASTNode) -> Result<(), Option<String>>
+    fn parse_fix_associativity(&self, ast : &mut ASTNode) -> Result<(), String>
     {
         if ast.isparent
         {
@@ -551,7 +551,7 @@ impl Parser {
         }
         Ok(())
     }
-    fn parse_tweak_ast(&self, ast : &mut ASTNode) -> Result<(), Option<String>>
+    fn parse_tweak_ast(&self, ast : &mut ASTNode) -> Result<(), String>
     {
         if ast.isparent
         {
@@ -677,7 +677,7 @@ impl Parser {
         Ok(())
     }
     
-    fn verify_ast(&self, ast : &ASTNode) -> Result<(), Option<String>>
+    fn verify_ast(&self, ast : &ASTNode) -> Result<(), String>
     {
         if ast.isparent
         {
@@ -710,7 +710,7 @@ impl Parser {
         }
         Ok(())
     }
-    pub fn parse_program(&self, tokens : &VecDeque<LexToken>, lines : &[String], silent: bool) -> Result<Option<ASTNode>, Option<String>>
+    pub fn parse_program(&self, tokens : &VecDeque<LexToken>, lines : &[String], silent: bool) -> Result<Option<ASTNode>, String>
     {
         let start_time = Instant::now();
         

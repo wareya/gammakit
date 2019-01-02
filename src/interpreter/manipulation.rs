@@ -40,13 +40,13 @@ impl Interpreter
         self.top_frame.pc += new;
     }
     
-    pub (crate) fn pull_from_code(&mut self, n : usize) -> Result<Vec<u8>, Option<String>>
+    pub (crate) fn pull_from_code(&mut self, n : usize) -> Result<Vec<u8>, String>
     {
         let vec = self.get_code().get(self.get_pc()..self.get_pc()+n).map(|v| v.to_vec()).ok_or_else(|| minierr("error: tried to access past end of code"))?;
         self.add_pc(n);
         Ok(vec)
     }
-    pub (crate) fn pull_single_from_code(&mut self) -> Result<u8, Option<String>>
+    pub (crate) fn pull_single_from_code(&mut self) -> Result<u8, String>
     {
         let byte = self.get_code().get(self.get_pc()).cloned().ok_or_else(|| minierr("error: tried to access past end of code"))?;
         self.add_pc(1);
@@ -75,17 +75,17 @@ impl Interpreter
         list_pop_generic!(args, Dict)
     }
     
-    pub (crate) fn read_u64(&mut self) -> Result<usize, Option<String>>
+    pub (crate) fn read_u64(&mut self) -> Result<usize, String>
     {
         Ok(unpack_u64(&self.pull_from_code(8)?)? as usize)
     }
     
-    pub (crate) fn read_string(&mut self) -> Result<String, Option<String>>
+    pub (crate) fn read_string(&mut self) -> Result<String, String>
     {
         let code = self.get_code();
         if self.get_pc() >= code.len()
         {
-            return Err(Some("error: tried to decode a string past the end of code".to_string()));
+            return Err("error: tried to decode a string past the end of code".to_string());
         }
         
         let mut bytes = Vec::<u8>::new();
@@ -100,7 +100,7 @@ impl Interpreter
         let res = std::str::from_utf8(&bytes).or_else(|_| plainerr("error: tried to decode a string that was not utf-8"))?;
         Ok(res.to_string())
     }
-    pub (crate) fn read_function(&mut self) -> Result<(String, FuncSpec), Option<String>>
+    pub (crate) fn read_function(&mut self) -> Result<(String, FuncSpec), String>
     {
         let code = self.get_code();
         
@@ -122,7 +122,7 @@ impl Interpreter
         Ok((name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : true }))
     }
     
-    pub (crate) fn read_lambda(&mut self) -> Result<(HashMap<String, Value>, FuncSpec), Option<String>>
+    pub (crate) fn read_lambda(&mut self) -> Result<(HashMap<String, Value>, FuncSpec), String>
     {
         let code = self.get_code();
         
@@ -130,7 +130,7 @@ impl Interpreter
         
         if self.top_frame.stack.len() < capturecount*2
         {
-            return Err(Some(format!("internal error: not enough values on stack to satisfy requirements of read_lambda (need {}, have {})", capturecount*2, self.top_frame.stack.len())));
+            return Err(format!("internal error: not enough values on stack to satisfy requirements of read_lambda (need {}, have {})", capturecount*2, self.top_frame.stack.len()));
         }
         
         let mut captures = HashMap::<String, Value>::new();
@@ -141,7 +141,7 @@ impl Interpreter
             
             if captures.contains_key(&name)
             {
-                return Err(Some(format!("error: duplicate capture variable name `{}` in lambda capture expression", name)));
+                return Err(format!("error: duplicate capture variable name `{}` in lambda capture expression", name));
             }
             captures.insert(name, val);
         }

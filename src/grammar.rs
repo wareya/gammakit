@@ -19,12 +19,12 @@ pub (crate) struct GrammarForm {
     pub (crate) tokens : Vec<GrammarToken>
 }
 
-fn minierr(mystr : &str) -> Option<String>
+fn minierr(mystr : &str) -> String
 {
-    Some(mystr.to_string())
+    mystr.to_string()
 }
 
-fn plainerr<T>(mystr : &str) -> Result<T, Option<String>>
+fn plainerr<T>(mystr : &str) -> Result<T, String>
 {
     Err(minierr(mystr))
 }
@@ -32,7 +32,7 @@ fn plainerr<T>(mystr : &str) -> Result<T, Option<String>>
 impl GrammarForm
 {
     #[allow(clippy::new_ret_no_self)]
-    pub (crate) fn new(line : &str, parser : &mut Parser, intoken : bool) -> Result<GrammarForm, Option<String>>
+    pub (crate) fn new(line : &str, parser : &mut Parser, intoken : bool) -> Result<GrammarForm, String>
     {
         let re = &mut parser.internal_regexes;
         let mut ret = GrammarForm { tokens : Vec::new() };

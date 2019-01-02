@@ -1,19 +1,19 @@
 #![allow(clippy::cast_lossless)]
 
-fn get(vec : &[u8], n : usize) -> Result<u8, Option<String>>
+fn get(vec : &[u8], n : usize) -> Result<u8, String>
 {
-    vec.get(n).cloned().ok_or_else(|| Some("tried to unpack past range of buffer".to_string()))
+    vec.get(n).cloned().ok_or_else(|| "tried to unpack past range of buffer".to_string())
 }
 
 pub (crate) fn pack_u16(num : u16) -> Vec<u8>
 {
     vec!(((num>>8)&0xFF) as u8, (num&0xFF) as u8)
 }
-pub (crate) fn unpack_u16(vec : &[u8]) -> Result<u16, Option<String>>
+pub (crate) fn unpack_u16(vec : &[u8]) -> Result<u16, String>
 {
     if vec.len() != 2
     {
-        return Err(Some("tried to unpack u16 from buffer of size other than 2 bytes".to_string()));
+        return Err("tried to unpack u16 from buffer of size other than 2 bytes".to_string());
     }
     Ok
     (
@@ -26,11 +26,11 @@ pub (crate) fn pack_u64(num : u64) -> Vec<u8>
     vec!(((num>>56)&0xFF) as u8, ((num>>48)&0xFF) as u8, ((num>>40)&0xFF) as u8, ((num>>32)&0xFF) as u8,
          ((num>>24)&0xFF) as u8, ((num>>16)&0xFF) as u8, ((num>> 8)&0xFF) as u8, ((num    )&0xFF) as u8)
 }
-pub (crate) fn unpack_u64(vec : &[u8]) ->  Result<u64, Option<String>>
+pub (crate) fn unpack_u64(vec : &[u8]) ->  Result<u64, String>
 {
     if vec.len() != 8
     {
-        return Err(Some("tried to unpack u64 from buffer of size other than 8 bytes".to_string()));
+        return Err("tried to unpack u64 from buffer of size other than 8 bytes".to_string());
     }
     Ok
     (
@@ -49,11 +49,11 @@ pub (crate) fn pack_f64(num : f64) -> Vec<u8>
     pack_u64(pun_f64_as_u64(num))
 }
 
-pub (crate) fn unpack_f64(vec : &[u8]) ->  Result<f64, Option<String>>
+pub (crate) fn unpack_f64(vec : &[u8]) ->  Result<f64, String>
 {
     if vec.len() != 8
     {
-        return Err(Some("tried to unpack f64 from buffer of size other than 8 bytes".to_string()));
+        return Err("tried to unpack f64 from buffer of size other than 8 bytes".to_string());
     }
     let num = unpack_u64(vec)?;
     Ok(f64::from_bits(num))
