@@ -52,10 +52,8 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTN
     
     for child in get!(Array, dict, "children")?
     {
-        match_or_err!(child, Value::Dict(dict),
-            ast.children.push(dict_to_ast(&dict)?),
-            minierr("error: values in list of children in ast node must be dictionaries that are themselves ast nodes")
-        )?;
+        let subnode = match_or_err!(child, Value::Dict(dict) => dict, minierr("error: values in list of children in ast node must be dictionaries that are themselves ast nodes"))?;
+        ast.children.push(dict_to_ast(subnode)?);
     }
     
     let val_opdata = get!(Dict, dict, "opdata")?;

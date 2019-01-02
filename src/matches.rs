@@ -9,7 +9,7 @@ macro_rules! matches { ( $x:expr , $( $p:pat )|+ ) =>
 } }
 
     
-macro_rules! match_or_err { ( $expr:expr, $as:pat, $ok:expr, $err:expr ) =>
+macro_rules! match_or_err { ( $expr:expr, $as:pat => $ok:expr, $err:expr ) =>
 {
     match $expr
     {

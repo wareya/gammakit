@@ -43,15 +43,10 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
         {
             Value::Array(ref mut var) =>
             {
-                if let Value::Number(indexnum) = index
-                {
-                    let mut newvar = var.get_mut(indexnum.round() as usize).ok_or_else(|| Some(format!("error: tried to access non-extant index {} of an array", indexnum)))?;
-                    assign_or_return_indexed(value, &mut newvar, new_indexes)
-                }
-                else
-                {
-                    plainerr("error: tried to use a non-number as an array index")
-                }
+                let indexnum = match_or_err!(index, Value::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an array index"))?;
+                
+                let mut newvar = var.get_mut(indexnum.round() as usize).ok_or_else(|| Some(format!("error: tried to access non-extant index {} of an array", indexnum)))?;
+                assign_or_return_indexed(value, &mut newvar, new_indexes)
             }
             Value::Dict(ref mut var) =>
             {
@@ -74,51 +69,42 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
             {
                 if !new_indexes.is_empty()
                 {
-                    plainerr("error: tried to index into the value at another index in a string (i.e. tried to do something like \"asdf\"[0][0])")
+                    return plainerr("error: tried to index into the value at another index in a string (i.e. tried to do something like \"asdf\"[0][0])");
                 }
-                else if let Value::Number(indexnum) = index
+                
+                let indexnum = match_or_err!(index, Value::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an index into a string"))?;
+                
+                let realindex = ((indexnum.round() as i64) % text.len() as i64) as usize;
+                
+                if let Some(value) = value
                 {
-                    let realindex = ((indexnum.round() as i64) % text.len() as i64) as usize;
+                    let mychar = match_or_err!(value, Value::Text(mychar) => mychar, minierr("error: tried to assign non-string to an index into a string (assigning by codepoint is not supported yet)"))?;
                     
-                    if let Some(value) = value
+                    if mychar.chars().count() == 1
                     {
-                        if let Value::Text(mychar) = value
-                        {
-                            if mychar.chars().count() == 1
-                            {
-                                let mychar = mychar.chars().next().ok_or_else(|| minierr("internal error: failed to get first character of a string of length 1"))?;
-                                // turn into array of codepoints, then modify
-                                let mut codepoints = text.chars().collect::<Vec<char>>();
-                                let codepoint = codepoints.get_mut(realindex).ok_or_else(|| minierr("error: tried to assign to a character index that was past the end of a string"))?;
-                                *codepoint = mychar;
-                                // turn array of codepoints back into string
-                                let newstr : String = codepoints.iter().collect();
-                                *text = newstr;
-                                Ok(None)
-                            }
-                            else
-                            {
-                                Err(Some(format!("error: tried to assign to an index into a string with a string that was not exactly one character long (was {} characters long)", mychar.len())))
-                            }
-                        }
-                        else
-                        {
-                            plainerr("error: tried to assign non-string to an index into a string (assigning by codepoint is not supported yet)")
-                        }
+                        let mychar = mychar.chars().next().ok_or_else(|| minierr("internal error: failed to get first character of a string of length 1"))?;
+                        // turn into array of codepoints, then modify
+                        let mut codepoints = text.chars().collect::<Vec<char>>();
+                        let codepoint = codepoints.get_mut(realindex).ok_or_else(|| minierr("error: tried to assign to a character index that was past the end of a string"))?;
+                        *codepoint = mychar;
+                        // turn array of codepoints back into string
+                        let newstr : String = codepoints.iter().collect();
+                        *text = newstr;
+                        Ok(None)
                     }
                     else
                     {
-                        let codepoints = text.chars().collect::<Vec<char>>();
-                        let codepoint = codepoints.get(realindex).ok_or_else(|| minierr("error: tried to evaluate a character from an index that was past the end of a string"))?;
-                        
-                        let mut newstr = String::new();
-                        newstr.push(*codepoint);
-                        Ok(Some(Value::Text(newstr)))
+                        Err(Some(format!("error: tried to assign to an index into a string with a string that was not exactly one character long (was {} characters long)", mychar.len())))
                     }
                 }
                 else
                 {
-                    plainerr("error: tried to use a non-number as an index into a string")
+                    let codepoints = text.chars().collect::<Vec<char>>();
+                    let codepoint = codepoints.get(realindex).ok_or_else(|| minierr("error: tried to evaluate a character from an index that was past the end of a string"))?;
+                    
+                    let mut newstr = String::new();
+                    newstr.push(*codepoint);
+                    Ok(Some(Value::Text(newstr)))
                 }
             }
             _ =>
@@ -231,16 +217,16 @@ fn access_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &
             {
                 if let Some(funcdat) = objspec.functions.get(&dirvar.name)
                 {
-                    if value.is_some()
-                    {
-                        return Err(Some(format!("error: tried to assign to function `{}` in instance of object type `{}`", dirvar.name, objspec.name)));
-                        // FIXME is this good behavior?
-                    }
-                    else
+                    if value.is_none()
                     {
                         let mut mydata = funcdat.clone();
                         mydata.forcecontext = inst.ident;
                         return Ok(Some(Value::new_funcval(false, Some(dirvar.name.clone()), None, Some(mydata))));
+                        // FIXME is this good behavior?
+                    }
+                    else
+                    {
+                        return Err(Some(format!("error: tried to assign to function `{}` in instance of object type `{}`", dirvar.name, objspec.name)));
                     }
                 }
             }
@@ -316,15 +302,15 @@ impl Interpreter
             
             let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| Some(format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident)))?;
             
-            if value.is_some()
-            {
-                Err(Some(format!("error: tried to assign to function `{}` in instance of object type `{}`", indirvar.name, objspec.name)))
-            }
-            else
+            if value.is_none()
             {
                 let mut mydata = funcdat.clone();
                 mydata.forcecontext = indirvar.ident;
                 Ok(Some(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata))))
+            }
+            else
+            {
+                Err(Some(format!("error: tried to assign to function `{}` in instance of object type `{}`", indirvar.name, objspec.name)))
             }
         }
     }
@@ -347,13 +333,13 @@ impl Interpreter
         }
         if let Some(var) = self.global.objectnames.get(&dirvar.name)
         {
-            if value.is_some()
+            if value.is_none()
             {
-                return Err(Some(format!("error: tried to assign to read-only object name `{}`", dirvar.name)));
+                return Ok(Some(Value::Number(*var as f64)));
             }
             else
             {
-                return Ok(Some(Value::Number(*var as f64)));
+                return Err(Some(format!("error: tried to assign to read-only object name `{}`", dirvar.name)));
             }
         }
         // TODO: Store actual function pointer instead?
