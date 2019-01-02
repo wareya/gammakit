@@ -8,24 +8,14 @@ pub (crate) fn ast_to_dict(ast : &ASTNode) -> Value
 {
     let mut astdict = HashMap::<HashableValue, Value>::new();
     
-    macro_rules! to_key {
-        ( $str:expr ) =>
-        {
-            HashableValue::Text($str.to_string())
-        }
-    }
+    macro_rules! to_key { ( $str:expr ) => { HashableValue::Text($str.to_string()) } }
     
     astdict.insert(to_key!("text"), Value::Text(ast.text.clone()));
     astdict.insert(to_key!("line"), Value::Number(ast.line as f64));
     astdict.insert(to_key!("position"), Value::Number(ast.line as f64));
     astdict.insert(to_key!("isparent"), Value::Number(bool_floaty(ast.isparent)));
     
-    let mut children = VecDeque::<Value>::new();
-    
-    for child in &ast.children
-    {
-        children.push_back(ast_to_dict(&child));
-    }
+    let children : VecDeque<Value> = ast.children.iter().map(|child| ast_to_dict(child)).collect();
     
     astdict.insert(to_key!("children"), Value::Array(children));
     
@@ -44,90 +34,34 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTN
 {
     let mut ast = dummy_astnode();
     
-    macro_rules! get {
-        ( $dict:expr, $str:expr ) =>
+    macro_rules! get { ( $as:ident, $dict:expr, $str:expr ) =>
+    {
+        match $dict.get(&HashableValue::Text($str.to_string())).ok_or_else(|| Some(format!("error: tried to turn dict into ast, but dict lacked {} field", $str)))?
         {
-            $dict.get(&HashableValue::Text($str.to_string()))
+            Value::$as(this) => Ok(this),
+            _ => Err(Some(format!("error: tried to turn dict into ast, but dict's {} field was of the wrong type", $str)))
         }
+    } }
+    
+    ast.text = get!(Text, dict, "text")?.clone();
+    ast.line = get!(Number, dict, "line")?.round() as usize;
+    ast.position = get!(Number, dict, "position")?.round() as usize;
+    ast.isparent = float_booly(*get!(Number, dict, "isparent")?);
+    
+    // ast.children from dummy_astnode() starts out extant but empty
+    
+    for child in get!(Array, dict, "children")?
+    {
+        match_or_err!(child, Value::Dict(dict),
+            ast.children.push(dict_to_ast(&dict)?),
+            minierr("error: values in list of children in ast node must be dictionaries that are themselves ast nodes")
+        )?;
     }
     
-    macro_rules! handle {
-        ( $into:expr, $dict:expr, $str:expr, $strident:ident, $subtype:ident, $helper:ident, $cast:ident, $errortext:expr ) =>
-        {
-            if let Some(Value::$subtype($strident)) = get!($dict, $str)
-            {
-                $into.$strident = $strident.$helper() as $cast;
-            }
-            else
-            {
-                return Err(Some(format!("error: tried to turn a dict into an ast but dict lacked \"{}\" field or the \"{}\" field was not {}", $str, $str, $errortext)));
-            }
-        }
-    }
-    
-    handle!(ast, dict, "text", text, Text, clone, String, "a string");
-    handle!(ast, dict, "line", line, Number, round, usize, "a number");
-    handle!(ast, dict, "position", position, Number, round, usize, "a number");
-    if let Some(Value::Number(isparent)) = get!(dict, "isparent")
-    {
-        ast.isparent = float_booly(*isparent);
-    }
-    else
-    {
-        return plainerr("error: tried to turn a dict into an ast but dict lacked \"isparent\" field or the \"isparent\" field was not a number");
-    }
-    
-    if let Some(Value::Array(val_children)) = get!(dict, "children")
-    {
-        // ast.children from dummy_astnode() starts out extant but empty
-        for child in val_children
-        {
-            if let Value::Dict(dict) = child
-            {
-                ast.children.push(dict_to_ast(&dict)?);
-            }
-            else
-            {
-                return plainerr("error: values in list of children in ast node must be dictionaries that are themselves ast nodes");
-            }
-        }
-    }
-    else
-    {
-        return plainerr("error: tried to turn a dict into an ast but dict lacked \"children\" field or the \"children\" field was not a list");
-    }
-    
-    if let Some(Value::Dict(val_opdata)) = get!(dict, "opdata")
-    {
-        if let Some(Value::Number(isop)) = get!(val_opdata, "isop")
-        {
-            ast.opdata.isop = float_booly(*isop);
-        }
-        else
-        {
-            return plainerr("error: tried to turn a dict into an ast but dict's opdata lacked \"isop\" field or the \"isop\" field was not a number");
-        }
-        if let Some(Value::Number(assoc)) = get!(val_opdata, "assoc")
-        {
-            ast.opdata.assoc = assoc.round() as i32;
-        }
-        else
-        {
-            return plainerr("error: tried to turn a dict into an ast but dict's opdata lacked \"assoc\" field or the \"assoc\" field was not a number");
-        }
-        if let Some(Value::Number(precedence)) = get!(val_opdata, "precedence")
-        {
-            ast.opdata.precedence = precedence.round() as i32;
-        }
-        else
-        {
-            return plainerr("error: tried to turn a dict into an ast but dict's opdata lacked \"precedence\" field or the \"precedence\" field was not a number");
-        }
-    }
-    else
-    {
-        return plainerr("error: tried to turn a dict into an ast but dict lacked \"opdata\" field or the \"opdata\" field was not a dictionary");
-    }
+    let val_opdata = get!(Dict, dict, "opdata")?;
+    ast.opdata.isop = float_booly(*get!(Number, val_opdata, "isop")?);
+    ast.opdata.assoc = get!(Number, val_opdata, "assoc")?.round() as i32;
+    ast.opdata.precedence = get!(Number, val_opdata, "precedence")?.round() as i32;
     
     Ok(ast)
 }
@@ -236,20 +170,12 @@ impl Interpreter
         {
             Value::Array(array) =>
             {
-                let mut list = VecDeque::<Value>::new();
-                for i in 0..array.len()
-                {
-                    list.push_back(Value::Number(i as f64));
-                }
+                let list = (0..array.len()).map(|i| Value::Number(i as f64)).collect();
                 Ok((Value::Array(list), false))
             }
             Value::Dict(dict) =>
             {
-                let mut list = VecDeque::<Value>::new();
-                for key in dict.keys()
-                {
-                    list.push_back(hashval_to_val(key));
-                }
+                let list = dict.keys().map(|key| hashval_to_val(key)).collect();
                 Ok((Value::Array(list), false))
             }
             _ =>
