@@ -102,22 +102,17 @@ impl Interpreter {
         }
         let op = self.pull_single_from_code()?;
         
-        if let Some(opfunc) = self.get_opfunc(op)
+        let opfunc = match_or_err!(self.get_opfunc(op), Some(opfunc) => opfunc, Some(format!("internal error: unknown operation 0x{:02X}\nline: {}", op, self.top_frame.currline)))?;
+        
+        opfunc(self)?;
+        self.handle_flow_control()?;
+        if self.doexit
         {
-            opfunc(self)?;
-            self.handle_flow_control()?;
-            if self.doexit
-            {
-                Err(None)
-            }
-            else
-            {
-                Ok(())
-            }
+            Err(None)
         }
         else
         {
-            Err(Some(format!("internal error: unknown operation 0x{:02X}\nline: {}", op, self.top_frame.currline)))
+            Ok(())
         }
     }
 }
