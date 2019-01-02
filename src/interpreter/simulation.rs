@@ -8,12 +8,7 @@ impl Interpreter
 {
     pub (crate) fn get_opfunc(&mut self, op : u8) -> Option<Box<Fn(&mut Interpreter) -> StepResult>>
     {
-        macro_rules! enbox {
-            ( $x:ident ) =>
-            {
-                Some(Box::new(Interpreter::$x))
-            }
-        }
+        macro_rules! enbox { ( $x:ident ) => { Some(Box::new(Interpreter::$x)) } }
         match op
         {
             NOP => enbox!(sim_NOP),
@@ -462,18 +457,9 @@ impl Interpreter
             
             match key
             {
-                Value::Number(number) =>
-                {
-                    names.push_front(HashableValue::Number(number));
-                }
-                Value::Text(text) =>
-                {
-                    names.push_front(HashableValue::Text(text));
-                }
-                _ =>
-                {
-                    return Err(Some(format!("error: dictionary key must be a string or number; was {:?}; line {}", key, self.top_frame.currline)));
-                }
+                Value::Number(number) => names.push_front(HashableValue::Number(number)),
+                Value::Text(text) => names.push_front(HashableValue::Text(text)),
+                _ => return Err(Some(format!("error: dictionary key must be a string or number; was {:?}; line {}", key, self.top_frame.currline)))
             }
         }
         let mut mydict = HashMap::<HashableValue, Value>::new();
@@ -500,21 +486,13 @@ impl Interpreter
                 self.stack_push_var(Variable::Array(arrayvar));
             }
             StackValue::Var(Variable::Direct(dirvar)) =>
-            {
-                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(index).into_iter().collect() } ));
-            }
+                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(index).into_iter().collect() } )),
             StackValue::Var(Variable::Indirect(indirvar)) =>
-            {
-                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(index).into_iter().collect() } ));
-            }
+                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(index).into_iter().collect() } )),
             StackValue::Val(Value::Array(array)) =>
-            {
-                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualArray(array), indexes : vec!(index).into_iter().collect() } ));
-            }
+                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualArray(array), indexes : vec!(index).into_iter().collect() } )),
             _ =>
-            {
-                return plainerr("error: tried to use array indexing on a non-indexable value");
-            }
+                return plainerr("error: tried to use array indexing on a non-indexable value"),
         }
         Ok(())
     }

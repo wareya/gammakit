@@ -78,24 +78,10 @@ impl Interpreter
     
     pub (crate) fn insert_default_internal_functions(&mut self)
     {
-        macro_rules! enrc {
-            ( $y:ident ) =>
-            {
-                Rc::new(Interpreter::$y)
-            }
-        }
-        macro_rules! insert {
-            ( $x:expr, $y:ident ) =>
-            {
-                self.insert_normal_internal_func($x.to_string(), enrc!($y));
-            }
-        }
-        macro_rules! insert_noreturn {
-            ( $x:expr, $y:ident ) =>
-            {
-                self.insert_noreturn_internal_func($x.to_string(), enrc!($y));
-            }
-        }
+        macro_rules! enrc { ( $y:ident ) => { Rc::new(Interpreter::$y) } }
+        macro_rules! insert { ( $x:expr, $y:ident ) => { self.insert_normal_internal_func($x.to_string(), enrc!($y)); } }
+        macro_rules! insert_noreturn { ( $x:expr, $y:ident ) => { self.insert_noreturn_internal_func($x.to_string(), enrc!($y)); } }
+        
         insert!("print"                 , sim_func_print                );
         insert!("len"                   , sim_func_len                  );
         insert!("keys"                  , sim_func_keys                 );
@@ -139,22 +125,10 @@ impl Interpreter
         let arg = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
         match arg
         {
-            Value::Text(string) =>
-            {
-                Ok((Value::Number(string.chars().count() as f64), false))
-            }
-            Value::Array(array) =>
-            {
-                Ok((Value::Number(array.len() as f64), false))
-            }
-            Value::Dict(dict) =>
-            {
-                Ok((Value::Number(dict.keys().len() as f64), false))
-            }
-            _ =>
-            {
-                plainerr("error: tried to take length of lengthless type")
-            }
+            Value::Text(string) => Ok((Value::Number(string.chars().count() as f64), false)),
+            Value::Array(array) => Ok((Value::Number(array.len() as f64), false)),
+            Value::Dict(dict) => Ok((Value::Number(dict.keys().len() as f64), false)),
+            _ => plainerr("error: tried to take length of lengthless type")
         }
     }
     pub (crate) fn sim_func_keys(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
@@ -176,10 +150,7 @@ impl Interpreter
                 let list = dict.keys().map(|key| hashval_to_val(key)).collect();
                 Ok((Value::Array(list), false))
             }
-            _ =>
-            {
-                plainerr("error: tried to take length of lengthless type")
-            }
+            _ => plainerr("error: tried to take length of lengthless type")
         }
     }
     pub (crate) fn sim_func_instance_create(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), Option<String>>
