@@ -260,7 +260,7 @@ impl Interpreter
                 
                 let mut var = instance.variables.get_mut(&indirvar.name).ok_or_else(|| Some(format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident)))?;
                 
-                return assign_or_return_indexed(value, &mut var, &arrayvar.indexes);
+                assign_or_return_indexed(value, &mut var, &arrayvar.indexes)
             }
             NonArrayVariable::Direct(ref dirvar) =>
             {

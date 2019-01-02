@@ -6,7 +6,7 @@ pub (crate) fn slice(text : &str, start : i64, end : i64) -> String
     let u_start = if start <  0 {chars.len() - (-start as usize)} else {start as usize};
     let u_end   = if end   <= 0 {chars.len() - (-end   as usize)} else {end   as usize};
     
-    chars.get(u_start..u_end).map(|chars| chars.into_iter().collect()).unwrap_or("".to_string())
+    chars.get(u_start..u_end).map(|chars| chars.into_iter().collect()).unwrap_or_else(|| "".to_string())
 }
 
 pub (crate) fn unescape(text: &str) -> String

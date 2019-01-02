@@ -1,3 +1,5 @@
+#![allow(clippy::suspicious_else_formatting)]
+
 use crate::interpreter::*;
 
 impl Interpreter {
