@@ -30,15 +30,6 @@ impl Interpreter
     {
         self.top_frame.push(stackvalue)
     }
-    pub (super) fn build_funcspec_location(&self) -> FuncSpecLocation
-    {
-        let mut outer_frames = Vec::<FrameIdentity>::new();
-        for frame in &self.frames
-        {
-            outer_frames.push(FrameIdentity::new(&frame));
-        }
-        FuncSpecLocation { outer_frames, top_frame : FrameIdentity::new(&self.top_frame) }
-    }
     
     pub (super) fn handle_func_call_or_expr(&mut self, isexpr : bool) -> StepResult
     {

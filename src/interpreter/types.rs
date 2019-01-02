@@ -33,22 +33,6 @@ pub (crate) struct Frame {
     pub (super) impassable: bool,
 }
 
-#[derive(Clone)]
-#[derive(Debug)]
-pub (crate) struct FrameIdentity {
-    pub (super) code: Weak<Vec<u8>>,
-    pub (super) startpc: usize,
-    pub (super) endpc: usize,
-    pub (super) scopestarts: Vec<usize>,
-}
-
-#[derive(Clone)]
-#[derive(Debug)]
-pub (crate) struct FuncSpecLocation {
-    pub (super) outer_frames : Vec<FrameIdentity>,
-    pub (super) top_frame : FrameIdentity,
-}
-
 // inaccessible types
 
 #[derive(Debug)]
@@ -61,7 +45,6 @@ pub (crate) struct FuncSpec {
     pub (super) fromobj: bool,
     pub (super) parentobj: usize,
     pub (super) forcecontext: usize,
-    pub (super) location: FuncSpecLocation,
     pub (super) impassable: bool,
 }
 pub (crate) struct ObjSpec {
@@ -192,13 +175,6 @@ impl Frame {
     pub (super) fn push(&mut self, stackvalue : StackValue)
     {
         self.stack.push(stackvalue)
-    }
-}
-
-impl FrameIdentity {
-    pub (crate) fn new(frame : &Frame) -> FrameIdentity
-    {
-        FrameIdentity { code : Rc::downgrade(&frame.code), startpc : frame.startpc, endpc : frame.endpc, scopestarts : frame.scopestarts.clone() }
     }
 }
 

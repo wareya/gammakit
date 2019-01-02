@@ -2,7 +2,6 @@ use std::collections::VecDeque;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::rc::Rc;
-use std::rc::Weak;
 
 use super::strings::*;
 use super::ast::*;
@@ -97,6 +96,10 @@ impl Interpreter {
     /// If there is an error string (Err(Some(string))), exit was non-graceful (i.e. there was an error). Otherwise (Err(None)), it was graceful.
     pub fn step(&mut self) -> StepResult
     {
+        if self.get_pc() < self.top_frame.startpc || self.get_pc() > self.top_frame.endpc
+        {
+            return plainerr("internal error: simulation stepped while outside of the range of the frame it was in");
+        }
         let op = self.pull_single_from_code()?;
         
         if let Some(opfunc) = self.get_opfunc(op)

@@ -313,7 +313,6 @@ impl Interpreter
               fromobj : false,
               parentobj : 0,
               forcecontext : 0,
-              location : self.build_funcspec_location(),
               impassable : true,
             }
             )), false)
@@ -350,7 +349,6 @@ impl Interpreter
               fromobj : false,
               parentobj : 0,
               forcecontext : 0,
-              location : self.build_funcspec_location(),
               impassable : true
             }
             )), false)
