@@ -105,7 +105,7 @@ impl Interpreter {
         
         let opfunc = match_or_err!(self.get_opfunc(op), Some(opfunc) => opfunc, Some(format!("internal error: unknown operation 0x{:02X}\nline: {}", op, self.top_frame.currline)))?;
         
-        opfunc(self).map_err(|err| Some(err))?;
+        opfunc(self).map_err(Some)?;
         self.handle_flow_control()?;
         if self.doexit
         {

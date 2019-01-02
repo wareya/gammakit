@@ -66,7 +66,7 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTN
 
 impl Interpreter
 {
-    fn insert_normal_internal_func(&mut self, funcname : String, func : Rc<InternalFunction>)
+    pub fn insert_normal_internal_func(&mut self, funcname : String, func : Rc<InternalFunction>)
     {
         self.internal_functions.insert(funcname, func);
     }
