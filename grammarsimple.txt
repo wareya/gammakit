@@ -178,6 +178,8 @@ $name$ >>? = $expr$
 funcdef:
 def $name$ ( ) { $statement$* }
 def $name$ ( $name$..., ) { $statement$* }
+subdef $name$ ( ) { $statement$* }
+subdef $name$ ( $name$..., ) { $statement$* }
 globaldef $name$ ( ) { $statement$* }
 globaldef $name$ ( $name$..., ) { $statement$* }
 

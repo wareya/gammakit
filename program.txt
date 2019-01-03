@@ -256,17 +256,6 @@ while(trew < 5)
     trew += 1;
 print(trew);
 
-
-/*
-def getarray()
-{
-    print(myarray);
-    return myarray;
-}
-
-print(getarray()[0]);
-*/
-
 var xaa = "myarray";
 print("asdf");
 print(xaa[1]);
@@ -315,3 +304,11 @@ def call_testfunc()
 }
 
 call_testfunc();
+
+subdef getarray()
+{
+    print(myarray);
+    return myarray;
+}
+
+print(getarray()[0]);

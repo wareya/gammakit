@@ -31,6 +31,7 @@ impl Interpreter
             LAMBDA => enbox!(sim_LAMBDA),
             OBJDEF => enbox!(sim_OBJDEF),
             GLOBALFUNCDEF => enbox!(sim_GLOBALFUNCDEF),
+            SUBFUNCDEF => enbox!(sim_SUBFUNCDEF),
             COLLECTARRAY => enbox!(sim_COLLECTARRAY),
             COLLECTDICT => enbox!(sim_COLLECTDICT),
             ARRAYEXPR => enbox!(sim_ARRAYEXPR),
@@ -336,7 +337,7 @@ impl Interpreter
     }
     pub (crate) fn sim_FUNCDEF(&mut self) -> OpResult
     {
-        let (funcname, myfuncspec) = self.read_function()?;
+        let (funcname, myfuncspec) = self.read_function(false)?;
         let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
         
         if scope.contains_key(&funcname)
@@ -348,13 +349,25 @@ impl Interpreter
     }
     pub (crate) fn sim_GLOBALFUNCDEF(&mut self) -> OpResult
     {
-        let (funcname, myfuncspec) = self.read_function()?;
+        let (funcname, myfuncspec) = self.read_function(false)?;
         
         if self.global.functions.contains_key(&funcname)
         {
             return Err(format!("error: redeclared global function {}", funcname));
         }
         self.global.functions.insert(funcname.clone(), Value::new_funcval(false, Some(funcname), None, Some(myfuncspec)));
+        Ok(())
+    }
+    pub (crate) fn sim_SUBFUNCDEF(&mut self) -> OpResult
+    {
+        let (funcname, myfuncspec) = self.read_function(true)?;
+        let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
+        
+        if scope.contains_key(&funcname)
+        {
+            return Err(format!("error: redeclared identifier {}", funcname));
+        }
+        scope.insert(funcname.clone(), Value::new_funcval(false, Some(funcname), None, Some(myfuncspec)));
         Ok(())
     }
     
@@ -447,7 +460,7 @@ impl Interpreter
         let mut funcs = HashMap::<String, FuncSpec>::new();
         for _ in 0..numfuncs
         {
-            let (funcname, mut myfuncspec) = self.read_function()?;
+            let (funcname, mut myfuncspec) = self.read_function(false)?;
             myfuncspec.fromobj = true;
             myfuncspec.parentobj = object_id;
             if funcs.contains_key(&funcname)
