@@ -3,6 +3,7 @@ extern crate regex;
 use std::fs::File;
 use std::io::Read;
 use std::vec::Vec;
+use std::rc::Rc;
 
 #[macro_use]
 mod matches;
@@ -55,13 +56,15 @@ fn main() -> std::io::Result<()>
                         }
                     }
                     
-                    let mut interpreter = Interpreter::new(code.clone(), Some(parser));
+                    let code = Rc::new(code);
+                    
+                    let mut interpreter = Interpreter::new(&code, Some(parser));
                     interpreter.insert_default_internal_functions();
                     
                     while interpreter.step().is_ok(){}
                     
                     interpreter.clear_global_state().unwrap_or(());
-                    interpreter.restart(code).unwrap_or(());
+                    interpreter.restart(&code).unwrap_or(());
                     
                     while interpreter.step().is_ok(){}
                 }

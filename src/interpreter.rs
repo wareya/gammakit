@@ -78,10 +78,10 @@ pub struct Interpreter {
 
 impl Interpreter {
     /// Creates a new interpreter 
-    pub fn new(code : Vec<u8>, parser : Option<Parser>) -> Interpreter
+    pub fn new(code : &Rc<Vec<u8>>, parser : Option<Parser>) -> Interpreter
     {
         Interpreter {
-            top_frame : Frame::new_root(Rc::new(code)),
+            top_frame : Frame::new_root(Rc::clone(code)),
             frames : vec!(),
             doexit : false,
             suppress_for_expr_end : false,
@@ -100,9 +100,9 @@ impl Interpreter {
     /// Does not unload internal function bindings.
     /// 
     /// Does not reset global state (objects/instances).
-    pub fn restart(&mut self, code: Vec<u8>) -> StepResult
+    pub fn restart(&mut self, code: &Rc<Vec<u8>>) -> StepResult
     {
-        self.top_frame = Frame::new_root(Rc::new(code));
+        self.top_frame = Frame::new_root(Rc::clone(code));
         self.frames = vec!();
         self.doexit = false;
         self.suppress_for_expr_end = false;
