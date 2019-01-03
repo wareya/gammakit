@@ -312,3 +312,11 @@ subdef getarray()
 }
 
 print(getarray()[0]);
+
+/*
+// TODO
+for(val in myarray)
+{
+    print(val);
+}
+*/
