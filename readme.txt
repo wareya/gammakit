@@ -60,25 +60,28 @@ instance_execute (returns a value, unlike with())
 instance_create
 instance_add_variable (novelty)
 
+"global" is a fake/fixed/read-only variable that stores global variables. Global functions are accessed as if they were in the current scope, but can be shadowed by local functions.
+
 TODO:
-- global variables and global functions
+- global variables and global functions (global.? global def?)
+- add a way of declaring functions that allows access to outer frame scopes (subdef?)
+- foreach with syntax for ( $name$ in $expr$ ) $block$ operating on arrays, dicts, strings, and maybe object IDs
+- add real generators, friendly with what non-programmers expect "script" to mean (e.g. an AI script, VN script, etc - changing state, returning, later coming back to where returned from)
+
+TODO (sanitation/low-priority):
 - make keys() iterate over dict keys in insertion order
 - make sure format_val does the same as the above
 - make compile_ast() verify that the ast has a coherent "type" (parent, text, operator)
-- make sure frames are handled coherently / add a way of declaring functions that blocks access to outer frame scopes (puredef?)
-
-- foreach with syntax for ( $name$ in $expr$ ) $block$ operating on arrays, dicts, strings, and maybe object IDs
 - forbid if-else inside an if condition's block with no enclosing braces
-- add bindings for input, graphics, sound
-- turn runtime panics into internal signals instead
-- real structs, copied by value like arrays/dicts are (if you don't want them copied by value just use objects/instances)
-- non-first-class arrays/dicts copied by id like instances? taking the same syntax of course
 
+MAYBE:
+- real structs, copied by value like arrays/dicts are (if you don't want them copied by value just use objects/instances)
+-- maybe just give .attr access syntax to dictionaries? (like js) (maybe use another symbol like -> or : or / so it doesn't have to decide)
+
+MAYBE (metaprogramming):
 - give the runtime control over interpreters of its own; runtime panics will invalidate interpreters
-- allow interpreters to act like generators
-- add real generators, friendly with what non-programmers expect "script" to mean (e.g. an AI script, VN script, etc - changing state, returning, later coming back to where returned from)
-- document transformations from parse tree (as in grammarsimple.txt) to syntax tree (input to compilation process)
 - investigate feasibility of grammar, parser, compiler, and interpreter hooks (limited to child interpreters)
+- allow interpreters to act like generators
 
 
 As of writing, clippy processes gammakit with no complaints. Certain lints are disabled in certain files where they are inappropriate, unhelpful, or generate false positives.

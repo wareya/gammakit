@@ -170,6 +170,7 @@ $statement$
 declaration:
 var $declname$...,
 far $declname$...,
+globalvar $declname$...,
 
 declname:
 $name$ >>? = $expr$

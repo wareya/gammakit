@@ -138,6 +138,10 @@ fn compile_declaration(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) 
         {
             code.push(DECLFAR);
         }
+        else if ast.child(0)?.text == "globalvar"
+        {
+            code.push(DECLGLOBALVAR);
+        }
         else
         {
             return plainerr("internal error: non-var/far prefix to declaration");

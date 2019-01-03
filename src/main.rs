@@ -63,10 +63,20 @@ fn main() -> std::io::Result<()>
                     
                     while interpreter.step().is_ok(){}
                     
+                    if let Some(err) = &interpreter.last_error
+                    {
+                        println!("{}", err);
+                    }
+                    
                     interpreter.clear_global_state().unwrap_or(());
                     interpreter.restart(&code).unwrap_or(());
                     
                     while interpreter.step().is_ok(){}
+                    
+                    if let Some(err) = &interpreter.last_error
+                    {
+                        println!("{}", err);
+                    }
                 }
                 else if let Err(err) = code
                 {

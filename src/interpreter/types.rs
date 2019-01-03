@@ -76,12 +76,31 @@ pub (crate) struct ArrayVar { // for x[y]
     pub (super) location: NonArrayVariable,
     pub (super) indexes: Vec<Value>
 }
+
+#[derive(Debug)]
+#[derive(Clone)]
+pub (crate) enum IndirectSource {
+    Ident(usize), // id of an instance
+    Global,
+}
 #[derive(Debug)]
 #[derive(Clone)]
 pub (crate) struct IndirectVar { // for x.y
-    pub (super) ident: usize, // id of an instance
+    pub (super) source: IndirectSource,
     pub (super) name: String
 }
+
+impl IndirectVar {
+    pub (crate) fn from_ident(ident : usize, name : String) -> Variable
+    {
+        Variable::Indirect(IndirectVar{source: IndirectSource::Ident(ident), name})
+    }
+    pub (crate) fn from_global(name : String) -> Variable
+    {
+        Variable::Indirect(IndirectVar{source: IndirectSource::Global, name})
+    }
+}
+
 #[derive(Debug)]
 #[derive(Clone)]
 pub (crate) struct DirectVar { // for x
@@ -107,12 +126,18 @@ pub struct FuncVal {
 
 #[derive(Debug)]
 #[derive(Clone)]
+pub enum Special {
+    Global
+}
+#[derive(Debug)]
+#[derive(Clone)]
 pub enum Value {
     Number(f64),
     Text(String),
     Array(VecDeque<Value>),
     Dict(HashMap<HashableValue, Value>),
     Func(Box<FuncVal>),
+    Special(Special),
 }
 #[derive(Debug)]
 #[derive(Clone)]

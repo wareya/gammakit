@@ -297,3 +297,10 @@ var scope_test;
 }
 scope_test(5);
 scope_test(0);
+
+globalvar x;
+
+print(global.x);
+global.x = 10;
+print(global.x);
+

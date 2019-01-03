@@ -242,11 +242,22 @@ impl Interpreter
         {
             NonArrayVariable::Indirect(ref indirvar) =>
             {
-                let instance = self.global.instances.get_mut(&indirvar.ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, indirvar.ident))?;
-                
-                let mut var = instance.variables.get_mut(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident))?;
-                
-                assign_or_return_indexed(value, &mut var, &arrayvar.indexes)
+                match indirvar.source
+                {
+                    IndirectSource::Ident(ident) =>
+                    {
+                        let instance = self.global.instances.get_mut(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, ident))?;
+                        
+                        let var = instance.variables.get_mut(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, ident))?;
+                        
+                        assign_or_return_indexed(value, var, &arrayvar.indexes)
+                    }
+                    IndirectSource::Global =>
+                    {
+                        let var = self.global.variables.get_mut(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", indirvar.name))?;
+                        assign_or_return_indexed(value, var, &arrayvar.indexes)
+                    }
+                }
             }
             NonArrayVariable::Direct(ref dirvar) =>
             {
@@ -290,32 +301,54 @@ impl Interpreter
     }
     fn evaluate_or_store_of_indirect(&mut self, indirvar : &IndirectVar, value : Option<Value>) -> Result<Option<Value>, String>
     {
-        let instance = self.global.instances.get_mut(&indirvar.ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, indirvar.ident))?;
-        
-        if let Some(var) = instance.variables.get_mut(&indirvar.name)
+        match indirvar.source
         {
-            assign_or_return(value, var)
-        }
-        else
-        {
-            let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident))?;
-            
-            let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, indirvar.ident))?;
-            
-            if value.is_none()
+            IndirectSource::Ident(ident) =>
             {
-                let mut mydata = funcdat.clone();
-                mydata.forcecontext = indirvar.ident;
-                Ok(Some(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata))))
+                let instance = self.global.instances.get_mut(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, ident))?;
+                
+                if let Some(var) = instance.variables.get_mut(&indirvar.name)
+                {
+                    assign_or_return(value, var)
+                }
+                else
+                {
+                    let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, ident))?;
+                    
+                    let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, ident))?;
+                    
+                    if value.is_none()
+                    {
+                        let mut mydata = funcdat.clone();
+                        mydata.forcecontext = ident;
+                        Ok(Some(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata))))
+                    }
+                    else
+                    {
+                        Err(format!("error: tried to assign to function `{}` in instance of object type `{}`", indirvar.name, objspec.name))
+                    }
+                }
             }
-            else
+            IndirectSource::Global =>
             {
-                Err(format!("error: tried to assign to function `{}` in instance of object type `{}`", indirvar.name, objspec.name))
+                let var = self.global.variables.get_mut(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", indirvar.name))?;
+                assign_or_return(value, var)
             }
         }
     }
     fn evaluate_or_store_of_direct(&mut self, dirvar : &DirectVar, value : Option<Value>) -> Result<Option<Value>, String>
     {
+        if dirvar.name == "global"
+        {
+            if value.is_none()
+            {
+                return Ok(Some(Value::Special(Special::Global)));
+            }
+            else
+            {
+                return Err(minierr("error: cannot assign to variable called \"global\" (special read-only name)"));
+            }
+        }
         if check_frame_dirvar(&mut self.global, &mut self.top_frame, dirvar)
         {
             return access_frame_dirvar(&mut self.global, &mut self.top_frame, dirvar, value);

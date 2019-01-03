@@ -43,7 +43,9 @@ struct GlobalState {
     objectnames: HashMap<String, usize>,
     objects: HashMap<usize, ObjSpec>,
     regex_holder: RegexHolder,
-    parser: Option<Parser>
+    parser: Option<Parser>,
+    variables: HashMap<String, Value>, // accessed as global.varname
+    functions: HashMap<String, Value>, // accessed as funcname
 }
 
 impl GlobalState {
@@ -57,7 +59,9 @@ impl GlobalState {
             objectnames : HashMap::new(),
             objects : HashMap::new(),
             regex_holder : RegexHolder::new(),
-            parser
+            parser,
+            variables : HashMap::new(),
+            functions : HashMap::new(),
         }
     }
 }

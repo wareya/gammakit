@@ -19,6 +19,7 @@ impl Interpreter
             PUSHVAR => enbox!(sim_PUSHVAR),
             DECLVAR => enbox!(sim_DECLVAR),
             DECLFAR => enbox!(sim_DECLFAR),
+            DECLGLOBALVAR => enbox!(sim_DECLGLOBALVAR),
             BINSTATE => enbox!(sim_BINSTATE),
             BINOP => enbox!(sim_BINOP),
             UNOP => enbox!(sim_UNOP),
@@ -84,6 +85,7 @@ impl Interpreter
         self.stack_push_val(val);
         Ok(())
     }
+    
     pub (crate) fn sim_DECLVAR(&mut self) -> OpResult
     {
         if self.stack_len() < 1
@@ -101,7 +103,6 @@ impl Interpreter
         
         Ok(())
     }
-    
     pub (crate) fn sim_DECLFAR(&mut self) -> OpResult
     {
         if self.stack_len() < 1
@@ -118,6 +119,22 @@ impl Interpreter
         instance.variables.insert(name, Value::Number(0.0));
         Ok(())
     }
+    pub (crate) fn sim_DECLGLOBALVAR(&mut self) -> OpResult
+    {
+        if self.stack_len() < 1
+        {
+            return plainerr("internal error: DECLGLOBALVAR instruction requires 1 values on the stack but only found 0");
+        }
+        let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to declare a global variable with a name of invalid type"))?;
+        
+        if self.global.variables.contains_key(&name)
+        {
+            return Err(format!("error: redeclared global variable identifier {}", name))
+        }
+        self.global.variables.insert(name, Value::Number(0.0));
+        
+        Ok(())
+    }
     
     pub (crate) fn sim_INDIRECTION(&mut self) -> OpResult
     {
@@ -126,15 +143,28 @@ impl Interpreter
             return Err(format!("internal error: INDIRECTION instruction requires 2 values on the stack but only found {}", self.stack_len()));
         }
         let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to perform INDIRECTION operation with a right-hand side that wasn't a name"))?;
-        let ident = self.stack_pop_number().ok_or_else(|| minierr("error: tried to use indirection on a type that can't be an identifier (only numbers can be identifiers)"))?.round() as usize;
-        
-        if !self.global.instances.contains_key(&ident)
+        let source = self.stack_pop_val().ok_or_else(|| minierr("internal error: failed to get source from stack in INDIRECTION operation"))?;
+        match source
         {
-            return Err(format!("error: tried to perform indirection on instance {} that doesn't exist", ident));
+            Value::Number(ident) =>
+            {
+                let ident = ident as usize;
+                if !self.global.instances.contains_key(&ident)
+                {
+                    return Err(format!("error: tried to perform indirection on instance {} that doesn't exist", ident));
+                }
+                self.stack_push_var(IndirectVar::from_ident(ident, name));
+                
+                Ok(())
+            }
+            Value::Special(Special::Global) =>
+            {
+                self.stack_push_var(IndirectVar::from_global(name));
+                
+                Ok(())
+            }
+            _ => plainerr("error: tried to use indirection on a type that can't be an identifier (only instance IDs (which are numbers) or the special name \"global\" can go on the left side of a . operator)")
         }
-        self.stack_push_var(Variable::Indirect(IndirectVar{ident, name}));
-        
-        Ok(())
     }
     pub (crate) fn sim_EVALUATION(&mut self) -> OpResult
     {
