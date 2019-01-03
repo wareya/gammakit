@@ -514,6 +514,12 @@ fn compile_rvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Resu
 }
 fn compile_funcdef(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), String>
 {
+    let kind = ast.child(0)?;
+    if kind.isparent || !matches!(kind.text.as_str(), "def" | "globaldef")
+    {
+        return plainerr("error: first token of fundef must be the text \"def\" or \"globaldef\"");
+    }
+    let is_global = kind.text == "globaldef";
     let name = &ast.child(1)?.child(0)?.text;
     
     let mut args = Vec::<&ASTNode>::new();
@@ -550,7 +556,14 @@ fn compile_funcdef(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> 
     }
     body.push(EXIT);
     
-    code.push(FUNCDEF);
+    if is_global
+    {
+        code.push(GLOBALFUNCDEF);
+    }
+    else
+    {
+        code.push(FUNCDEF);
+    }
     code.extend(name.bytes());
     code.push(0x00);
     code.extend(pack_u16(args.len() as u16));

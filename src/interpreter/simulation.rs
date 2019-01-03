@@ -30,6 +30,7 @@ impl Interpreter
             FUNCDEF => enbox!(sim_FUNCDEF),
             LAMBDA => enbox!(sim_LAMBDA),
             OBJDEF => enbox!(sim_OBJDEF),
+            GLOBALFUNCDEF => enbox!(sim_GLOBALFUNCDEF),
             COLLECTARRAY => enbox!(sim_COLLECTARRAY),
             COLLECTDICT => enbox!(sim_COLLECTDICT),
             ARRAYEXPR => enbox!(sim_ARRAYEXPR),
@@ -343,6 +344,17 @@ impl Interpreter
             return Err(format!("error: redeclared identifier {}", funcname));
         }
         scope.insert(funcname.clone(), Value::new_funcval(false, Some(funcname), None, Some(myfuncspec)));
+        Ok(())
+    }
+    pub (crate) fn sim_GLOBALFUNCDEF(&mut self) -> OpResult
+    {
+        let (funcname, myfuncspec) = self.read_function()?;
+        
+        if self.global.functions.contains_key(&funcname)
+        {
+            return Err(format!("error: redeclared global function {}", funcname));
+        }
+        self.global.functions.insert(funcname.clone(), Value::new_funcval(false, Some(funcname), None, Some(myfuncspec)));
         Ok(())
     }
     

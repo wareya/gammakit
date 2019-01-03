@@ -186,7 +186,7 @@ fn check_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &D
             }
             else if let Some(objspec) = global.objects.get(&inst.objtype)
             {
-                if objspec.functions.get(&dirvar.name).is_some()
+                if objspec.functions.contains_key(&dirvar.name)
                 {
                     return true;
                 }
@@ -276,9 +276,13 @@ impl Interpreter
                         if frame.impassable { break; }
                     }
                 }
-                if self.global.objectnames.get(&dirvar.name).is_some()
+                if self.global.objectnames.contains_key(&dirvar.name)
                 {
                     return plainerr("error: tried to index into object name as though it was an array");
+                }
+                if self.global.functions.contains_key(&dirvar.name)
+                {
+                    return plainerr("error: tried to index into global function name as though it was an array");
                 }
                 if self.get_internal_function(&dirvar.name).is_some()
                 {
@@ -375,10 +379,27 @@ impl Interpreter
                 return Err(format!("error: tried to assign to read-only object name `{}`", dirvar.name));
             }
         }
-        // TODO: Store actual function pointer instead?
+        if let Some(var) = self.global.functions.get(&dirvar.name)
+        {
+            if value.is_none()
+            {
+                return Ok(Some(var.clone()));
+            }
+            else
+            {
+                return Err(format!("error: tried to assign to global function `{}` (no such identifier exists in any other scope, you should declare it with 'var' to override this logic)", dirvar.name));
+            }
+        }
         if self.get_internal_function(&dirvar.name).is_some()
         {
-            return Ok(Some(Value::new_funcval(true, Some(dirvar.name.clone()), None, None)));
+            if value.is_none()
+            {
+                return Ok(Some(Value::new_funcval(true, Some(dirvar.name.clone()), None, None)));
+            }
+            else
+            {
+                return Err(format!("error: tried to assign to internal function name"));
+            }
         }
         
         Err(format!("error: unknown identifier `{}`", dirvar.name))

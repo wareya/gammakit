@@ -102,6 +102,7 @@ pub (crate) const ARRAYEXPR : u8 = 0xA2;
 pub (crate) const FUNCDEF : u8 = 0xB0;
 pub (crate) const LAMBDA : u8 = 0xB1;
 pub (crate) const OBJDEF : u8 = 0xB2;
+pub (crate) const GLOBALFUNCDEF : u8 = 0xB3;
 
 pub (crate) const EXIT : u8 = 0xF0;
 pub (crate) const RETURN : u8 = 0xF1;

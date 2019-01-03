@@ -304,3 +304,14 @@ print(global.x);
 global.x = 10;
 print(global.x);
 
+globaldef testfunc()
+{
+    print("I was accessed!");
+}
+
+def call_testfunc()
+{
+    testfunc();
+}
+
+call_testfunc();
