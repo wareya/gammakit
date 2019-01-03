@@ -398,7 +398,7 @@ impl Interpreter
             }
             else
             {
-                return Err(format!("error: tried to assign to internal function name"));
+                return plainerr("error: tried to assign to internal function name");
             }
         }
         
