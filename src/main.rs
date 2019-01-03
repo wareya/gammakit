@@ -55,8 +55,13 @@ fn main() -> std::io::Result<()>
                         }
                     }
                     
-                    let mut interpreter = Interpreter::new(code, Some(parser));
+                    let mut interpreter = Interpreter::new(code.clone(), Some(parser));
                     interpreter.insert_default_internal_functions();
+                    
+                    while interpreter.step().is_ok(){}
+                    
+                    interpreter.clear_global_state().unwrap_or(());
+                    interpreter.restart(code).unwrap_or(());
                     
                     while interpreter.step().is_ok(){}
                 }
