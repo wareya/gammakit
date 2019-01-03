@@ -639,6 +639,11 @@ fn compile_objdef(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Re
     for child in funcs.iter()
     {
         let code = compile_astnode(child, scopedepth)?;
+        let first_byte = code.get(0).ok_or_else(|| minierr("internal error: compile_astnode for child function of objdef somehow didn't have even a single byte of code"))?;
+        if *first_byte != FUNCDEF
+        {
+            return plainerr("error: functions inside of an object definition must be defined with \"def\", not \"globaldef\" or \"subdef\"");
+        }
         // cut off the FUNCDEF byte
         let without_first_byte = code.get(1..).ok_or_else(|| minierr("internal error: compile_astnode for child function of objdef somehow didn't have even a single byte of code"))?;
         childcode.extend(without_first_byte);
