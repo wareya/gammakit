@@ -323,17 +323,21 @@ for(val in myarray)
 
 print("generator tests below:");
 
-generator test()
+generator test(i)
 {
-    yield 10;
-    yield 9;
-    yield 8;
-    yield 7;
+    while(i > 0)
+    {
+        yield i;
+        i -= 1;
+    }
+    return "generator has finalized";
 }
 
-var test_state = test();
+var test_state = test(10);
 
 while(test_state)
     print(invoke test_state);
 
 print("generator tests end here");
+
+
