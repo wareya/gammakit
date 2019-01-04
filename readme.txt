@@ -48,6 +48,8 @@ prints the following output:
     toast
     not toast
 
+Gammakits also has generators, which require separate initialization and "iteration"/invokation/stepping. Initialization returns a generator state value that truth-tests as whether the generator has finalized or not.
+
 Available functions:
 
 print
@@ -63,6 +65,7 @@ instance_add_variable (novelty)
 "global" is a fake/fixed/read-only variable that stores global variables (e.g. global.players). Global functions are accessed as if they were in the current scope, but can be shadowed by local functions.
 
 TODO:
+- switch statement ("match"? implicit break. "case x, y:"?)
 - sets (syntax " set { } | set { $expr$..., $unusedcomma$? } " compared to dict syntax of " { } | { $dictval$..., $unusedcomma$? } ")
 - some way to add and remove elements from arrays/dicts/sets (| and ^ maybe)
 - foreach with syntax " for ( $name$ in $expr$ ) $block$ " operating on arrays, dicts, strings, and maybe object IDs
