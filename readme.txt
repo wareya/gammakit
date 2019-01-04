@@ -72,6 +72,7 @@ TODO (sanitation/low-priority):
 - make sure format_val does the same as the above
 - make compile_ast() verify that the ast has a coherent "type" (parent, text, operator)
 - forbid if-else inside an if condition's block with no enclosing braces
+- make parser provide named tokens in parse errors, not just literal tokens
 
 MAYBE:
 - real structs, copied by value like arrays/dicts are (if you don't want them copied by value just use objects/instances)
