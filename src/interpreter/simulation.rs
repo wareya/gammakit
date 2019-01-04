@@ -27,11 +27,15 @@ impl Interpreter
             EVALUATION => enbox!(sim_EVALUATION),
             FUNCCALL => enbox!(sim_FUNCCALL),
             FUNCEXPR => enbox!(sim_FUNCEXPR),
+            INVOKE => enbox!(sim_INVOKE),
+            INVOKECALL => enbox!(sim_INVOKECALL),
+            INVOKEEXPR => enbox!(sim_INVOKEEXPR),
             FUNCDEF => enbox!(sim_FUNCDEF),
             LAMBDA => enbox!(sim_LAMBDA),
             OBJDEF => enbox!(sim_OBJDEF),
             GLOBALFUNCDEF => enbox!(sim_GLOBALFUNCDEF),
             SUBFUNCDEF => enbox!(sim_SUBFUNCDEF),
+            GENERATORDEF => enbox!(sim_GENERATORDEF),
             COLLECTARRAY => enbox!(sim_COLLECTARRAY),
             COLLECTDICT => enbox!(sim_COLLECTDICT),
             ARRAYEXPR => enbox!(sim_ARRAYEXPR),
@@ -46,6 +50,7 @@ impl Interpreter
             WITH => enbox!(sim_WITH),
             EXIT => enbox!(sim_EXIT),
             RETURN => enbox!(sim_RETURN),
+            YIELD => enbox!(sim_YIELD),
             LINENUM => enbox!(sim_LINENUM),
             _ => None
         }
@@ -198,6 +203,40 @@ impl Interpreter
     {
         self.handle_func_call_or_expr(true)
     }
+    pub (crate) fn sim_INVOKE(&mut self) -> OpResult
+    {
+        self.handle_invocation()
+    }
+    pub (crate) fn sim_INVOKECALL(&mut self) -> OpResult
+    {
+        if self.stack_len() < 3
+        {
+            return Err(format!("internal error: INVOKECALL instruction requires 3 values on the stack but found {}", self.stack_len()));
+        }
+        let generator = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 1 to INVOKECALL must be a value"))?;
+        let _yielded = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 2 to INVOKECALL must be a value"))?;
+        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: stack argument 3 to INVOKECALL must be a variable"))?;
+        
+        self.evaluate_or_store(&var, Some(generator))?;
+        
+        Ok(())
+    }
+    pub (crate) fn sim_INVOKEEXPR(&mut self) -> OpResult
+    {
+        if self.stack_len() < 3
+        {
+            return Err(format!("internal error: INVOKECALL instruction requires 3 values on the stack but found {}", self.stack_len()));
+        }
+        let generator = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 1 to INVOKECALL must be a value"))?;
+        let yielded = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 2 to INVOKECALL must be a value"))?;
+        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: stack argument 3 to INVOKECALL must be a variable"))?;
+        
+        self.evaluate_or_store(&var, Some(generator))?;
+        
+        self.stack_push_val(yielded);
+        
+        Ok(())
+    }
     
     pub (crate) fn sim_SCOPE(&mut self) -> OpResult
     {
@@ -337,7 +376,7 @@ impl Interpreter
     }
     pub (crate) fn sim_FUNCDEF(&mut self) -> OpResult
     {
-        let (funcname, myfuncspec) = self.read_function(false)?;
+        let (funcname, myfuncspec) = self.read_function(false, false)?;
         let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
         
         if scope.contains_key(&funcname)
@@ -349,7 +388,7 @@ impl Interpreter
     }
     pub (crate) fn sim_GLOBALFUNCDEF(&mut self) -> OpResult
     {
-        let (funcname, myfuncspec) = self.read_function(false)?;
+        let (funcname, myfuncspec) = self.read_function(false, false)?;
         
         if self.global.functions.contains_key(&funcname)
         {
@@ -360,7 +399,19 @@ impl Interpreter
     }
     pub (crate) fn sim_SUBFUNCDEF(&mut self) -> OpResult
     {
-        let (funcname, myfuncspec) = self.read_function(true)?;
+        let (funcname, myfuncspec) = self.read_function(true, false)?;
+        let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
+        
+        if scope.contains_key(&funcname)
+        {
+            return Err(format!("error: redeclared identifier {}", funcname));
+        }
+        scope.insert(funcname.clone(), Value::new_funcval(false, Some(funcname), None, Some(myfuncspec)));
+        Ok(())
+    }
+    pub (crate) fn sim_GENERATORDEF(&mut self) -> OpResult
+    {
+        let (funcname, myfuncspec) = self.read_function(false, true)?;
         let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
         
         if scope.contains_key(&funcname)
@@ -460,7 +511,7 @@ impl Interpreter
         let mut funcs = HashMap::<String, FuncSpec>::new();
         for _ in 0..numfuncs
         {
-            let (funcname, mut myfuncspec) = self.read_function(false)?;
+            let (funcname, mut myfuncspec) = self.read_function(false, false)?;
             myfuncspec.fromobj = true;
             myfuncspec.parentobj = object_id;
             if funcs.contains_key(&funcname)
@@ -553,14 +604,23 @@ impl Interpreter
     }
     pub (crate) fn sim_EXIT(&mut self) -> OpResult // an exit is a return with no value
     {
-        if let Some(top_frame) = self.frames.pop()
+        if let Some(outer_top_frame) = self.frames.pop()
         {
+            let was_generator = self.top_frame.generator;
             let frame_was_expr = self.top_frame.isexpr;
-            self.top_frame = top_frame;
-            // exit implies no pushed variable. if the outside expects a value, push it
+            self.top_frame = outer_top_frame;
+            // exit implies no remaining value on the stack. if the outside expects a value, push it
             if frame_was_expr
             {
                 self.stack_push_val(Value::Number(0.0));
+            }
+            if was_generator
+            {
+                self.stack_push_val(Value::Generator(GeneratorState{frame : None}));
+                if !frame_was_expr
+                {
+                    return plainerr("internal error: generators must always return into an expression");
+                }
             }
         }
         else
@@ -571,16 +631,51 @@ impl Interpreter
     }
     pub (crate) fn sim_RETURN(&mut self) -> OpResult
     {
+        let was_generator = self.top_frame.generator;
         let old_frame = self.frames.pop().ok_or_else(|| minierr("error: attempted to return from global code; use exit() instead"))?;
         
         let inner_frame_stack_last = self.stack_pop();
         let frame_was_expr = self.top_frame.isexpr;
         self.top_frame = old_frame;
-        // exit implies no pushed variable. if the outside expects a value, push it
+        
         if frame_was_expr
         {
             let val = inner_frame_stack_last.ok_or_else(|| minierr("error: RETURN instruction needed a value remaining on the inner frame's stack, but there were none"))?;
             self.stack_push(val);
+        }
+        if was_generator
+        {
+            self.stack_push_val(Value::Generator(GeneratorState{frame : None}));
+            if !frame_was_expr
+            {
+                return plainerr("internal error: generators must always return into an expression");
+            }
+        }
+        Ok(())
+    }
+    pub (crate) fn sim_YIELD(&mut self) -> OpResult
+    {
+        if !self.top_frame.generator
+        {
+            return plainerr("error: tried to yield in non-generator function; use return instead");
+        }
+        
+        let frame_was_expr = self.top_frame.isexpr;
+        let mut old_frame = self.frames.pop().ok_or_else(|| minierr("error: attempted to return from global code; use exit() instead"))?;
+        
+        let inner_frame_stack_last = self.stack_pop();
+        std::mem::swap(&mut self.top_frame, &mut old_frame);
+        let new_gen_state = GeneratorState{frame : Some(old_frame)};
+        
+        if frame_was_expr
+        {
+            let val = inner_frame_stack_last.ok_or_else(|| minierr("error: YIELD instruction needed a value remaining on the inner frame's stack, but there were none"))?;
+            self.stack_push(val);
+            self.stack_push_val(Value::Generator(new_gen_state));
+        }
+        else
+        {
+            return plainerr("internal error: generators must always return into an expression");
         }
         Ok(())
     }

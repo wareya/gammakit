@@ -297,6 +297,7 @@ pub (crate) fn value_truthy(imm : &Value) -> bool
     match imm
     {
         Value::Number(value) => float_booly(*value),
+        Value::Generator(gen_state) => gen_state.frame.is_some(),
         _ => true
     }
 }

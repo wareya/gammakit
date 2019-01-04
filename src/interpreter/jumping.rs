@@ -4,6 +4,10 @@ impl Interpreter
 {
     pub (crate) fn jump_to_function(&mut self, function : &FuncSpec, mut args : Vec<Value>, isexpr : bool, funcdata : &FuncVal) -> OpResult
     {
+        if function.generator
+        {
+            return plainerr("internal error: can't use jump_to_function on a generator");
+        }
         if function.varnames.len() > args.len()
         {
             return plainerr("error: did not provide enough arguments to function");
@@ -13,7 +17,7 @@ impl Interpreter
             return plainerr("error: provided too many arguments to function");
         }
         
-        let mut frameswapper = Frame::new_from_call(Rc::clone(&function.code), function.startaddr, function.endaddr, isexpr, function.impassable);
+        let mut frameswapper = Frame::new_from_call(Rc::clone(&function.code), function.startaddr, function.endaddr, isexpr, function.impassable, false);
         std::mem::swap(&mut frameswapper, &mut self.top_frame);
         self.frames.push(frameswapper);
         
@@ -35,6 +39,13 @@ impl Interpreter
             let arg = args.pop().ok_or_else(|| minierr("internal error: list of arguments to provide to function was shorter than list of argument names (this error should be unreachable!)"))?;
             scope.insert(varname.clone(), arg);
         }
+        
+        Ok(())
+    }
+    pub (crate) fn jump_to_generator_state(&mut self, mut new_frame : Frame) -> OpResult
+    {
+        std::mem::swap(&mut new_frame, &mut self.top_frame);
+        self.frames.push(new_frame);
         
         Ok(())
     }
@@ -62,10 +73,40 @@ impl Interpreter
         }
         else
         {
-            let definition = funcdata.userdefdata.clone();
-            let defdata = definition.ok_or_else(|| minierr("internal error: called a function that was not internal but didn't have definition data"))?;
+            let defdata = funcdata.userdefdata.as_ref().ok_or_else(|| minierr("internal error: called a function that was not internal but didn't have definition data"))?;
             
-            if !defdata.fromobj
+            if defdata.generator
+            {
+                if isexpr
+                {
+                    // mostly copy pasted from jump_to_function... but didn't want to make jump_to_function even more complicated.
+                    // make a new function for constructing a function's first frame?
+                    if defdata.varnames.len() > args.len()
+                    {
+                        return plainerr("error: did not provide enough arguments to function");
+                    }
+                    if defdata.varnames.len() < args.len()
+                    {
+                        return plainerr("error: provided too many arguments to function");
+                    }
+                    let mut new_frame = Frame::new_from_call(Rc::clone(&defdata.code), defdata.startaddr, defdata.endaddr, true, true, true);
+                    
+                    let scope = new_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: no scope in top frame despite just making it in jump_to_function (this error should be unreachable!)"))?;
+                    if let Some(ref name) = funcdata.name
+                    {
+                        scope.insert(name.clone(), Value::Func(Box::new(funcdata.clone())));
+                    }
+                    let mut args = args.clone();
+                    for varname in &defdata.varnames
+                    {
+                        let arg = args.pop().ok_or_else(|| minierr("internal error: list of arguments to provide to function was shorter than list of argument names (this error should be unreachable!)"))?;
+                        scope.insert(varname.clone(), arg);
+                    }
+                    
+                    self.stack_push_val(Value::Generator(GeneratorState{frame: Some(new_frame)}));
+                }
+            }
+            else if !defdata.fromobj
             {
                 self.jump_to_function(&defdata, args, isexpr, &funcdata)?;
                 return Ok(());

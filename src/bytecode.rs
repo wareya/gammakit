@@ -71,6 +71,7 @@ pub (crate) const PUSHNAME : u8 = 0x14;
 pub (crate) const BINOP : u8 = 0x20;
 pub (crate) const UNOP : u8 = 0x21;
 pub (crate) const FUNCEXPR : u8 = 0x22;
+pub (crate) const INVOKEEXPR : u8 = 0x28;
 
 pub (crate) const DECLVAR : u8 = 0x30;
 pub (crate) const DECLFAR : u8 = 0x31;
@@ -79,6 +80,9 @@ pub (crate) const DECLGLOBALVAR : u8 = 0x32;
 pub (crate) const BINSTATE : u8 = 0x40;
 pub (crate) const UNSTATE : u8 = 0x41;
 pub (crate) const FUNCCALL : u8 = 0x42;
+pub (crate) const INVOKECALL : u8 = 0x48;
+
+pub (crate) const INVOKE : u8 = 0x50;
 
 pub (crate) const SCOPE : u8 = 0x60;
 pub (crate) const UNSCOPE : u8 = 0x61;
@@ -104,9 +108,11 @@ pub (crate) const LAMBDA : u8 = 0xB1;
 pub (crate) const OBJDEF : u8 = 0xB2;
 pub (crate) const GLOBALFUNCDEF : u8 = 0xB3;
 pub (crate) const SUBFUNCDEF : u8 = 0xB4;
+pub (crate) const GENERATORDEF : u8 = 0xB5;
 
 pub (crate) const EXIT : u8 = 0xF0;
 pub (crate) const RETURN : u8 = 0xF1;
+pub (crate) const YIELD : u8 = 0xF2;
 pub (crate) const LINENUM : u8 = 0xF8;
 
 

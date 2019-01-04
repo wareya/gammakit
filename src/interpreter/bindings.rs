@@ -233,7 +233,10 @@ impl Interpreter
             return plainerr("error: unsupported: tried to use instance_execute() with an internal function");
         }
         let defdata = func.userdefdata.as_ref().ok_or_else(|| minierr("internal error: funcval was non-internal but had no userdefdata"))?;
-        
+        if defdata.generator
+        {
+            return plainerr("error: cannot use instance_execute with a generator");
+        }
         self.global.instances.get_mut(&instance_id).ok_or_else(|| format!("error: tried to execute function with instance {} that doesn't exist", instance_id))?;
         
         self.jump_to_function(defdata, args.into_iter().rev().collect(), isexpr, &func)?;
@@ -285,6 +288,7 @@ impl Interpreter
               parentobj : 0,
               forcecontext : 0,
               impassable : true,
+              generator : false,
             }
             )), false)
         )
@@ -320,7 +324,8 @@ impl Interpreter
               fromobj : false,
               parentobj : 0,
               forcecontext : 0,
-              impassable : true
+              impassable : true,
+              generator : false,
             }
             )), false)
         )

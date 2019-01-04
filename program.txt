@@ -320,3 +320,20 @@ for(val in myarray)
     print(val);
 }
 */
+
+print("generator tests below:");
+
+generator test()
+{
+    yield 10;
+    yield 9;
+    yield 8;
+    yield 7;
+}
+
+var test_state = test();
+
+while(test_state)
+    print(invoke test_state);
+
+print("generator tests end here");

@@ -18,6 +18,8 @@ pub (crate) struct ControlData {
     pub (super) scopes: u16,
     pub (super) other: Option<VecDeque<usize>> // in with(), a list of instance IDs
 }
+#[derive(Debug)]
+#[derive(Clone)]
 pub (crate) struct Frame {
     pub (super) code: Rc<Vec<u8>>,
     pub (super) startpc: usize,
@@ -31,6 +33,7 @@ pub (crate) struct Frame {
     pub (super) isexpr: bool,
     pub (super) currline: usize,
     pub (super) impassable: bool,
+    pub (super) generator: bool,
 }
 
 // inaccessible types
@@ -46,6 +49,7 @@ pub (crate) struct FuncSpec {
     pub (super) parentobj: usize,
     pub (super) forcecontext: usize,
     pub (super) impassable: bool,
+    pub (super) generator: bool,
 }
 pub (crate) struct ObjSpec {
     #[allow(unused)]
@@ -124,6 +128,13 @@ pub struct FuncVal {
     pub (super) userdefdata: Option<FuncSpec>
 }
 
+// value types
+#[derive(Debug)]
+#[derive(Clone)]
+pub struct GeneratorState {
+    pub (super) frame: Option<Frame>, // stores code, pc, and stacks; becomes None after the generator returns/finalizes or exits through its bottom
+}
+
 #[derive(Debug)]
 #[derive(Clone)]
 pub enum Special {
@@ -137,6 +148,7 @@ pub enum Value {
     Array(VecDeque<Value>),
     Dict(HashMap<HashableValue, Value>),
     Func(Box<FuncVal>),
+    Generator(GeneratorState),
     Special(Special),
 }
 #[derive(Debug)]
@@ -159,11 +171,11 @@ impl Frame {
     pub (super) fn new_root(code : Rc<Vec<u8>>) -> Frame
     {
         let codelen = code.len();
-        Frame { code, startpc : 0, pc : 0, endpc : codelen, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0, impassable: true }
+        Frame { code, startpc : 0, pc : 0, endpc : codelen, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0, impassable: true, generator: false }
     }
-    pub (super) fn new_from_call(code : Rc<Vec<u8>>, startpc : usize, endpc : usize, isexpr : bool, impassable : bool) -> Frame
+    pub (super) fn new_from_call(code : Rc<Vec<u8>>, startpc : usize, endpc : usize, isexpr : bool, impassable : bool, generator : bool) -> Frame
     {
-        Frame { code, startpc, pc : startpc, endpc, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, impassable }
+        Frame { code, startpc, pc : startpc, endpc, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, impassable, generator }
     }
     pub (super) fn len(&mut self) -> usize
     {

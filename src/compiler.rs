@@ -70,7 +70,7 @@ fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
                 code.extend(block);
             }   
         }
-        else if matches!(ast.child(0)?.text.as_str(), "declaration" | "funccall" | "funcexpr" | "funcdef" | "objdef")
+        else if matches!(ast.child(0)?.text.as_str(), "declaration" | "funccall" | "funcexpr" | "funcdef" | "objdef" | "invocation_call" )
         {
             code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
         }
@@ -88,7 +88,7 @@ fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
             {
                 code.push(CONTINUE);
             }
-            else if ast.child(0)?.child(0)?.text == "return"
+            else if matches!(ast.child(0)?.child(0)?.text.as_str(), "return" | "yield")
             {
                 if ast.child(0)?.children.len() == 2
                 {
@@ -103,7 +103,18 @@ fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
                 {
                     return plainerr("internal error: broken return instruction");
                 }
-                code.push(RETURN);
+                if ast.child(0)?.child(0)?.text == "return"
+                {
+                    code.push(RETURN);
+                }
+                else if ast.child(0)?.child(0)?.text == "yield"
+                {
+                    code.push(YIELD);
+                }
+                else
+                {
+                    return plainerr("internal error: broken logic in compiling return/yield AST node");
+                }
             }
             else
             {
@@ -515,12 +526,11 @@ fn compile_rvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Resu
 fn compile_funcdef(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), String>
 {
     let kind = ast.child(0)?.child(0)?;
-    if !matches!(kind.text.as_str(), "def" | "globaldef" | "subdef")
+    if !matches!(kind.text.as_str(), "def" | "globaldef" | "subdef" | "generator")
     {
-        return plainerr("error: first token of fundef must be the text \"def\", \"globaldef\", or \"subdef\"");
+        return plainerr("error: first token of funcdef must be \"def\" | \"globaldef\" | \"subdef\" | \"generator\"");
     }
-    let is_global = kind.text == "globaldef";
-    let is_subroutine = kind.text == "subdef";
+    let kind = &kind.text;
     let name = &ast.child(1)?.child(0)?.text;
     
     let mut args = Vec::<&ASTNode>::new();
@@ -557,13 +567,17 @@ fn compile_funcdef(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> 
     }
     body.push(EXIT);
     
-    if is_global
+    if kind == "globaldef"
     {
         code.push(GLOBALFUNCDEF);
     }
-    else if is_subroutine
+    else if kind == "subdef"
     {
         code.push(SUBFUNCDEF);
+    }
+    else if kind == "generator"
+    {
+        code.push(GENERATORDEF);
     }
     else
     {
@@ -749,6 +763,32 @@ fn compile_lhunop(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Re
     
     Ok(())
 }
+fn compile_invocation_call(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    if ast.children.len() != 2
+    {
+        return plainerr("error: invocation must have exactly two children");
+    }
+    
+    code.extend(compile_astnode(ast.child(1)?, scopedepth)?);
+    code.push(INVOKE);
+    code.push(INVOKECALL);
+    
+    Ok(())
+}
+fn compile_invocation_expr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    if ast.children.len() != 2
+    {
+        return plainerr("error: invocation must have exactly two children");
+    }
+    
+    code.extend(compile_astnode(ast.child(1)?, scopedepth)?);
+    code.push(INVOKE);
+    code.push(INVOKEEXPR);
+    
+    Ok(())
+}
 fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String>
 {
     if !ast.isparent
@@ -822,6 +862,10 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
                     compile_indirection(ast, &mut code, scopedepth)?,
                 "lhunop" =>
                     compile_lhunop(ast, &mut code, scopedepth)?,
+                "invocation_call" =>
+                    compile_invocation_call(ast, &mut code, scopedepth)?,
+                "invocation_expr" =>
+                    compile_invocation_expr(ast, &mut code, scopedepth)?,
                 _ =>
                     plainerr("internal error: unhandled ast node type in compiler")?,
             }

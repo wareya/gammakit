@@ -100,7 +100,7 @@ impl Interpreter
         let res = std::str::from_utf8(&bytes).or_else(|_| plainerr("error: tried to decode a string that was not utf-8"))?;
         Ok(res.to_string())
     }
-    pub (crate) fn read_function(&mut self, subroutine : bool) -> Result<(String, FuncSpec), String>
+    pub (crate) fn read_function(&mut self, subroutine : bool, generator : bool) -> Result<(String, FuncSpec), String>
     {
         let code = self.get_code();
         
@@ -119,7 +119,7 @@ impl Interpreter
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        Ok((name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : !subroutine }))
+        Ok((name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : !subroutine, generator }))
     }
     
     pub (crate) fn read_lambda(&mut self) -> Result<(HashMap<String, Value>, FuncSpec), String>
@@ -159,7 +159,7 @@ impl Interpreter
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        Ok((captures, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : true }))
+        Ok((captures, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : true, generator : false }))
     }
     
     pub (crate) fn stack_pop_number(&mut self) -> Option<f64>

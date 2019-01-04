@@ -73,6 +73,7 @@ pub struct Interpreter {
     doexit: bool,
     // TODO: look into how to avoid this and why I don't need it for while loops
     suppress_for_expr_end: bool,
+    // TODO: move to GlobalState?
     internal_functions: HashMap<String, Rc<InternalFunction>>,
     internal_functions_noreturn: HashSet<String>,
     global: GlobalState,

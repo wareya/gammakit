@@ -66,7 +66,6 @@ TODO:
 - sets (syntax " set { } | set { $expr$..., $unusedcomma$? } " compared to dict syntax of " { } | { $dictval$..., $unusedcomma$? } ")
 - some way to add and remove elements from arrays/dicts/sets (| and ^ maybe)
 - foreach with syntax " for ( $name$ in $expr$ ) $block$ " operating on arrays, dicts, strings, and maybe object IDs
-- add real generators, friendly with what non-programmers expect "script" to mean (e.g. an AI script, VN script, etc - changing state, returning, later coming back to where returned from)
 
 TODO (sanitation/low-priority):
 - make keys() iterate over dict keys in insertion order

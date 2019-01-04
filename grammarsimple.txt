@@ -56,8 +56,12 @@ $number$
 $string$
 $name$
 
+invocation_expr:
+invoke $lvar$
+
 simplexpr:
 ( $expr$ )
+$invocation_expr$
 $lambda$
 $arraybody$
 $dictbody$
@@ -120,6 +124,9 @@ binop_3:
 / \l 3
 % \l 3
 
+invocation_call:
+invoke $lvar$
+
 statement:
 { $statement$* }
 $string$ ;
@@ -131,6 +138,7 @@ $objdef$
 $lvar$ $binstateop$ $expr$ ;
 $instruction$ ;
 $funccall$ ;
+$invocation_call$ ;
 
 objdef:
 obj $name$ { $funcdef$* }
@@ -140,6 +148,8 @@ break
 continue
 return $expr$
 return
+yield $expr$
+yield
 
 condition:
 $ifcondition$
@@ -179,6 +189,7 @@ funcdeftoken:
 def
 subdef
 globaldef
+generator
 
 funcdef:
 $funcdeftoken$ $name$ ( ) { $statement$* }
