@@ -175,13 +175,14 @@ globalvar $declname$...,
 declname:
 $name$ >>? = $expr$
 
+funcdeftoken:
+def
+subdef
+globaldef
+
 funcdef:
-def $name$ ( ) { $statement$* }
-def $name$ ( $name$..., ) { $statement$* }
-subdef $name$ ( ) { $statement$* }
-subdef $name$ ( $name$..., ) { $statement$* }
-globaldef $name$ ( ) { $statement$* }
-globaldef $name$ ( $name$..., ) { $statement$* }
+$funcdeftoken$ $name$ ( ) { $statement$* }
+$funcdeftoken$ $name$ ( $name$..., ) { $statement$* }
 
 binstateop:
 =

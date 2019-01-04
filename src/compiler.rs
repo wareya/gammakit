@@ -514,8 +514,8 @@ fn compile_rvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Resu
 }
 fn compile_funcdef(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), String>
 {
-    let kind = ast.child(0)?;
-    if kind.isparent || !matches!(kind.text.as_str(), "def" | "globaldef" | "subdef")
+    let kind = ast.child(0)?.child(0)?;
+    if !matches!(kind.text.as_str(), "def" | "globaldef" | "subdef")
     {
         return plainerr("error: first token of fundef must be the text \"def\", \"globaldef\", or \"subdef\"");
     }

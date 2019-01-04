@@ -63,9 +63,9 @@ instance_add_variable (novelty)
 "global" is a fake/fixed/read-only variable that stores global variables. Global functions are accessed as if they were in the current scope, but can be shadowed by local functions.
 
 TODO:
-- sets (syntax " set { } | set { $expr$..., $unusedcomma$? } " compared to dict syntax of " { } | { $dictval$..., $unusedcomma$? } " )
+- sets (syntax " set { } | set { $expr$..., $unusedcomma$? } " compared to dict syntax of " { } | { $dictval$..., $unusedcomma$? } ")
 - some way to add and remove elements from arrays/dicts/sets (| and ^ maybe)
-- foreach with syntax for ( $name$ in $expr$ ) $block$ operating on arrays, dicts, strings, and maybe object IDs
+- foreach with syntax " for ( $name$ in $expr$ ) $block$ " operating on arrays, dicts, strings, and maybe object IDs
 - add real generators, friendly with what non-programmers expect "script" to mean (e.g. an AI script, VN script, etc - changing state, returning, later coming back to where returned from)
 
 TODO (sanitation/low-priority):
@@ -76,7 +76,7 @@ TODO (sanitation/low-priority):
 
 MAYBE:
 - real structs, copied by value like arrays/dicts are (if you don't want them copied by value just use objects/instances)
--- maybe just give .attr access syntax to dictionaries? (like js) (maybe use another symbol like -> or : or / so it doesn't have to decide)
+-- maybe just give .attr access syntax to dictionaries? (like js) (maybe use another symbol like -> or : or / so it doesn't have to decide?)
 
 MAYBE (metaprogramming):
 - give the runtime control over interpreters of its own; runtime panics will invalidate interpreters
