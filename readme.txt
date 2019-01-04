@@ -60,7 +60,7 @@ instance_execute (returns a value, unlike with())
 instance_create
 instance_add_variable (novelty)
 
-"global" is a fake/fixed/read-only variable that stores global variables. Global functions are accessed as if they were in the current scope, but can be shadowed by local functions.
+"global" is a fake/fixed/read-only variable that stores global variables (e.g. global.players). Global functions are accessed as if they were in the current scope, but can be shadowed by local functions.
 
 TODO:
 - sets (syntax " set { } | set { $expr$..., $unusedcomma$? } " compared to dict syntax of " { } | { $dictval$..., $unusedcomma$? } ")
