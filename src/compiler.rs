@@ -209,25 +209,22 @@ fn compile_block(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Res
 
 fn compile_ifcondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
-    let expr = compile_astnode(ast.child(1)?, scopedepth)?;
+    code.extend(compile_astnode(ast.child(1)?, scopedepth)?);
+    
     let block = compile_astnode(ast.child(2)?, scopedepth)?;
     
     if ast.children.len() == 3
     {
         code.push(IF);
-        code.extend(pack_u64(expr.len() as u64));
         code.extend(pack_u64(block.len() as u64));
-        code.extend(expr);
         code.extend(block);
     }
     else if ast.children.len() == 5 && ast.child(3)?.text == "else"
     {
         let block2 = compile_astnode(ast.child(4)?, scopedepth)?;
         code.push(IFELSE);
-        code.extend(pack_u64(expr.len() as u64));
         code.extend(pack_u64(block.len() as u64));
         code.extend(pack_u64(block2.len() as u64));
-        code.extend(expr);
         code.extend(block);
         code.extend(block2);
     }

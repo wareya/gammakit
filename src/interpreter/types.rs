@@ -12,21 +12,13 @@ pub (crate) use self::ops::*;
 
 #[derive(Debug)]
 #[derive(Clone)]
-pub (crate) struct IfData {
-    pub (super) scopes: u16,
-    pub (super) expr_end: usize,
-    pub (super) if_end: usize,
-}
-
-#[derive(Debug)]
-#[derive(Clone)]
 pub (crate) struct IfElseData {
     pub (super) scopes: u16,
-    pub (super) expr_end: usize,
     pub (super) if_end: usize,
     pub (super) else_end: usize,
 }
 
+// note: for loops are controlled the same way as while loops
 #[derive(Debug)]
 #[derive(Clone)]
 pub (crate) struct WhileData {
@@ -58,7 +50,6 @@ pub (crate) struct ForEachData {
 #[derive(Debug)]
 #[derive(Clone)]
 pub (crate) enum Controller {
-    If(IfData),
     IfElse(IfElseData),
     While(WhileData),
     With(WithData),

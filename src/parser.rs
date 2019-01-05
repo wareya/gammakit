@@ -675,7 +675,6 @@ impl Parser {
                     ast.children.remove(5); // )
                     ast.children.remove(3); // "in"
                     ast.children.remove(1); // (
-                    println!("simplified foreach");
                 }
                 _ => {}
             }

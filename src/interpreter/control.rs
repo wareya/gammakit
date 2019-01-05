@@ -26,43 +26,13 @@ impl Interpreter {
     }
     fn handle_ifelse_flow(&mut self, data : &IfElseData, put_controller_back : &mut bool) -> Result<(), String>
     {
-        // if we are at the end of the expression, test it, jump to the "else" block if it's false
-        if self.get_pc() == data.expr_end
-        {
-            let testval = self.stack_pop_val().ok_or_else(|| minierr("internal error: failed to find value on stack while handling IFELSE controller"))?;
-            if !value_truthy(&testval)
-            {
-                self.set_pc(data.if_end);
-            }
-        }
         // end of the main block, jump to the end of the "else" block
-        else if self.get_pc() == data.if_end
+        if self.get_pc() == data.if_end
         {
             
             self.set_pc(data.else_end);
             self.drain_scopes(data.scopes);
             *put_controller_back = false;
-        }
-        // end of the "else" block, clean up
-        else if self.get_pc() == data.else_end
-        {
-            self.drain_scopes(data.scopes);
-            *put_controller_back = false;
-        }
-        Ok(())
-    }
-    fn handle_if_flow(&mut self, data : &IfData, put_controller_back : &mut bool) -> Result<(), String>
-    {
-        // if we are at the end of the expression, test it, jump past the block if it's false
-        if self.get_pc() == data.expr_end
-        {
-            let testval = self.stack_pop_val().ok_or_else(|| minierr("internal error: failed to find value on stack while handling IF controller"))?;
-            if !value_truthy(&testval)
-            {
-                self.set_pc(data.if_end);
-                self.drain_scopes(data.scopes);
-                *put_controller_back = false;
-            }
         }
         Ok(())
     }
@@ -122,7 +92,6 @@ impl Interpreter {
             
             match controller
             {
-                Controller::If(ref controller)          => self.handle_if_flow(&controller, &mut put_controller_back)?,
                 Controller::IfElse(ref controller)      => self.handle_ifelse_flow(&controller, &mut put_controller_back)?,
                 Controller::While(ref controller)       => self.handle_while_flow(&controller, &mut put_controller_back)?,
                 Controller::With(ref mut controller)    => self.handle_with_flow(controller, &mut put_controller_back)?,

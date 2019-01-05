@@ -298,28 +298,41 @@ impl Interpreter
     }
     pub (crate) fn sim_IF(&mut self) -> OpResult
     {
-        let exprlen = self.read_usize()?;
+        if self.stack_len() < 1
+        {
+            return plainerr("internal error: IF instruction requires 1 values on the stack but found 0");
+        }
+        let testval = self.stack_pop_val().ok_or_else(|| minierr("internal error: failed to find value on stack while handling IF controller"))?;
         let codelen = self.read_usize()?;
-        let current_pc = self.get_pc();
-        self.top_frame.controlstack.push(Controller::If(IfData{
-            scopes : self.top_frame.scopes.len() as u16,
-            expr_end : current_pc+exprlen,
-            if_end : current_pc+exprlen+codelen
-        }));
+        if !value_truthy(&testval)
+        {
+            self.add_pc(codelen);
+        }
+        
         Ok(())
     }
     pub (crate) fn sim_IFELSE(&mut self) -> OpResult
     {
-        let exprlen = self.read_usize()?;
+        if self.stack_len() < 1
+        {
+            return plainerr("internal error: IFELSE instruction requires 1 values on the stack but found 0");
+        }
+        let testval = self.stack_pop_val().ok_or_else(|| minierr("internal error: failed to find value on stack while handling IF controller"))?;
         let codelen1 = self.read_usize()?;
         let codelen2 = self.read_usize()?;
         let current_pc = self.get_pc();
-        self.top_frame.controlstack.push(Controller::IfElse(IfElseData{
-            scopes : self.top_frame.scopes.len() as u16,
-            expr_end : current_pc+exprlen,
-            if_end : current_pc+exprlen+codelen1,
-            else_end : current_pc+exprlen+codelen1+codelen2
-        }));
+        if !value_truthy(&testval)
+        {
+            self.add_pc(codelen1);
+        }
+        else
+        {
+            self.top_frame.controlstack.push(Controller::IfElse(IfElseData{
+                scopes : self.top_frame.scopes.len() as u16,
+                if_end : current_pc+codelen1,
+                else_end : current_pc+codelen1+codelen2
+            }));
+        }
         Ok(())
     }
     pub (crate) fn sim_WHILE(&mut self) -> OpResult
