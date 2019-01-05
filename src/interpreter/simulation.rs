@@ -477,11 +477,11 @@ impl Interpreter
         Ok(())
     }
     
-    pub (crate) fn sim_SHORTCIRCUITIFTRUE(&mut self) -> OpResult
+    fn handle_short_circuit(&mut self, truthiness : bool) -> OpResult
     {
         if self.stack_len() < 1
         {
-            return Err(format!("internal error: SHORTCIRCUITIFTRUE instruction requires 1 values on the stack but found {}", self.stack_len()))
+            return Err(format!("internal error: short circuit instruction requires 1 values on the stack but found {}", self.stack_len()))
         }
         let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: left operand of binary logical operator was a value instead of a variable"))?;
         
@@ -489,7 +489,7 @@ impl Interpreter
         
         let truthy = value_truthy(&val);
         
-        if truthy
+        if truthy as bool == truthiness
         {
             self.add_pc(rel);
             self.stack_push_val(Value::Number(bool_floaty(truthy)));
@@ -500,29 +500,14 @@ impl Interpreter
         }
         Ok(())
     }
+    pub (crate) fn sim_SHORTCIRCUITIFTRUE(&mut self) -> OpResult
+    {
+        self.handle_short_circuit(true)
+    }
     
     pub (crate) fn sim_SHORTCIRCUITIFFALSE(&mut self) -> OpResult
     {
-        if self.stack_len() < 1
-        {
-            return Err(format!("internal error: SHORTCIRCUITIFTRUE instruction requires 1 values on the stack but found {}", self.stack_len()))
-        }
-        let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: left operand of binary logical operator was a value instead of a variable"))?;
-        
-        let rel = self.read_u64()?;
-        
-        let truthy = value_truthy(&val);
-        
-        if !truthy
-        {
-            self.add_pc(rel);
-            self.stack_push_val(Value::Number(bool_floaty(truthy)));
-        }
-        else
-        {
-            self.stack_push_val(val);
-        }
-        Ok(())
+        self.handle_short_circuit(false)
     }
     
     pub (crate) fn sim_UNOP(&mut self) -> OpResult
