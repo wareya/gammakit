@@ -225,3 +225,15 @@ lambdaargs:
 
 lambdabody:
 { $statement$* }
+
+switch:
+switch ( $expr$ ) { $switchcase$+ $switchdefault$? }
+
+switchcase:
+case $expr$..., : $nakedblock$
+
+switchdefault:
+default : $nakedblock$
+
+nakedblock:
+$statement$*

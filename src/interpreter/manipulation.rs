@@ -169,27 +169,15 @@ impl Interpreter
     
     pub (crate) fn stack_pop_number(&mut self) -> Option<f64>
     {
-        if let Some(Value::Number(val)) = self.stack_pop_val()
-        {
-            return Some(val);
-        }
-        None
+        match_or_none!(self.stack_pop_val(), Some(Value::Number(val)) => val)
     }
     pub (crate) fn stack_pop_text(&mut self) -> Option<String>
     {
-        if let Some(Value::Text(val)) = self.stack_pop_val()
-        {
-            return Some(val);
-        }
-        None
+        match_or_none!(self.stack_pop_val(), Some(Value::Text(val)) => val)
     }
     pub (crate) fn stack_pop_name(&mut self) -> Option<String>
     {
-        if let Some(Variable::Direct(DirectVar{name:text})) = self.stack_pop_var()
-        {
-            return Some(text);
-        }
-        None
+        match_or_none!(self.stack_pop_var(), Some(Variable::Direct(DirectVar{name:text})) => text)
     }
     
     pub (crate) fn drain_scopes(&mut self, desired_depth : u16)

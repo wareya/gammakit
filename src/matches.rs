@@ -8,13 +8,23 @@ macro_rules! matches { ( $x:expr , $( $p:pat )|+ ) =>
     }
 } }
 
-    
+
 macro_rules! match_or_err { ( $expr:expr, $as:pat => $ok:expr, $err:expr ) =>
 {
     match $expr
     {
         $as => Ok($ok),
         _ => Err($err)
+    }
+} }
+
+
+macro_rules! match_or_none { ( $expr:expr, $as:pat => $ok:expr ) =>
+{
+    match $expr
+    {
+        $as => Some($ok),
+        _ => None
     }
 } }
 

@@ -50,6 +50,7 @@ impl RegexHolder {
         {
             let regex = regex.as_ref().ok()?;
             let my_match = regex.find_at(text, start)?;
+            
             if my_match.start() == start
             {
                 return Some(my_match.as_str().to_string());

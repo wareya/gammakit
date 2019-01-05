@@ -221,19 +221,11 @@ impl Frame {
     }
     pub (super) fn pop_val(&mut self) -> Option<Value>
     {
-        if let Some(StackValue::Val(r)) = self.stack.pop()
-        {
-            return Some(r);
-        }
-        None
+        match_or_none!(self.stack.pop(), Some(StackValue::Val(r)) => r)
     }
     pub (super) fn pop_var(&mut self) -> Option<Variable>
     {
-        if let Some(StackValue::Var(r)) = self.stack.pop()
-        {
-            return Some(r);
-        }
-        None
+        match_or_none!(self.stack.pop(), Some(StackValue::Var(r)) => r)
     }
     pub (super) fn pop(&mut self) -> Option<StackValue>
     {

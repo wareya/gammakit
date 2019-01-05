@@ -95,11 +95,7 @@ impl Interpreter
     }
     pub (crate) fn get_internal_function(&self, name : &str) -> Option<Rc<InternalFunction>>
     {
-        match self.internal_functions.get(name)
-        {
-            Some(f) => Some(Rc::clone(f)),
-            None => None
-        }
+        match_or_none!(self.internal_functions.get(name), Some(f) => Rc::clone(f))
     }
     pub (crate) fn internal_function_is_noreturn(&mut self, name : &str) -> bool
     {
