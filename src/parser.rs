@@ -663,8 +663,19 @@ impl Parser {
                     {
                         return plainerr("internal error: if/while/with loop doesn't have at least 5 children (this includes its parens) (it should have a token, paren, expr, paren, block)");
                     }
-                    ast.children.remove(3);
-                    ast.children.remove(1);
+                    ast.children.remove(3); // )
+                    ast.children.remove(1); // (
+                }
+                "foreach" =>
+                {
+                    if ast.children.len() != 7
+                    {
+                        return plainerr("internal error: foreach loop doesn't have exactly 7 children (this includes its parens) (it should have a token, paren, expr, paren, block)");
+                    }
+                    ast.children.remove(5); // )
+                    ast.children.remove(3); // "in"
+                    ast.children.remove(1); // (
+                    println!("simplified foreach");
                 }
                 _ => {}
             }

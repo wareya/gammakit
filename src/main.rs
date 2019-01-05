@@ -22,68 +22,58 @@ use crate::compiler::*;
 use crate::disassembler::*;
 use crate::interpreter::*;
 
-fn main() -> std::io::Result<()>
+fn main() -> Result<(), String>
 {
-    let mut file = File::open("grammarsimple.txt")?;
+    let mut file = File::open("grammarsimple.txt").or_else(|_| Err("failed to open grammar".to_string()))?;
     let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
+    file.read_to_string(&mut contents).or_else(|_| Err("failed to read grammar into memory".to_string()))?;
     
     let mut parser = Parser::new();
-    if parser.init(&contents).is_ok()
+    parser.init(&contents)?;
+
+    let mut file2 = File::open("program.txt").or_else(|_| Err("failed to open program".to_string()))?;
+    let mut contents2 = String::new();
+    file2.read_to_string(&mut contents2).or_else(|_| Err("failed to read program into memory".to_string()))?;
+    
+    let program_lines : Vec<String> = contents2.lines().map(|x| x.to_string()).collect();
+    
+    let tokens = parser.tokenize(&program_lines, false)?;
+    
+    let ast = parser.parse_program(&tokens, &program_lines, false)?.ok_or_else(|| "failed to parse program".to_string())?;
+    
+    let code = compile_bytecode(&ast)?;
+    
+    if false
     {
-        let mut file2 = File::open("program.txt")?;
-        let mut contents2 = String::new();
-        file2.read_to_string(&mut contents2)?;
-        
-        let program_lines : Vec<String> = contents2.lines().map(|x| x.to_string()).collect();
-        
-        if let Ok(tokens) = parser.tokenize(&program_lines, false)
+        if let Ok(disassembly) = disassemble_bytecode(&code, 0, 0)
         {
-            if let Ok(Some(ref ast)) = parser.parse_program(&tokens, &program_lines, false)
+            for line in disassembly
             {
-                let code = compile_bytecode(ast);
-                
-                if let Ok(code) = code
-                {
-                    if false
-                    {
-                        if let Ok(disassembly) = disassemble_bytecode(&code, 0, 0)
-                        {
-                            for line in disassembly
-                            {
-                                println!("{}", line);
-                            }
-                        }
-                    }
-                    
-                    let code = Rc::new(code);
-                    
-                    let mut interpreter = Interpreter::new(&code, Some(parser));
-                    interpreter.insert_default_internal_functions();
-                    
-                    while interpreter.step().is_ok(){}
-                    
-                    if let Some(err) = &interpreter.last_error
-                    {
-                        println!("{}", err);
-                    }
-                    
-                    interpreter.clear_global_state().unwrap_or(());
-                    interpreter.restart(&code).unwrap_or(());
-                    
-                    while interpreter.step().is_ok(){}
-                    
-                    if let Some(err) = &interpreter.last_error
-                    {
-                        println!("{}", err);
-                    }
-                }
-                else if let Err(err) = code
-                {
-                    println!("{}", err);
-                }
+                println!("{}", line);
             }
         }
+    }
+    
+    let code = Rc::new(code);
+    
+    let mut interpreter = Interpreter::new(&code, Some(parser));
+    interpreter.insert_default_internal_functions();
+    
+    while interpreter.step().is_ok(){}
+    
+    if let Some(err) = &interpreter.last_error
+    {
+        println!("{}", err);
+    }
+    
+    interpreter.clear_global_state().unwrap_or(());
+    interpreter.restart(&code).unwrap_or(());
+    
+    while interpreter.step().is_ok(){}
+    
+    if let Some(err) = &interpreter.last_error
+    {
+        println!("{}", err);
     }
     
     Ok(())

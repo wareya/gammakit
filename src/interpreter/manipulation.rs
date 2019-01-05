@@ -74,8 +74,13 @@ impl Interpreter
     {
         list_pop_generic!(args, Dict)
     }
-    
-    pub (crate) fn read_u64(&mut self) -> Result<usize, String>
+    /*
+    pub (crate) fn read_u64(&mut self) -> Result<u64, String>
+    {
+        Ok(unpack_u64(&self.pull_from_code(8)?)? as u64)
+    }
+    */
+    pub (crate) fn read_usize(&mut self) -> Result<usize, String>
     {
         Ok(unpack_u64(&self.pull_from_code(8)?)? as usize)
     }
@@ -199,7 +204,7 @@ impl Interpreter
     {
         while let Some(controller) = self.top_frame.controlstack.last()
         {
-            if matches!(controller.controltype, WHILE | FOR) // TODO: let WITH support break/continue
+            if matches!(controller, Controller::While(_)) // NOTE: the while controller also handles for loops // TODO: let WITH and FOREACH support break/continue
             {
                 break;
             }

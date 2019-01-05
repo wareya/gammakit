@@ -95,6 +95,7 @@ pub (crate) const IFELSE : u8 = 0x81;
 pub (crate) const WHILE : u8 = 0x82;
 pub (crate) const FOR : u8 = 0x83;
 pub (crate) const WITH : u8 = 0x84;
+pub (crate) const FOREACH : u8 = 0x85;
 
 pub (crate) const BREAK : u8 = 0x90;
 pub (crate) const CONTINUE : u8 = 0x91;

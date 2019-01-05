@@ -65,10 +65,9 @@ instance_add_variable (novelty)
 "global" is a fake/fixed/read-only variable that stores global variables (e.g. global.players). Global functions are accessed as if they were in the current scope, but can be shadowed by local functions.
 
 TODO:
-- switch statement ("match"? implicit break. "case x, y:"?) with no fallthrough
+- switch statement ("match"? "case x, y:"?) with no fallthrough
 - sets (syntax " set { } | set { $expr$..., $unusedcomma$? } " compared to dict syntax of " { } | { $dictval$..., $unusedcomma$? } ")
 - some way to add and remove elements from arrays/dicts/sets (and some way to do so without cloning and overwriting them?)
-- foreach with syntax " for ( $name$ in $expr$ ) $block$ " operating on arrays, dicts, strings, and maybe object IDs
 
 TODO (sanitation/low-priority):
 - make keys() iterate over dict keys in insertion order

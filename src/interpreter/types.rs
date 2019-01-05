@@ -12,12 +12,59 @@ pub (crate) use self::ops::*;
 
 #[derive(Debug)]
 #[derive(Clone)]
-pub (crate) struct ControlData {
-    pub (super) controltype: u8,
-    pub (super) controlpoints: Vec<usize>,
+pub (crate) struct IfData {
     pub (super) scopes: u16,
-    pub (super) other: Option<VecDeque<usize>> // in with(), a list of instance IDs
+    pub (super) expr_end: usize,
+    pub (super) if_end: usize,
 }
+
+#[derive(Debug)]
+#[derive(Clone)]
+pub (crate) struct IfElseData {
+    pub (super) scopes: u16,
+    pub (super) expr_end: usize,
+    pub (super) if_end: usize,
+    pub (super) else_end: usize,
+}
+
+#[derive(Debug)]
+#[derive(Clone)]
+pub (crate) struct WhileData {
+    pub (super) scopes: u16,
+    pub (super) expr_start: usize, // continue destination
+    pub (super) loop_start: usize,
+    pub (super) loop_end: usize, // continue from here
+}
+
+#[derive(Debug)]
+#[derive(Clone)]
+pub (crate) struct WithData {
+    pub (super) scopes: u16,
+    pub (super) loop_start: usize,
+    pub (super) loop_end: usize,
+    pub (super) instances: VecDeque<Value>,
+}
+
+#[derive(Debug)]
+#[derive(Clone)]
+pub (crate) struct ForEachData {
+    pub (super) scopes: u16,
+    pub (super) loop_start: usize,
+    pub (super) loop_end: usize,
+    pub (super) name: String,
+    pub (super) values: VecDeque<Value>,
+}
+
+#[derive(Debug)]
+#[derive(Clone)]
+pub (crate) enum Controller {
+    If(IfData),
+    IfElse(IfElseData),
+    While(WhileData),
+    With(WithData),
+    ForEach(ForEachData),
+}
+
 #[derive(Debug)]
 #[derive(Clone)]
 pub (crate) struct Frame {
@@ -28,7 +75,7 @@ pub (crate) struct Frame {
     pub (super) scopes: Vec<HashMap<String, Value>>,
     pub (super) scopestarts: Vec<usize>,
     pub (super) instancestack: Vec<usize>,
-    pub (super) controlstack: Vec<ControlData>,
+    pub (super) controlstack: Vec<Controller>,
     pub (super) stack: Vec<StackValue>,
     pub (super) isexpr: bool,
     pub (super) currline: usize,

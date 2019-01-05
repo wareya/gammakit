@@ -132,6 +132,7 @@ statement:
 $string$ ;
 $declaration$ ;
 $condition$
+$foreach$
 $withstatement$
 $funcdef$
 $objdef$
@@ -170,6 +171,9 @@ $funccall$
 
 forcondition:
 for ( $barestatement$? ; $expr$? ; $barestatement$? ) $block$
+
+foreach:
+for ( $name$ in $expr$ ) $block$
 
 ifcondition:
 if ( $expr$ ) $block$ >>? else $block$

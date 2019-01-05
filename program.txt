@@ -1,3 +1,9 @@
+while (1)
+{
+    print("this loop isn't broken");
+    break;
+}
+
 obj Ab
 {
 
@@ -287,6 +293,8 @@ var scope_test;
 scope_test(5);
 scope_test(0);
 
+print("global behavior tests:");
+
 globalvar x;
 
 print(global.x);
@@ -305,6 +313,8 @@ def call_testfunc()
 
 call_testfunc();
 
+print("subroutine-like function tests:");
+
 subdef getarray()
 {
     print(myarray);
@@ -313,15 +323,7 @@ subdef getarray()
 
 print(getarray()[0]);
 
-/*
-// TODO
-for(val in myarray)
-{
-    print(val);
-}
-*/
-
-print("generator tests below:");
+print("generator tests:");
 
 generator test(i)
 {
@@ -338,9 +340,6 @@ var test_state = test(10);
 while(test_state)
     print(invoke test_state);
 
-print("generator tests end here");
-
-
 // binary logical operator short-circuiting
 
 def runs_only_once(x)
@@ -354,14 +353,34 @@ if(runs_only_once(0) && runs_only_once(0)){}
 print("short circuiting of \"or\":");
 if(runs_only_once(1) || runs_only_once(1)){}
 
-
 def runs_twice(x)
 {
     print("this runs twice!");
     return x;
 }
+
 print("lack of short circuiting of \"and\":");
 if(runs_twice(1) && runs_twice(1)){}
 
 print("lack of short circuiting of \"or\":");
 if(runs_twice(0) || runs_twice(0)){}
+
+// unicode support
+
+print("unicode support:");
+
+print("utf-8にも対応している");
+
+// foreach support
+
+var test_array = ["asdf", 0, ["test", 0]];
+var test_dict = {"asdf" : 1, 0 : "a"};
+
+for(thing in test_array)
+    print(thing);
+
+for(thing in test_dict)
+    print(thing);
+
+for(nothing in [])
+    print("oops! this shouldn't execute!");

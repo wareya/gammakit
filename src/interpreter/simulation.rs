@@ -47,6 +47,7 @@ impl Interpreter
             IFELSE => enbox!(sim_IFELSE),
             WHILE => enbox!(sim_WHILE),
             FOR => enbox!(sim_FOR),
+            FOREACH => enbox!(sim_FOREACH),
             SCOPE => enbox!(sim_SCOPE),
             UNSCOPE => enbox!(sim_UNSCOPE),
             WITH => enbox!(sim_WITH),
@@ -263,19 +264,16 @@ impl Interpreter
         self.pop_controlstack_until_loop();
         
         let controller = self.top_frame.controlstack.last().ok_or_else(|| minierr("error: break instruction not inside of loop"))?;
-    
-        let destination_index =
-        match controller.controltype
+        
+        let (scopes, destination) =
+        match controller
         {
-            WHILE => 2,
-            FOR => 3,
-            _ => return Err(format!("FIXME: unimplemented BREAK out from 0x{:02X} loop", controller.controltype))
+            Controller::While(data) => (data.scopes, data.loop_end),
+            _ => return plainerr("FIXME: unimplemented BREAK out from non-for/while loop")
         };
         
-        let destination_address = *controller.controlpoints.get(destination_index).ok_or_else(|| minierr("internal error: break instruction found invalid associated destination index"))?;
-        
-        self.drain_scopes(controller.scopes);
-        self.set_pc(destination_address);
+        self.drain_scopes(scopes);
+        self.set_pc(destination);
         self.top_frame.controlstack.pop();
         
         Ok(())
@@ -286,57 +284,124 @@ impl Interpreter
         
         let controller = self.top_frame.controlstack.last().ok_or_else(|| minierr("error: continue instruction not inside of loop"))?;
         
-        let destination_index =
-        match controller.controltype
+        let (scopes, destination) =
+        match controller
         {
-            WHILE => 0,
-            FOR => {self.suppress_for_expr_end = true; 1},
-            _ => return Err(format!("FIXME: unimplemented CONTINUE out from 0x{:02X} loop", controller.controltype))
+            Controller::While(data) => (data.scopes, data.expr_start),
+            _ => return plainerr("FIXME: unimplemented CONTINUE out from non for/while loop")
         };
         
-        let destination_address = *controller.controlpoints.get(destination_index).ok_or_else(|| minierr("internal error: continue instruction found invalid associated destination index"))?;
-        
-        self.drain_scopes(controller.scopes);
-        self.set_pc(destination_address);
+        self.drain_scopes(scopes);
+        self.set_pc(destination);
         
         Ok(())
     }
     pub (crate) fn sim_IF(&mut self) -> OpResult
     {
-        let exprlen = self.read_u64()?;
-        let codelen = self.read_u64()?;
+        let exprlen = self.read_usize()?;
+        let codelen = self.read_usize()?;
         let current_pc = self.get_pc();
-        let scopes = self.top_frame.scopes.len() as u16;
-        self.top_frame.controlstack.push(ControlData{controltype : IF, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen), scopes, other : None});
+        self.top_frame.controlstack.push(Controller::If(IfData{
+            scopes : self.top_frame.scopes.len() as u16,
+            expr_end : current_pc+exprlen,
+            if_end : current_pc+exprlen+codelen
+        }));
         Ok(())
     }
     pub (crate) fn sim_IFELSE(&mut self) -> OpResult
     {
-        let exprlen = self.read_u64()?;
-        let codelen1 = self.read_u64()?;
-        let codelen2 = self.read_u64()?;
+        let exprlen = self.read_usize()?;
+        let codelen1 = self.read_usize()?;
+        let codelen2 = self.read_usize()?;
         let current_pc = self.get_pc();
-        let scopes = self.top_frame.scopes.len() as u16;
-        self.top_frame.controlstack.push(ControlData{controltype : IFELSE, controlpoints : vec!(current_pc+exprlen, current_pc+exprlen+codelen1, current_pc+exprlen+codelen1+codelen2), scopes, other : None});
+        self.top_frame.controlstack.push(Controller::IfElse(IfElseData{
+            scopes : self.top_frame.scopes.len() as u16,
+            expr_end : current_pc+exprlen,
+            if_end : current_pc+exprlen+codelen1,
+            else_end : current_pc+exprlen+codelen1+codelen2
+        }));
         Ok(())
     }
     pub (crate) fn sim_WHILE(&mut self) -> OpResult
     {
-        let exprlen = self.read_u64()?;
-        let codelen = self.read_u64()?;
+        let exprlen = self.read_usize()?;
+        let codelen = self.read_usize()?;
         let current_pc = self.get_pc();
-        let scopes = self.top_frame.scopes.len() as u16;
-        self.top_frame.controlstack.push(ControlData{controltype : WHILE, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+codelen), scopes, other : None});
+        self.top_frame.controlstack.push(Controller::While(WhileData{
+            scopes : self.top_frame.scopes.len() as u16,
+            expr_start : current_pc,
+            loop_start : current_pc+exprlen,
+            loop_end : current_pc+exprlen+codelen
+        }));
         Ok(())
     }
     pub (crate) fn sim_FOR(&mut self) -> OpResult
     {
-        let exprlen = self.read_u64()?;
-        let postlen = self.read_u64()?;
-        let codelen = self.read_u64()?;
+        let postlen = self.read_usize()?;
+        let exprlen = self.read_usize()?;
+        let codelen = self.read_usize()?;
         let current_pc = self.get_pc();
-        let scopes = self.top_frame.scopes.len() as u16;
-        self.top_frame.controlstack.push(ControlData{controltype : FOR, controlpoints : vec!(current_pc, current_pc+exprlen, current_pc+exprlen+postlen, current_pc+exprlen+postlen+codelen), scopes, other : None});
+        self.top_frame.controlstack.push(Controller::While(WhileData{
+            scopes : self.top_frame.scopes.len() as u16,
+            expr_start : current_pc,
+            loop_start : current_pc+postlen+exprlen,
+            loop_end : current_pc+postlen+exprlen+codelen
+        }));
+        self.add_pc(postlen);
+        Ok(())
+    }
+    pub (crate) fn sim_FOREACH(&mut self) -> OpResult
+    {
+        if self.stack_len() < 2
+        {
+            return Err(format!("internal error: FOREACH instruction requires 2 values on the stack but found {}", self.stack_len()));
+        }
+        
+        let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: foreach loop was fed a variable of some sort, instead of a value, for what to loop over"))?;
+        let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: foreach loop was fed a non-name stack value"))?;
+        
+        let mut list : VecDeque<Value> = match val
+        {
+            Value::Array(list) => list.clone(),
+            Value::Dict(mut dict) =>
+            {
+                dict.drain().map(|(k, v)|
+                {
+                    let mut sublist = VecDeque::new();
+                    sublist.push_back(hashval_to_val(&k));
+                    sublist.push_back(v);
+                    Value::Array(sublist)
+                }).collect()
+            }
+            // TODO: support foreach over generators
+            _ => return plainerr("error: value fed to for-each loop must be an array or dictionary")
+        };
+        
+        let codelen = self.read_usize()?;
+        
+        if let Some(first_val) = list.remove(0)
+        {
+            let current_pc = self.get_pc();
+            self.top_frame.controlstack.push(Controller::ForEach(ForEachData{
+                scopes : self.top_frame.scopes.len() as u16,
+                loop_start : current_pc,
+                loop_end : current_pc+codelen,
+                name : name.clone(),
+                values : list
+            }));
+            
+            let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
+            if scope.contains_key(&name)
+            {
+                return Err(format!("error: redeclared identifier {}", name))
+            }
+            scope.insert(name, first_val);
+        }
+        else
+        {
+            self.add_pc(codelen);
+        }
+        
         Ok(())
     }
     pub (crate) fn sim_WITH(&mut self) -> OpResult
@@ -348,7 +413,7 @@ impl Interpreter
         // NOTE: for with(), the self.top_frame.scopes.len() >= 0xFFFF error case is handled by SCOPE instruction
         let other_id = self.stack_pop_number().ok_or_else(|| minierr("error: tried to use with() on a non-numeric expression (instance ids and object ids are numeric)"))?.round() as usize;
         
-        let codelen = self.read_u64()?;
+        let codelen = self.read_usize()?;
         
         let current_pc = self.get_pc();
         
@@ -356,7 +421,12 @@ impl Interpreter
         {
             self.top_frame.instancestack.push(other_id);
             
-            self.top_frame.controlstack.push(ControlData{controltype : WITH, controlpoints : vec!(current_pc, current_pc + codelen), scopes : self.top_frame.scopes.len() as u16, other : Some(VecDeque::new())});
+            self.top_frame.controlstack.push(Controller::With(WithData{
+                scopes : self.top_frame.scopes.len() as u16,
+                loop_start : current_pc,
+                loop_end : current_pc + codelen,
+                instances : VecDeque::new()
+            }));
         }
         else
         {
@@ -364,14 +434,17 @@ impl Interpreter
             if let Some(first) = instance_id_list.first()
             {
                 self.top_frame.instancestack.push(*first);
-                let mut copylist : VecDeque<usize> = instance_id_list.iter().cloned().collect();
-                copylist.pop_front();
-                self.top_frame.controlstack.push(ControlData{controltype : WITH, controlpoints : vec!(current_pc, current_pc + codelen), scopes : self.top_frame.scopes.len() as u16, other : Some(copylist)});
+                self.top_frame.controlstack.push(Controller::With(WithData{
+                    scopes : self.top_frame.scopes.len() as u16,
+                    loop_start : current_pc,
+                    loop_end : current_pc + codelen,
+                    instances : instance_id_list.get(1..).ok_or_else(|| minierr("internal error: inaccessible error in sim_WITH"))?.iter().map(|id| Value::Number(*id as f64)).collect()
+                }));
             }
             else
             {
                 // silently skip block if there are no instances of this object type
-                self.add_pc(codelen);
+                self.add_pc(codelen as usize);
             }
         }
         Ok(())
@@ -485,13 +558,13 @@ impl Interpreter
         }
         let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: left operand of binary logical operator was a value instead of a variable"))?;
         
-        let rel = self.read_u64()?;
+        let rel = self.read_usize()?;
         
         let truthy = value_truthy(&val);
         
         if truthy as bool == truthiness
         {
-            self.add_pc(rel);
+            self.add_pc(rel as usize);
             self.stack_push_val(Value::Number(bool_floaty(truthy)));
         }
         else
@@ -716,7 +789,7 @@ impl Interpreter
     }
     pub (crate) fn sim_LINENUM(&mut self) -> OpResult
     {
-        self.top_frame.currline = self.read_u64()?;
+        self.top_frame.currline = self.read_usize()? as usize;
         Ok(())
     }
 }
