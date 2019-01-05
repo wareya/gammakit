@@ -341,3 +341,27 @@ while(test_state)
 print("generator tests end here");
 
 
+// binary logical operator short-circuiting
+
+def runs_only_once(x)
+{
+    print("this only runs once!");
+    return x;
+}
+print("short circuiting of \"and\":");
+if(runs_only_once(0) && runs_only_once(0)){}
+
+print("short circuiting of \"or\":");
+if(runs_only_once(1) || runs_only_once(1)){}
+
+
+def runs_twice(x)
+{
+    print("this runs twice!");
+    return x;
+}
+print("lack of short circuiting of \"and\":");
+if(runs_twice(1) && runs_twice(1)){}
+
+print("lack of short circuiting of \"or\":");
+if(runs_twice(0) || runs_twice(0)){}

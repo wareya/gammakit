@@ -23,6 +23,8 @@ impl Interpreter
             BINSTATE => enbox!(sim_BINSTATE),
             BINOP => enbox!(sim_BINOP),
             UNOP => enbox!(sim_UNOP),
+            SHORTCIRCUITIFTRUE => enbox!(sim_SHORTCIRCUITIFTRUE),
+            SHORTCIRCUITIFFALSE => enbox!(sim_SHORTCIRCUITIFFALSE),
             INDIRECTION => enbox!(sim_INDIRECTION),
             EVALUATION => enbox!(sim_EVALUATION),
             FUNCCALL => enbox!(sim_FUNCCALL),
@@ -472,6 +474,54 @@ impl Interpreter
             Err(format!("error: disallowed binary expression\n({})\n(value 1: {})\n(value 2: {})", text, left_fmt, right_fmt))
         })?;
         self.stack_push_val(new_value);
+        Ok(())
+    }
+    
+    pub (crate) fn sim_SHORTCIRCUITIFTRUE(&mut self) -> OpResult
+    {
+        if self.stack_len() < 1
+        {
+            return Err(format!("internal error: SHORTCIRCUITIFTRUE instruction requires 1 values on the stack but found {}", self.stack_len()))
+        }
+        let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: left operand of binary logical operator was a value instead of a variable"))?;
+        
+        let rel = self.read_u64()?;
+        
+        let truthy = value_truthy(&val);
+        
+        if truthy
+        {
+            self.add_pc(rel);
+            self.stack_push_val(Value::Number(bool_floaty(truthy)));
+        }
+        else
+        {
+            self.stack_push_val(val);
+        }
+        Ok(())
+    }
+    
+    pub (crate) fn sim_SHORTCIRCUITIFFALSE(&mut self) -> OpResult
+    {
+        if self.stack_len() < 1
+        {
+            return Err(format!("internal error: SHORTCIRCUITIFTRUE instruction requires 1 values on the stack but found {}", self.stack_len()))
+        }
+        let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: left operand of binary logical operator was a value instead of a variable"))?;
+        
+        let rel = self.read_u64()?;
+        
+        let truthy = value_truthy(&val);
+        
+        if !truthy
+        {
+            self.add_pc(rel);
+            self.stack_push_val(Value::Number(bool_floaty(truthy)));
+        }
+        else
+        {
+            self.stack_push_val(val);
+        }
         Ok(())
     }
     

@@ -801,12 +801,28 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
         
         if ast.text.starts_with("binexpr_")
         {
-            assert!(ast.children.len() == 3);
+            if ast.children.len() != 3
+            {
+                return plainerr("error: binexpr_ nodes must have exactly three children");
+            }
             code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
-            code.extend(compile_astnode(ast.child(2)?, scopedepth)?);
-            code.push(BINOP);
             let op = get_binop_type(ast.child(1)?.child(0)?.text.as_str()).ok_or_else(|| minierr("internal error: unhandled type of binary expression"))?;
-            code.push(op);
+            
+            let mut finalcode =  compile_astnode(ast.child(2)?, scopedepth)?;
+            finalcode.push(BINOP);
+            finalcode.push(op);
+            
+            if op == 0x10 // and
+            {
+                code.push(SHORTCIRCUITIFFALSE);
+                code.extend(pack_u64(finalcode.len() as u64));
+            }
+            else if op == 0x11 // or
+            {
+                code.push(SHORTCIRCUITIFTRUE);
+                code.extend(pack_u64(finalcode.len() as u64));
+            }
+            code.extend(finalcode);
         }
         else
         {

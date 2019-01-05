@@ -98,6 +98,8 @@ pub (crate) const WITH : u8 = 0x84;
 
 pub (crate) const BREAK : u8 = 0x90;
 pub (crate) const CONTINUE : u8 = 0x91;
+pub (crate) const SHORTCIRCUITIFTRUE : u8 = 0x98;
+pub (crate) const SHORTCIRCUITIFFALSE : u8 = 0x99;
 
 pub (crate) const INDIRECTION : u8 = 0xA0;
 pub (crate) const EVALUATION : u8 = 0xA1;
