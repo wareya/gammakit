@@ -48,27 +48,12 @@ fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
             let ast = &ast.child(0)?;
             
             let expr = compile_astnode(ast.child(1)?, scopedepth)?;
-            let sentinel = &ast.child(2)?.child(0)?.child(0)?;
+            let block = compile_astnode(ast.child(2)?, scopedepth)?;
             
             code.extend(expr);
             code.push(WITH);
-            
-            if !sentinel.isparent && sentinel.text == "{"
-            {
-                let block = compile_astnode(ast.child(2)?.child(0)?, scopedepth)?;
-                code.extend(pack_u64(block.len() as u64));
-                code.extend(block);
-            }
-            else
-            {
-                let mut block = Vec::<u8>::new();
-                block.push(SCOPE);
-                block.extend(compile_astnode(ast.child(2)?.child(0)?, scopedepth+1)?);
-                block.push(UNSCOPE);
-                block.extend(pack_u16(scopedepth as u16));
-                code.extend(pack_u64(block.len() as u64));
-                code.extend(block);
-            }   
+            code.extend(pack_u64(block.len() as u64));
+            code.extend(block);
         }
         else if matches!(ast.child(0)?.text.as_str(), "declaration" | "funccall" | "funcexpr" | "funcdef" | "objdef" | "invocation_call" | "foreach" )
         {
