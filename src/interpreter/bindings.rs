@@ -108,9 +108,9 @@ impl Interpreter
     }
     // last argument is isexpr - as of the time of writing this comment, it's used exclusively by instance_execute
     // second return value is whether the frame was moved - necessary for weird functions like instance_create that implicly call user defined functions, because moving the frame to call user defined functions also moves the original stack
-    pub (crate) fn sim_func_print(&mut self, args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    pub (crate) fn sim_func_print(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
     {
-        for arg in args.iter().rev()
+        for arg in args.drain(..).rev()
         {
             let formatted = format_val(&arg).ok_or_else(|| minierr("error: tried to print unprintable value"))?;
             println!("{}", formatted);
@@ -183,7 +183,7 @@ impl Interpreter
             }
             Value::Set(mut set) =>
             {
-                if args.len() != 0
+                if !args.is_empty()
                 {
                     return plainerr("error: insert() with a set must not be called with a third argument");
                 }

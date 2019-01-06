@@ -71,7 +71,7 @@ TODO:
 - equality and partial equality for types other than numbers and strings
 
 TODO (sanitation/low-priority):
-- make keys() iterate over dict keys in insertion order
+- make keys() iterate over dict/set elements in insertion order
 - make sure format_val does the same as the above
 - make compile_ast() verify that the ast has a coherent "type" (parent, text, operator)
 - some way to add/remove elements of arrays/dicts/sets WITHOUT copying and overwriting them
