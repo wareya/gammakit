@@ -65,7 +65,6 @@ instance_add_variable (novelty)
 "global" is a fake/fixed/read-only variable that stores global variables (e.g. global.players). Global functions are accessed as if they were in the current scope, but can be shadowed by local functions.
 
 TODO:
-- some way to add and remove elements from arrays/dicts
 - sets (syntax " set { } | set { $expr$..., $unusedcomma$? } " compared to dict syntax of " { } | { $dictval$..., $unusedcomma$? } ")
 - unary statements (++ and --, only as statements)
 - equality and partial equality for types other than numbers and strings

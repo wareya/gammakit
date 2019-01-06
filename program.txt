@@ -431,5 +431,17 @@ case 0:
 
 print("insert():");
 
-print(insert(insert(insert([], 0, 10), 0, 5), 1, 7));
-print(insert(insert(insert({}, 0, 10), "asdf", 5), "asdf", 7));
+var changed_array = insert(insert(insert([], 0, 10), 0, 5), 1, 7);
+var changed_dict = insert(insert(insert({}, 0, 10), "asdf", 5), "asdf", 7);
+
+print(changed_array);
+print(changed_dict);
+
+print("remove():");
+
+changed_array = remove(changed_array, 1);
+changed_dict = remove(changed_dict, "asdf");
+
+print(changed_array);
+print(changed_dict);
+
