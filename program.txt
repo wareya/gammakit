@@ -445,3 +445,5 @@ changed_dict = remove(changed_dict, "asdf");
 print(changed_array);
 print(changed_dict);
 
+print("round(), floor(), ceil():");
+print(round(0.49999), round(0.5), floor(0.9), ceil(0.1));

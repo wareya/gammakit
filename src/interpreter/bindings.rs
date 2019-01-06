@@ -92,6 +92,9 @@ impl Interpreter
         insert!("instance_add_variable" , sim_func_instance_add_variable);
         insert!("insert"                , sim_func_insert               );
         insert!("remove"                , sim_func_remove               );
+        insert!("round"                 , sim_func_round                );
+        insert!("floor"                 , sim_func_floor                );
+        insert!("ceil"                  , sim_func_ceil                 );
         
         insert_noreturn!("instance_execute", sim_func_instance_execute);
     }
@@ -107,7 +110,7 @@ impl Interpreter
     // second return value is whether the frame was moved - necessary for weird functions like instance_create that implicly call user defined functions, because moving the frame to call user defined functions also moves the original stack
     pub (crate) fn sim_func_print(&mut self, args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
     {
-        for arg in args
+        for arg in args.iter().rev()
         {
             let formatted = format_val(&arg).ok_or_else(|| minierr("error: tried to print unprintable value"))?;
             println!("{}", formatted);
@@ -192,10 +195,10 @@ impl Interpreter
         {
             Value::Array(mut array) =>
             {
-                let index = match_or_err!(key, Value::Number(index) => index.round() as isize, minierr("error: tried to insert into an array with a non-number index"))?;
+                let index = match_or_err!(key, Value::Number(index) => index.round() as isize, minierr("error: tried to remove from an array with a non-number index"))?;
                 if index < 0 || index as usize > array.len()
                 {
-                    return plainerr("error: tried to insert into an array at an out-of-range index");
+                    return plainerr("error: tried to remove from an array at an out-of-range index");
                 }
                 array.remove(index as usize);
                 Ok((Value::Array(array), false))
@@ -205,8 +208,26 @@ impl Interpreter
                 dict.remove(&val_to_hashval(key)?);
                 Ok((Value::Dict(dict), false))
             }
-            _ => plainerr("error: remove() must be called with an array or dictionary as the first argument")
+            _ => plainerr("error: remove() must be called with an array or dictionary as its argument")
         }
+    }
+    pub (crate) fn sim_func_round(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    {
+        let val = args.pop().ok_or_else(|| minierr("error: wrong number of arguments to round(); expected 1, got 0"))?;
+        let num = match_or_err!(val, Value::Number(num) => num, minierr("error: round() must be called with a number as its argument"))?;
+        Ok((Value::Number(num.round()), false))
+    }
+    pub (crate) fn sim_func_ceil(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    {
+        let val = args.pop().ok_or_else(|| minierr("error: wrong number of arguments to ceil(); expected 1, got 0"))?;
+        let num = match_or_err!(val, Value::Number(num) => num, minierr("error: ceil() must be called with a number as its argument"))?;
+        Ok((Value::Number(num.ceil()), false))
+    }
+    pub (crate) fn sim_func_floor(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    {
+        let val = args.pop().ok_or_else(|| minierr("error: wrong number of arguments to floor(); expected 1, got 0"))?;
+        let num = match_or_err!(val, Value::Number(num) => num, minierr("error: floor() must be called with a number as its argument"))?;
+        Ok((Value::Number(num.floor()), false))
     }
     pub (crate) fn sim_func_instance_create(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
     {

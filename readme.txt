@@ -61,6 +61,8 @@ compile_ast
 instance_execute (returns a value, unlike with())
 instance_create
 instance_add_variable (novelty)
+insert
+remove
 
 "global" is a fake/fixed/read-only variable that stores global variables (e.g. global.players). Global functions are accessed as if they were in the current scope, but can be shadowed by local functions.
 
