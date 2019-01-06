@@ -70,6 +70,7 @@ contains
 
 TODO:
 - equality and inequality for types other than numbers and strings
+- change object and instance IDs to opaque pointers instead of numbers
 
 TODO (sanitation/low-priority):
 - make keys() iterate over dict/set elements in insertion order
