@@ -90,6 +90,7 @@ impl Interpreter
         insert!("compile_ast"           , sim_func_compile_ast          );
         insert!("instance_create"       , sim_func_instance_create      );
         insert!("instance_add_variable" , sim_func_instance_add_variable);
+        insert!("insert"                , sim_func_insert               );
         
         insert_noreturn!("instance_execute", sim_func_instance_execute);
     }
@@ -147,6 +148,42 @@ impl Interpreter
                 Ok((Value::Array(list), false))
             }
             _ => plainerr("error: tried to take length of lengthless type")
+        }
+    }
+    pub (crate) fn sim_func_insert(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    {
+        if args.len() != 3
+        {
+            return Err(format!("error: wrong number of arguments to insert(); expected 3, got {}", args.len()));
+        }
+        let collection = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
+        let key = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
+        let value = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
+        match collection
+        {
+            Value::Array(mut array) =>
+            {
+                match key
+                {
+                    Value::Number(index) =>
+                    {
+                        let index = index.round() as isize;
+                        if index < 0 || index as usize > array.len()
+                        {
+                            return plainerr("error: tried to insert into an array at an out-of-range index");
+                        }
+                        array.insert(index as usize, value);
+                        Ok((Value::Array(array), false))
+                    }
+                    _ => plainerr("error: tried to insert into an array with a non-number index")
+                }
+            }
+            Value::Dict(mut dict) =>
+            {
+                dict.insert(val_to_hashval(key)?, value);
+                Ok((Value::Dict(dict), false))
+            }
+            _ => plainerr("error: insert() must be called with an array or dictionary as the first argument")
         }
     }
     pub (crate) fn sim_func_instance_create(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>

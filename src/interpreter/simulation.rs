@@ -738,26 +738,12 @@ impl Interpreter
             return Err(format!("internal error: not enough values on stack for COLLECTDICT instruction to build dict (need {}, have {})", numvals*2, self.stack_len()));
         }
         
-        let mut names = VecDeque::<HashableValue>::new();
-        let mut values = VecDeque::<Value>::new();
-        
+        let mut mydict = HashMap::<HashableValue, Value>::new();
         for _i in 0..numvals
         {
             let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTDICT instruction failed to collect values from stack"))?;
             let key = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTDICT instruction failed to collect values from stack"))?;
-            values.push_front(val);
-            
-            match key
-            {
-                Value::Number(number) => names.push_front(HashableValue::Number(number)),
-                Value::Text(text) => names.push_front(HashableValue::Text(text)),
-                _ => return Err(format!("error: dictionary key must be a string or number; was {:?}; line {}", key, self.top_frame.currline))
-            }
-        }
-        let mut mydict = HashMap::<HashableValue, Value>::new();
-        for (name, value) in names.into_iter().zip(values.into_iter())
-        {
-            mydict.insert(name, value);
+            mydict.insert(val_to_hashval(key)?, val);
         }
         self.stack_push_val(Value::Dict(mydict));
         Ok(())

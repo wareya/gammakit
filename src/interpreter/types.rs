@@ -271,6 +271,15 @@ pub (crate) fn hashval_to_val(hashval : &HashableValue) -> Value
         HashableValue::Text(val) => Value::Text(val.clone()),
     }
 }
+pub (crate) fn val_to_hashval(val : Value) -> Result<HashableValue, String>
+{
+    match val
+    {
+        Value::Number(number) => Ok(HashableValue::Number(number)),
+        Value::Text(text) => Ok(HashableValue::Text(text)),
+        _ => plainerr("error: tried to use non-hashable value as a dictionary key")
+    }
+}
 
 impl std::hash::Hash for HashableValue {
     fn hash<H: std::hash::Hasher>(&self, state : &mut H)
