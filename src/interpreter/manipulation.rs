@@ -111,7 +111,7 @@ impl Interpreter
         
         let argcount = self.read_u16()?;
         
-        let bodylen = unpack_u64(&self.pull_from_code(8)?)? as usize;
+        let bodylen = self.read_usize()?;
         
         let mut args = Vec::<String>::new();
         for _ in 0..argcount
@@ -151,7 +151,7 @@ impl Interpreter
         
         let argcount = self.read_u16()?;
         
-        let bodylen = unpack_u64(&self.pull_from_code(8)?)? as usize;
+        let bodylen = self.read_usize()?;
         
         let mut args = Vec::<String>::new();
         for _ in 0..argcount
