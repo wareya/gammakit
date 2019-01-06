@@ -48,6 +48,10 @@ impl Interpreter
             WHILE => enbox!(sim_WHILE),
             FOR => enbox!(sim_FOR),
             FOREACH => enbox!(sim_FOREACH),
+            SWITCH => enbox!(sim_SWITCH),
+            SWITCHCASE => enbox!(sim_SWITCHCASE),
+            SWITCHDEFAULT => enbox!(sim_SWITCHDEFAULT),
+            SWITCHEXIT => enbox!(sim_SWITCHEXIT),
             SCOPE => enbox!(sim_SCOPE),
             UNSCOPE => enbox!(sim_UNSCOPE),
             WITH => enbox!(sim_WITH),
@@ -460,6 +464,67 @@ impl Interpreter
                 self.add_pc(codelen as usize);
             }
         }
+        Ok(())
+    }
+    pub (crate) fn sim_SWITCH(&mut self) -> OpResult
+    {
+        if self.stack_len() < 1
+        {
+            return plainerr("internal error: SWITCH instruction requires 1 values on the stack but found 0");
+        }
+        let value = self.stack_pop_val().ok_or_else(|| minierr("internal error: switch expression was a variable instead of a value"))?;
+        
+        let num_cases = self.read_u16()?;
+        let current_pc = self.get_pc();
+        
+        let mut case_block_addresses = vec!();
+        for _ in 0..num_cases
+        {
+            case_block_addresses.push(current_pc + self.read_usize()?);
+        }
+        let exit = current_pc + self.read_usize()?;
+        
+        self.top_frame.controlstack.push(Controller::Switch(SwitchData{
+            scopes : self.top_frame.scopes.len() as u16,
+            blocks : case_block_addresses,
+            exit,
+            value
+        }));
+        
+        Ok(())
+    }
+    pub (crate) fn sim_SWITCHCASE(&mut self) -> OpResult
+    {
+        if self.stack_len() < 1
+        {
+            return plainerr("internal error: SWITCHCASE instruction requires 1 values on the stack but found 0");
+        }
+        let value = self.stack_pop_val().ok_or_else(|| minierr("internal error: switch case expression was a variable instead of a value"))?;
+        
+        let which_case = self.read_u16()?;
+        
+        let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref switchdata)) => switchdata, minierr("internal error: SWITCHCASE instruction outside of switch statement"))?;
+        
+        if ops::value_equal(&value, &switchdata.value)?
+        {
+            self.set_pc(*switchdata.blocks.get(which_case as usize).ok_or_else(|| minierr("internal error: which_case in SWITCHCASE was too large"))?);
+        }
+        
+        Ok(())
+    }
+    pub (crate) fn sim_SWITCHDEFAULT(&mut self) -> OpResult
+    {
+        let which_case = self.read_u16()?;
+        let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref switchdata)) => switchdata, minierr("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
+        self.set_pc(*switchdata.blocks.get(which_case as usize).ok_or_else(|| minierr("internal error: which_case in SWITCHDEFAULT was too large"))?);
+        
+        Ok(())
+    }
+    pub (crate) fn sim_SWITCHEXIT(&mut self) -> OpResult
+    {
+        let switchdata = match_or_err!(self.top_frame.controlstack.pop(), Some(Controller::Switch(switchdata)) => switchdata, minierr("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
+        self.set_pc(switchdata.exit);
+        
         Ok(())
     }
     pub (crate) fn sim_FUNCDEF(&mut self) -> OpResult

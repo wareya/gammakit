@@ -68,6 +68,8 @@ TODO:
 - switch statement ("match"? "case x, y:"?) with no fallthrough
 - sets (syntax " set { } | set { $expr$..., $unusedcomma$? } " compared to dict syntax of " { } | { $dictval$..., $unusedcomma$? } ")
 - some way to add and remove elements from arrays/dicts/sets (and some way to do so without cloning and overwriting them?)
+- unary statements (++ and --, only as statements)
+- equality and partial equality for types other than numbers and strings
 
 TODO (sanitation/low-priority):
 - make keys() iterate over dict keys in insertion order
@@ -85,5 +87,6 @@ MAYBE (metaprogramming):
 - investigate feasibility of grammar, parser, compiler, and interpreter hooks (limited to child interpreters)
 - allow interpreters to act like generators
 
+Disassembler is currently broken due to changing how if statements are compiled.
 
 As of writing, clippy processes gammakit with no complaints. Certain lints are disabled in certain files where they are inappropriate, unhelpful, or generate false positives.

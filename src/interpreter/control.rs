@@ -29,7 +29,6 @@ impl Interpreter {
         // end of the main block, jump to the end of the "else" block
         if self.get_pc() == data.if_end
         {
-            
             self.set_pc(data.else_end);
             self.drain_scopes(data.scopes);
             *put_controller_back = false;
@@ -95,7 +94,8 @@ impl Interpreter {
                 Controller::IfElse(ref controller)      => self.handle_ifelse_flow(&controller, &mut put_controller_back)?,
                 Controller::While(ref controller)       => self.handle_while_flow(&controller, &mut put_controller_back)?,
                 Controller::With(ref mut controller)    => self.handle_with_flow(controller, &mut put_controller_back)?,
-                Controller::ForEach(ref mut controller) => self.handle_foreach_flow(controller, &mut put_controller_back)?
+                Controller::ForEach(ref mut controller) => self.handle_foreach_flow(controller, &mut put_controller_back)?,
+                Controller::Switch(_)  => ()
             }
             
             if put_controller_back

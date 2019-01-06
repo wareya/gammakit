@@ -143,24 +143,28 @@ pub (crate) fn bool_floaty(b : bool) -> f64
 {
     if b {1.0} else {0.0}
 }
-// TODO string comparison
-fn value_op_equal(left : &Value, right : &Value) -> Result<Value, String>
+
+pub (crate) fn value_equal(left : &Value, right : &Value) -> Result<bool, String>
 {
     match (left, right)
     {
-        (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left==right))),
-        (Value::Text(left), Value::Text(right)) => Ok(Value::Number(bool_floaty(left==right))),
-        _ => Err("types incompatible with equal".to_string())
+        (Value::Number(left), Value::Number(right)) => Ok(left==right),
+        (Value::Text(left), Value::Text(right)) => Ok(left==right),
+        _ => Ok(false)
     }
 }
-// TODO string comparison
+// FIXME string/array/dict/generator/etc comparison
+fn value_op_equal(left : &Value, right : &Value) -> Result<Value, String>
+{
+    Ok(Value::Number(bool_floaty(value_equal(left, right)?)))
+}
 fn value_op_not_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
         (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left != right))),
         (Value::Text(left), Value::Text(right)) => Ok(Value::Number(bool_floaty(left != right))),
-        _ => Err("types incompatible with equal".to_string()),
+        _ => Ok(Value::Number(0.0))
     }
 }
 fn value_op_greater_or_equal(left : &Value, right : &Value) -> Result<Value, String>
@@ -168,7 +172,7 @@ fn value_op_greater_or_equal(left : &Value, right : &Value) -> Result<Value, Str
     match (left, right)
     {
         (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left >= right))),
-        _ => Err("types incompatible with greater than or equal".to_string())
+        _ => Ok(Value::Number(0.0))
     }
 }
 fn value_op_less_or_equal(left : &Value, right : &Value) -> Result<Value, String>
@@ -176,7 +180,7 @@ fn value_op_less_or_equal(left : &Value, right : &Value) -> Result<Value, String
     match (left, right)
     {
         (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left <= right))),
-        _ => Err("types incompatible with less than or equal".to_string())
+        _ => Ok(Value::Number(0.0))
     }
 }
 fn value_op_greater(left : &Value, right : &Value) -> Result<Value, String>
@@ -184,7 +188,7 @@ fn value_op_greater(left : &Value, right : &Value) -> Result<Value, String>
     match (left, right)
     {
         (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left > right))),
-        _ => Err("types incompatible with greater than".to_string())
+        _ => Ok(Value::Number(0.0))
     }
 }
 fn value_op_less(left : &Value, right : &Value) -> Result<Value, String>
@@ -192,10 +196,10 @@ fn value_op_less(left : &Value, right : &Value) -> Result<Value, String>
     match (left, right)
     {
         (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left < right))),
-        _ => Err("types incompatible with less than".to_string())
+        _ => Ok(Value::Number(0.0))
     }
 }
-// TODO dicts
+
 fn value_op_and(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
@@ -204,7 +208,6 @@ fn value_op_and(left : &Value, right : &Value) -> Result<Value, String>
         _ => Err("types incompatible with logical and".to_string())
     }
 }
-// TODO dicts
 fn value_op_or(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)

@@ -86,6 +86,9 @@ pub (crate) const INVOKE : u8 = 0x50;
 
 pub (crate) const SCOPE : u8 = 0x60;
 pub (crate) const UNSCOPE : u8 = 0x61;
+pub (crate) const SWITCHCASE : u8 = 0x68;
+pub (crate) const SWITCHDEFAULT : u8 = 0x69;
+pub (crate) const SWITCHEXIT : u8 = 0x6F;
 
 pub (crate) const COLLECTARRAY : u8 = 0x70;
 pub (crate) const COLLECTDICT : u8 = 0x71;
@@ -96,6 +99,7 @@ pub (crate) const WHILE : u8 = 0x82;
 pub (crate) const FOR : u8 = 0x83;
 pub (crate) const WITH : u8 = 0x84;
 pub (crate) const FOREACH : u8 = 0x85;
+pub (crate) const SWITCH : u8 = 0x86;
 
 pub (crate) const BREAK : u8 = 0x90;
 pub (crate) const CONTINUE : u8 = 0x91;
@@ -116,6 +120,7 @@ pub (crate) const GENERATORDEF : u8 = 0xB5;
 pub (crate) const EXIT : u8 = 0xF0;
 pub (crate) const RETURN : u8 = 0xF1;
 pub (crate) const YIELD : u8 = 0xF2;
+
 pub (crate) const LINENUM : u8 = 0xF8;
 
 

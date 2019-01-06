@@ -134,6 +134,7 @@ $declaration$ ;
 $condition$
 $foreach$
 $withstatement$
+$switch$
 $funcdef$
 $objdef$
 $lvar$ $binstateop$ $expr$ ;

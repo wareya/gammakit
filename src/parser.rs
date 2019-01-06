@@ -676,6 +676,13 @@ impl Parser {
                     ast.children.remove(3); // "in"
                     ast.children.remove(1); // (
                 }
+                "switch" =>
+                {
+                    ast.children.pop(); // }
+                    ast.children.remove(4); // {
+                    ast.children.remove(3); // )
+                    ast.children.remove(1); // (
+                }
                 _ => {}
             }
             

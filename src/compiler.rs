@@ -55,7 +55,7 @@ fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
             code.extend(pack_u64(block.len() as u64));
             code.extend(block);
         }
-        else if matches!(ast.child(0)?.text.as_str(), "declaration" | "funccall" | "funcexpr" | "funcdef" | "objdef" | "invocation_call" | "foreach" )
+        else if matches!(ast.child(0)?.text.as_str(), "declaration" | "funccall" | "funcexpr" | "funcdef" | "objdef" | "invocation_call" | "foreach"  | "switch" )
         {
             code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
         }
@@ -207,6 +207,20 @@ fn compile_block(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Res
     Ok(())
 }
 
+fn compile_nakedblock(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    code.push(SCOPE);
+    
+    for child in &ast.children
+    {
+        code.extend(compile_astnode(child, scopedepth+1)?);
+    }
+    
+    code.push(UNSCOPE);
+    code.extend(pack_u16(scopedepth as u16));
+    Ok(())
+}
+
 fn compile_ifcondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     code.extend(compile_astnode(ast.child(1)?, scopedepth)?);
@@ -236,6 +250,84 @@ fn compile_ifcondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) 
         //print_ast(ast);
         //assert!(false);
     }
+    Ok(())
+}
+
+struct Case {
+    labels: Vec<u8>,
+    block: Vec<u8>
+}
+
+impl Case {
+    // compiles switchcase and switchdefault blocks; in the case of default, the label vector is blank
+    fn compile(ast : &ASTNode, which : u16, scopedepth : usize) -> Result<Case, String>
+    {
+        if !ast.isparent || !matches!(ast.text.as_str(), "switchcase" | "switchdefault")
+        {
+            return plainerr("error: tried to compile a non-switchcase/switchdefault ast node as a switch case")
+        }
+        let mut labels = vec!();
+        for node in ast.child_slice(1, -2)? // implicitly causes switchdefault to have 0 labels
+        {
+            labels.extend(compile_astnode(node, scopedepth)?);
+            labels.push(SWITCHCASE);
+            labels.extend(pack_u16(which));
+        }
+        if labels.len() == 0
+        {
+            labels.push(SWITCHDEFAULT);
+            labels.extend(pack_u16(which));
+        }
+        let mut block = compile_astnode(ast.last_child()?, scopedepth)?;
+        block.push(SWITCHEXIT);
+        Ok(Case{labels, block})
+    }
+}
+
+fn compile_switch(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    code.extend(compile_astnode(ast.child(1)?, scopedepth)?);
+    
+    
+    // SWITCH (u8)
+    // num cases (u16)
+    // case block locations... (relative to end of "num cases") (u64s)
+    // case label expressions... (arbitrary)
+    // case blocks... (arbitrary)
+    
+    code.push(SWITCH);
+    code.extend(pack_u16((ast.children.len()-2) as u16));
+    
+    let mut labels = vec!();
+    let mut blocks = vec!();
+    
+    for node in ast.child_slice(2, 0)?
+    {
+        let case = Case::compile(node, blocks.len() as u16, scopedepth)?;
+        labels.extend(case.labels);
+        
+        blocks.push(case.block);
+    }
+    labels.push(SWITCHEXIT);
+    if blocks.len() != ast.children.len()-2
+    {
+        return plainerr("error: broken switch node");
+    }
+    if blocks.len() > 0xFFFF
+    {
+        return plainerr("error: switches may have a maximum of 0x10000 (65000ish) labels");
+    }
+    let mut case_block_offset = labels.len() + (blocks.len()+1)*8;
+    for block in &blocks
+    {
+        code.extend(pack_u64(case_block_offset as u64));
+        case_block_offset += block.len();
+    }
+    code.extend(pack_u64(case_block_offset as u64));
+    
+    code.extend(labels);
+    code.extend(blocks.drain(..).flatten());
+    
     Ok(())
 }
 fn compile_whilecondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
@@ -839,6 +931,8 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
                     compile_forcondition(ast, &mut code, scopedepth)?,
                 "foreach" =>
                     compile_foreach(ast, &mut code, scopedepth)?,
+                "switch" =>
+                    compile_switch(ast, &mut code, scopedepth)?,
                 "expr" =>
                     compile_expr(ast, &mut code, scopedepth)?,
                 "simplexpr" =>
@@ -873,6 +967,8 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
                     compile_invocation_expr(ast, &mut code, scopedepth)?,
                 "block" =>
                     compile_block(ast, &mut code, scopedepth)?,
+                "nakedblock" =>
+                    compile_nakedblock(ast, &mut code, scopedepth)?,
                 _ =>
                     Err(format!("internal error: unhandled ast node type `{}` in compiler", ast.text))?,
             }

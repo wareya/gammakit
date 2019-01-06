@@ -49,11 +49,21 @@ pub (crate) struct ForEachData {
 
 #[derive(Debug)]
 #[derive(Clone)]
+pub (crate) struct SwitchData {
+    pub (super) scopes: u16,
+    pub (super) blocks: Vec<usize>,
+    pub (super) exit: usize,
+    pub (super) value: Value,
+}
+
+#[derive(Debug)]
+#[derive(Clone)]
 pub (crate) enum Controller {
     IfElse(IfElseData),
     While(WhileData),
     With(WithData),
     ForEach(ForEachData),
+    Switch(SwitchData),
 }
 
 #[derive(Debug)]

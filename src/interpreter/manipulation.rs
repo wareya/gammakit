@@ -74,12 +74,10 @@ impl Interpreter
     {
         list_pop_generic!(args, Dict)
     }
-    /*
-    pub (crate) fn read_u64(&mut self) -> Result<u64, String>
+    pub (crate) fn read_u16(&mut self) -> Result<u16, String>
     {
-        Ok(unpack_u64(&self.pull_from_code(8)?)? as u64)
+        Ok(unpack_u16(&self.pull_from_code(2)?)?)
     }
-    */
     pub (crate) fn read_usize(&mut self) -> Result<usize, String>
     {
         Ok(unpack_u64(&self.pull_from_code(8)?)? as usize)
@@ -111,7 +109,7 @@ impl Interpreter
         
         let name = self.read_string()?;
         
-        let argcount = unpack_u16(&self.pull_from_code(2)?)?;
+        let argcount = self.read_u16()?;
         
         let bodylen = unpack_u64(&self.pull_from_code(8)?)? as usize;
         
@@ -131,7 +129,7 @@ impl Interpreter
     {
         let code = self.get_code();
         
-        let capturecount = unpack_u16(&self.pull_from_code(2)?)? as usize;
+        let capturecount = self.read_u16()? as usize;
         
         if self.top_frame.stack.len() < capturecount*2
         {
@@ -151,7 +149,7 @@ impl Interpreter
             captures.insert(name, val);
         }
         
-        let argcount = unpack_u16(&self.pull_from_code(2)?)?;
+        let argcount = self.read_u16()?;
         
         let bodylen = unpack_u64(&self.pull_from_code(8)?)? as usize;
         
