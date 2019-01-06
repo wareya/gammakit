@@ -14,12 +14,10 @@ mod parser;
 mod bytecode;
 mod grammar;
 mod compiler;
-mod disassembler;
 mod interpreter;
 
 use crate::parser::*;
 use crate::compiler::*;
-use crate::disassembler::*;
 use crate::interpreter::*;
 
 fn main() -> Result<(), String>
@@ -41,20 +39,7 @@ fn main() -> Result<(), String>
     
     let ast = parser.parse_program(&tokens, &program_lines, false)?.ok_or_else(|| "failed to parse program".to_string())?;
     
-    let code = compile_bytecode(&ast)?;
-    
-    if false
-    {
-        if let Ok(disassembly) = disassemble_bytecode(&code, 0, 0)
-        {
-            for line in disassembly
-            {
-                println!("{}", line);
-            }
-        }
-    }
-    
-    let code = Rc::new(code);
+    let code = Rc::new(compile_bytecode(&ast)?);
     
     let mut interpreter = Interpreter::new(&code, Some(parser));
     interpreter.insert_default_internal_functions();
