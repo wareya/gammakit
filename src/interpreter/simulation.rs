@@ -21,6 +21,7 @@ impl Interpreter
             DECLFAR => enbox!(sim_DECLFAR),
             DECLGLOBALVAR => enbox!(sim_DECLGLOBALVAR),
             BINSTATE => enbox!(sim_BINSTATE),
+            UNSTATE => enbox!(sim_UNSTATE),
             BINOP => enbox!(sim_BINOP),
             UNOP => enbox!(sim_UNOP),
             SHORTCIRCUITIFTRUE => enbox!(sim_SHORTCIRCUITIFTRUE),
@@ -604,6 +605,24 @@ impl Interpreter
         }
         Ok(())
     }
+    pub (crate) fn sim_UNSTATE(&mut self) -> OpResult
+    {
+        if self.stack_len() < 1
+        {
+            return Err(format!("internal error: UNSTATE instruction requires 2 values on the stack but found {}", self.stack_len()));
+        }
+        
+        let immediate = self.pull_single_from_code()?;
+        
+        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: argument to UNSTATE could not be found or was not a variable"))?;
+        
+        let opfunc = get_unstate_function(immediate).ok_or_else(|| format!("internal error: unknown unary statement operation 0x{:02X}", immediate))?;
+        let mut value = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just accessing value"))?;
+        value = opfunc(&value).or_else(|text| Err(format!("error: disallowed unary statement operation\n({})", text)))?;
+        
+        self.evaluate_or_store(&var, Some(value))?;
+        Ok(())
+    }
     
     pub (crate) fn sim_BINOP(&mut self) -> OpResult
     {
@@ -672,7 +691,7 @@ impl Interpreter
         let immediate = self.pull_single_from_code()?;
         
         let value = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction UNOP (this error should be inaccessible!)"))?;
-        let opfunc = get_unop_function(immediate).ok_or_else(|| format!("internal error: unknown binary operation 0x{:02X}", immediate))?;
+        let opfunc = get_unop_function(immediate).ok_or_else(|| format!("internal error: unknown unary operation 0x{:02X}", immediate))?;
         
         let new_value = opfunc(&value).or_else(|text| Err(format!("error: disallowed unary expression\n({})", text)))?;
         self.stack_push_val(new_value);

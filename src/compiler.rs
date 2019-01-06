@@ -41,6 +41,18 @@ fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
         let op = get_assignment_type(operator).ok_or_else(|| minierr(&format!("internal error: unhandled or unsupported type of binary statement {}", operator)))?;
         code.push(op);
     }
+    else if ast.children.len() == 2 && ast.child(1)?.isparent && ast.child(1)?.text == "unstateop"
+    {
+        let operator = &ast.child(1)?.child(0)?.text;
+        code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
+        code.push(UNSTATE);
+        match operator.as_str()
+        {
+            "++" => code.push(00),
+            "--" => code.push(01),
+            _ => return Err(format!("internal error: unhandled or unsupported type of unary statement {}", operator))
+        }
+    }
     else if ast.child(0)?.isparent
     {
         if ast.child(0)?.text == "withstatement"

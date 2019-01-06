@@ -135,7 +135,6 @@ invoke $lvar$
 
 statement:
 { $statement$* }
-$string$ ;
 $declaration$ ;
 $condition$
 $foreach$
@@ -144,6 +143,7 @@ $switch$
 $funcdef$
 $objdef$
 $lvar$ $binstateop$ $expr$ ;
+$lvar$ $unstateop$ ;
 $instruction$ ;
 $funccall$ ;
 $invocation_call$ ;
@@ -174,6 +174,7 @@ barestatement:
 { $statement$* }
 $declaration$
 $lvar$ $binstateop$ $expr$
+$lvar$ $unstateop$
 $funccall$
 
 forcondition:
@@ -212,6 +213,10 @@ binstateop:
 -=
 *=
 /=
+
+unstateop:
+++
+--
 
 program:
 $statement$*

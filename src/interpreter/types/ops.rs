@@ -310,7 +310,7 @@ fn value_op_not(value : &Value) -> Result<Value, String>
         _ => Err("type incompatible with not operator".to_string())
     }
 }
-
+        
 pub (crate) fn get_unop_function(op : u8) -> Option<Box<Fn(&Value) -> Result<Value, String>>>
 {
     macro_rules! enbox { ( $x:ident ) => { Some(Box::new($x)) } }
@@ -319,7 +319,26 @@ pub (crate) fn get_unop_function(op : u8) -> Option<Box<Fn(&Value) -> Result<Val
         0x10 => enbox!(value_op_negative),
         0x11 => enbox!(value_op_positive),
         0x20 => enbox!(value_op_not),
-        // TODO: add "not" and "bitwise not"
+        // TODO: add "bitwise not"?
+        _ => None
+    }
+}
+
+fn value_op_increment(value : &Value) -> Result<Value, String>
+{
+    value_op_add(value, &Value::Number(1.0))
+}
+fn value_op_decrement(value : &Value) -> Result<Value, String>
+{
+    value_op_subtract(value, &Value::Number(1.0))
+}
+pub (crate) fn get_unstate_function(op : u8) -> Option<Box<Fn(&Value) -> Result<Value, String>>>
+{
+    macro_rules! enbox { ( $x:ident ) => { Some(Box::new($x)) } }
+    match op
+    {
+        0x00 => enbox!(value_op_increment),
+        0x01 => enbox!(value_op_decrement),
         _ => None
     }
 }
