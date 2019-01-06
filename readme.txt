@@ -6,6 +6,8 @@ Gammakit supports GameMaker-like objects and with() (i.e. with() is a loop).
 
 Gammakit is dynamically typed, and arrays and dictionaries are copied by value, not reference.
 
+Gammakit has generators, which require separate initialization and invocation. Initialization returns a generator state value that truth-tests as whether the generator has finalized or not.
+
 Gammakit allows the programmer to generate or parse and modify ASTs and compile them into pseudofunctions at runtime.
 
 For example, the following code:
@@ -48,7 +50,6 @@ prints the following output:
     toast
     not toast
 
-Gammakits also has generators, which require separate initialization and "iteration"/invokation/stepping. Initialization returns a generator state value that truth-tests as whether the generator has finalized or not.
 
 Available functions:
 
@@ -68,7 +69,7 @@ contains
 "global" is a fake/fixed/read-only variable that stores global variables (e.g. global.players). Global functions are accessed as if they were in the current scope, but can be shadowed by local functions.
 
 TODO:
-- equality and partial equality for types other than numbers and strings
+- equality and inequality for types other than numbers and strings
 
 TODO (sanitation/low-priority):
 - make keys() iterate over dict/set elements in insertion order
