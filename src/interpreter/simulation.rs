@@ -77,7 +77,7 @@ impl Interpreter
     }
     pub (crate) fn sim_PUSHSHORT(&mut self) -> OpResult
     {
-        let value = unpack_u16(&self.pull_from_code(2)?)?;
+        let value = self.read_u16()?;
         self.stack_push_val(Value::Number(value as f64));
         Ok(())
     }
@@ -260,7 +260,7 @@ impl Interpreter
     }
     pub (crate) fn sim_UNSCOPE(&mut self) -> OpResult
     {
-        let immediate = unpack_u16(&self.pull_from_code(2)?)? as usize;
+        let immediate = self.read_u16()? as usize;
         
         self.drain_scopes((immediate+1) as u16);
         Ok(())
@@ -712,7 +712,7 @@ impl Interpreter
         }
         
         let object_id = self.global.object_id;
-        let numfuncs = unpack_u16(&self.pull_from_code(2)?)?;
+        let numfuncs = self.read_u16()?;
         
         let mut funcs = HashMap::<String, FuncSpec>::new();
         for _ in 0..numfuncs
@@ -736,7 +736,7 @@ impl Interpreter
     }
     pub (crate) fn sim_COLLECTARRAY(&mut self) -> OpResult
     {
-        let numvals = unpack_u16(&self.pull_from_code(2)?)? as usize;
+        let numvals = self.read_u16()? as usize;
         if self.stack_len() < numvals
         {
             return Err(format!("internal error: not enough values on stack for COLLECTARRAY instruction to build array (need {}, have {})", numvals, self.stack_len()));
@@ -752,7 +752,7 @@ impl Interpreter
     }
     pub (crate) fn sim_COLLECTDICT(&mut self) -> OpResult
     {
-        let numvals = unpack_u16(&self.pull_from_code(2)?)? as usize;
+        let numvals = self.read_u16()? as usize;
         if self.stack_len() < numvals*2
         {
             return Err(format!("internal error: not enough values on stack for COLLECTDICT instruction to build dict (need {}, have {})", numvals*2, self.stack_len()));
