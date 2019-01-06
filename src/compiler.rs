@@ -48,8 +48,8 @@ fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
         code.push(UNSTATE);
         match operator.as_str()
         {
-            "++" => code.push(00),
-            "--" => code.push(01),
+            "++" => code.push(0x00),
+            "--" => code.push(0x01),
             _ => return Err(format!("internal error: unhandled or unsupported type of unary statement {}", operator))
         }
     }
