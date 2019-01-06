@@ -40,6 +40,7 @@ impl Interpreter
             GENERATORDEF => enbox!(sim_GENERATORDEF),
             COLLECTARRAY => enbox!(sim_COLLECTARRAY),
             COLLECTDICT => enbox!(sim_COLLECTDICT),
+            COLLECTSET => enbox!(sim_COLLECTSET),
             ARRAYEXPR => enbox!(sim_ARRAYEXPR),
             BREAK => enbox!(sim_BREAK),
             CONTINUE => enbox!(sim_CONTINUE),
@@ -722,7 +723,7 @@ impl Interpreter
             return Err(format!("internal error: not enough values on stack for COLLECTARRAY instruction to build array (need {}, have {})", numvals, self.stack_len()));
         }
         let mut myarray = VecDeque::<Value>::new();
-        for _i in 0..numvals
+        for _ in 0..numvals
         {
             let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTARRAY instruction failed to collect values from stack (this error should be unreachable!)"))?;
             myarray.push_front(val);
@@ -739,13 +740,30 @@ impl Interpreter
         }
         
         let mut mydict = HashMap::<HashableValue, Value>::new();
-        for _i in 0..numvals
+        for _ in 0..numvals
         {
             let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTDICT instruction failed to collect values from stack"))?;
             let key = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTDICT instruction failed to collect values from stack"))?;
             mydict.insert(val_to_hashval(key)?, val);
         }
         self.stack_push_val(Value::Dict(mydict));
+        Ok(())
+    }
+    pub (crate) fn sim_COLLECTSET(&mut self) -> OpResult
+    {
+        let numvals = self.read_u16()? as usize;
+        if self.stack_len() < numvals
+        {
+            return Err(format!("internal error: not enough values on stack for COLLECTSET instruction to build dict (need {}, have {})", numvals, self.stack_len()));
+        }
+        
+        let mut myset = HashSet::<HashableValue>::new();
+        for _ in 0..numvals
+        {
+            let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTSET instruction failed to collect values from stack"))?;
+            myset.insert(val_to_hashval(val)?);
+        }
+        self.stack_push_val(Value::Set(myset));
         Ok(())
     }
     pub (crate) fn sim_ARRAYEXPR(&mut self) -> OpResult

@@ -288,7 +288,6 @@ fn compile_switch(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Re
 {
     code.extend(compile_astnode(ast.child(1)?, scopedepth)?);
     
-    
     // SWITCH (u8)
     // num cases (u16)
     // case block locations... (relative to end of "num cases") (u64s)
@@ -788,6 +787,25 @@ fn compile_dictbody(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> 
     
     Ok(())
 }
+fn compile_setbody(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    let mut elementcount = 0;
+    let mut childexprs = Vec::<u8>::new();
+    for expression in ast.child_slice(2, -1)?
+    {
+        if expression.text == "unusedcomma"
+        {
+            break;
+        }
+        childexprs.extend(compile_astnode(expression, scopedepth)?);
+        elementcount += 1;
+    }
+    code.extend(childexprs);
+    code.push(COLLECTSET);
+    code.extend(pack_u16(elementcount as u16));
+    
+    Ok(())
+}
 fn compile_arrayexpr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     if ast.child(0)?.isparent && ast.child(0)?.text == "name"
@@ -955,6 +973,8 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
                     compile_arraybody(ast, &mut code, scopedepth)?,
                 "dictbody" =>
                     compile_dictbody(ast, &mut code, scopedepth)?,
+                "setbody" =>
+                    compile_setbody(ast, &mut code, scopedepth)?,
                 "arrayexpr" =>
                     compile_arrayexpr(ast, &mut code, scopedepth)?,
                 "indirection" =>

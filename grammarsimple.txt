@@ -47,11 +47,16 @@ dictbody:
 { }
 { $dictval$..., $unusedcomma$? }
 
+setbody:
+set { }
+set { $expr$..., $unusedcomma$? }
+
 supersimplexpr:
 ( $expr$ )
 $lambda$
 $arraybody$
 $dictbody$
+$setbody$
 $number$
 $string$
 $name$
@@ -65,6 +70,7 @@ $invocation_expr$
 $lambda$
 $arraybody$
 $dictbody$
+$setbody$
 $number$
 $string$
 $rvar$

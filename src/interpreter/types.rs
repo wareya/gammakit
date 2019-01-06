@@ -195,6 +195,7 @@ pub enum Value {
     Text(String),
     Array(VecDeque<Value>),
     Dict(HashMap<HashableValue, Value>),
+    Set(HashSet<HashableValue>),
     Func(Box<FuncVal>),
     Generator(GeneratorState),
     Special(Special),

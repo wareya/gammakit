@@ -156,17 +156,17 @@ impl Interpreter
     }
     pub (crate) fn sim_func_insert(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
     {
-        if args.len() != 3
+        if !matches!(args.len(), 3 | 2)
         {
-            return Err(format!("error: wrong number of arguments to insert(); expected 3, got {}", args.len()));
+            return Err(format!("error: wrong number of arguments to insert(); expected 3 or 2, got {}", args.len()));
         }
         let collection = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
         let key = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
-        let value = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
         match collection
         {
             Value::Array(mut array) =>
             {
+                let value = args.pop().ok_or_else(|| minierr("error: insert() with an array also requires a value to insert at the given index"))?;
                 let index = match_or_err!(key, Value::Number(index) => index.round() as isize, minierr("error: tried to insert into an array with a non-number index"))?;
                 if index < 0 || index as usize > array.len()
                 {
@@ -177,10 +177,20 @@ impl Interpreter
             }
             Value::Dict(mut dict) =>
             {
+                let value = args.pop().ok_or_else(|| minierr("error: insert() with a dict also requires a value to insert at the given key"))?;
                 dict.insert(val_to_hashval(key)?, value);
                 Ok((Value::Dict(dict), false))
             }
-            _ => plainerr("error: insert() must be called with an array or dictionary as the first argument")
+            Value::Set(mut set) =>
+            {
+                if args.len() != 0
+                {
+                    return plainerr("error: insert() with a set must not be called with a third argument");
+                }
+                set.insert(val_to_hashval(key)?);
+                Ok((Value::Set(set), false))
+            }
+            _ => plainerr("error: insert() must be called with an array, dictionary, or set as the first argument")
         }
     }
     pub (crate) fn sim_func_remove(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
@@ -208,7 +218,12 @@ impl Interpreter
                 dict.remove(&val_to_hashval(key)?);
                 Ok((Value::Dict(dict), false))
             }
-            _ => plainerr("error: remove() must be called with an array or dictionary as its argument")
+            Value::Set(mut set) =>
+            {
+                set.remove(&val_to_hashval(key)?);
+                Ok((Value::Set(set), false))
+            }
+            _ => plainerr("error: remove() must be called with an array, dictionary, or set as its argument")
         }
     }
     pub (crate) fn sim_func_round(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>

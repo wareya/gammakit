@@ -45,7 +45,12 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
             ret.push_str("{");
             for (i, (key, val)) in dict.iter().enumerate()
             {
-                if let Some(part) = format_val(&hashval_to_val(key))
+                if let HashableValue::Text(text) = key
+                {
+                    ret.push_str(&format!("\"{}\"", escape(text)));
+                    ret.push_str(": ");
+                }
+                else if let Some(part) = format_val(&hashval_to_val(key))
                 {
                     ret.push_str(&part);
                     ret.push_str(": ");
@@ -76,10 +81,34 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
             
             Some(ret)
         }
-        _ =>
+        Value::Set(set) =>
         {
-            None
+            let mut ret = String::new();
+            ret.push_str("{");
+            for (i, val) in set.iter().enumerate()
+            {
+                if let HashableValue::Text(text) = val
+                {
+                    ret.push_str(&format!("\"{}\"", escape(text)));
+                }
+                else if let Some(part) = format_val(&hashval_to_val(val))
+                {
+                    ret.push_str(&part);
+                }
+                else
+                {
+                    return None
+                }
+                if i+1 != set.len()
+                {
+                    ret.push_str(", ");
+                }
+            }
+            ret.push_str("}");
+            
+            Some(ret)
         }
+        Value::Func(_) | Value::Generator(_) | Value::Special(_) => None
     }
 }
 

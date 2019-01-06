@@ -93,6 +93,7 @@ pub (crate) const SWITCHEXIT : u8 = 0x6F;
 
 pub (crate) const COLLECTARRAY : u8 = 0x70;
 pub (crate) const COLLECTDICT : u8 = 0x71;
+pub (crate) const COLLECTSET : u8 = 0x72;
 
 pub (crate) const IF : u8 = 0x80;
 pub (crate) const IFELSE : u8 = 0x81;
