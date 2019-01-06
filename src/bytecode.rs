@@ -78,6 +78,7 @@ pub (crate) const DECLFAR : u8 = 0x31;
 pub (crate) const DECLGLOBALVAR : u8 = 0x32;
 
 pub (crate) const BINSTATE : u8 = 0x40;
+#[allow(dead_code)]
 pub (crate) const UNSTATE : u8 = 0x41;
 pub (crate) const FUNCCALL : u8 = 0x42;
 pub (crate) const INVOKECALL : u8 = 0x48;
