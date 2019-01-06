@@ -92,6 +92,7 @@ impl Interpreter
         insert!("instance_add_variable" , sim_func_instance_add_variable);
         insert!("insert"                , sim_func_insert               );
         insert!("remove"                , sim_func_remove               );
+        insert!("contains"              , sim_func_contains             );
         insert!("round"                 , sim_func_round                );
         insert!("floor"                 , sim_func_floor                );
         insert!("ceil"                  , sim_func_ceil                 );
@@ -223,6 +224,21 @@ impl Interpreter
                 set.remove(&val_to_hashval(key)?);
                 Ok((Value::Set(set), false))
             }
+            _ => plainerr("error: remove() must be called with an array, dictionary, or set as its argument")
+        }
+    }
+    pub (crate) fn sim_func_contains(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    {
+        if args.len() != 2
+        {
+            return Err(format!("error: wrong number of arguments to contains(); expected 2, got {}", args.len()));
+        }
+        let collection = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
+        let key = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
+        match collection
+        {
+            Value::Dict(dict) => Ok((Value::Number(bool_floaty(dict.contains_key(&val_to_hashval(key)?))), false)),
+            Value::Set (set ) => Ok((Value::Number(bool_floaty(set .contains    (&val_to_hashval(key)?))), false)),
             _ => plainerr("error: remove() must be called with an array, dictionary, or set as its argument")
         }
     }

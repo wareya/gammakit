@@ -448,6 +448,12 @@ changed_dict = remove(changed_dict, "asdf");
 print(changed_array);
 print(changed_dict);
 
+print("contains():");
+
+print(contains(changed_dict, 0), contains(changed_dict, "notthere"));
+print(contains(set{10}, 10), contains(set{10}, 0));
+
+
 print("round(), floor(), ceil():");
 print(round(0.49999), round(0.5), floor(0.9), ceil(0.1));
 
@@ -456,3 +462,4 @@ print("sets:");
 print(set {0, 0, 10, "asdf", "asdf"});
 print(remove(set{0, 1, 10, 16}, 10));
 print(insert(set{}, 10));
+
