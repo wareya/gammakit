@@ -198,6 +198,8 @@ pub enum Value {
     Set(HashSet<HashableValue>),
     Func(Box<FuncVal>),
     Generator(GeneratorState),
+    Instance(usize),
+    Object(usize),
     Special(Special),
 }
 #[derive(Debug)]

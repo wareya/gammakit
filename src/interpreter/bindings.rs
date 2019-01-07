@@ -267,8 +267,7 @@ impl Interpreter
             return Err(format!("error: wrong number of arguments to instance_create(); expected 1, got {}", args.len()));
         }
         
-        let object_id_f = self.list_pop_number(&mut args).or_else(|_| plainerr("error: tried to use a non-number as an object id"))?;
-        let object_id = object_id_f.round() as usize;
+        let object_id = self.list_pop_object(&mut args).or_else(|_| plainerr("error: first argument to instance_create() must be an object"))?;
         let instance_id = self.global.instance_id as usize;
         let object = self.global.objects.get(&object_id).ok_or_else(|| format!("error: tried to create instance of non-extant object type {}", object_id))?;
         
@@ -295,11 +294,11 @@ impl Interpreter
             let pseudo_funcvar = FuncVal{internal : false, name : Some("create".to_string()), predefined : None, userdefdata : Some(function.clone())};
             self.jump_to_function(&function.clone(), Vec::new(), false, &pseudo_funcvar)?;
             self.top_frame.instancestack.push(instance_id);
-            Ok((Value::Number(instance_id as f64), true))
+            Ok((Value::Instance(instance_id), true))
         }
         else
         {
-            Ok((Value::Number(instance_id as f64), false))
+            Ok((Value::Instance(instance_id), false))
         }
     }
     pub (crate) fn sim_func_instance_add_variable(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
@@ -308,8 +307,7 @@ impl Interpreter
         {
             return Err(format!("error: wrong number of arguments to instance_add_variable(); expected 2 to 3, got {}", args.len()));
         }
-        let instance_id_f = self.list_pop_number(&mut args).or_else(|_| plainerr("error: first argument to instance_add_variable() must be a number"))?;
-        let instance_id = instance_id_f.round() as usize;
+        let instance_id = self.list_pop_instance(&mut args).or_else(|_| plainerr("error: first argument to instance_add_variable() must be an instance"))?;
         let name = self.list_pop_text(&mut args).or_else(|_| plainerr("error: second argument to instance_add_variable() must be a string"))?;
         
         if !self.global.regex_holder.is_exact(r"[a-zA-Z_][a-zA-Z_0-9]*", &name)
@@ -331,8 +329,7 @@ impl Interpreter
         {
             return Err(format!("error: wrong number of arguments to instance_execute(); expected 2 or more, got {}", args.len()));
         }
-        let instance_id_f = self.list_pop_number(&mut args).or_else(|_| plainerr("error: first argument to instance_execute() must be a number"))?;
-        let instance_id = instance_id_f.round() as usize;
+        let instance_id = self.list_pop_instance(&mut args).or_else(|_| plainerr("error: first argument to instance_execute() must be a number"))?;
         let func = self.list_pop_func(&mut args).or_else(|_| plainerr("error: second argument to instance_execute() must be a function"))?;
         
         if func.internal

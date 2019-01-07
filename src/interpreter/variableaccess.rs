@@ -372,7 +372,7 @@ impl Interpreter
         {
             if value.is_none()
             {
-                return Ok(Some(Value::Number(*var as f64)));
+                return Ok(Some(Value::Object(*var)));
             }
             else
             {

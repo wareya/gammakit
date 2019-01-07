@@ -54,9 +54,19 @@ impl Interpreter
     }
     
     // second val: 0: no value on stack; 1: value on stack was of the wrong type
+    /*
     pub (crate) fn list_pop_number(&mut self, args : &mut Vec<Value>) -> Result<f64, i32>
     {
         list_pop_generic!(args, Number)
+    }
+    */
+    pub (crate) fn list_pop_instance(&mut self, args : &mut Vec<Value>) -> Result<usize, i32>
+    {
+        list_pop_generic!(args, Instance)
+    }
+    pub (crate) fn list_pop_object(&mut self, args : &mut Vec<Value>) -> Result<usize, i32>
+    {
+        list_pop_generic!(args, Object)
     }
     pub (crate) fn list_pop_text(&mut self, args : &mut Vec<Value>) -> Result<String, i32>
     {
@@ -165,10 +175,12 @@ impl Interpreter
         Ok((captures, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : true, generator : false }))
     }
     
+    /*
     pub (crate) fn stack_pop_number(&mut self) -> Option<f64>
     {
         match_or_none!(self.stack_pop_val(), Some(Value::Number(val)) => val)
     }
+    */
     pub (crate) fn stack_pop_text(&mut self) -> Option<String>
     {
         match_or_none!(self.stack_pop_val(), Some(Value::Text(val)) => val)

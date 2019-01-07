@@ -52,8 +52,8 @@ impl GlobalState {
     fn new(parser : Option<Parser>) -> GlobalState
     {
         GlobalState {
-            instance_id : 1_0000_0000,
-            object_id : 3_0000_0000,
+            instance_id : 1,
+            object_id : 1,
             instances : HashMap::new(),
             instances_by_type : HashMap::new(),
             objectnames : HashMap::new(),

@@ -4,14 +4,8 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
 {
     match val
     {
-        Value::Number(float) =>
-        {
-            Some(format!("{:.10}", float).trim_right_matches('0').trim_right_matches('.').to_string())
-        }
-        Value::Text(string) =>
-        {
-            Some(string.clone())
-        }
+        Value::Number(float) => Some(format!("{:.10}", float).trim_right_matches('0').trim_right_matches('.').to_string()),
+        Value::Text(string) => Some(string.clone()),
         Value::Array(array) =>
         {
             let mut ret = String::new();
@@ -108,6 +102,8 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
             
             Some(ret)
         }
+        Value::Instance(id) => Some(format!("instance {}", id)),
+        Value::Object(id) => Some(format!("object {}", id)), // TODO: use name?
         Value::Func(_) | Value::Generator(_) | Value::Special(_) => None
     }
 }

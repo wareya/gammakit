@@ -162,9 +162,8 @@ impl Interpreter
         let source = self.stack_pop_val().ok_or_else(|| minierr("internal error: failed to get source from stack in INDIRECTION operation"))?;
         match source
         {
-            Value::Number(ident) =>
+            Value::Instance(ident) =>
             {
-                let ident = ident as usize;
                 if !self.global.instances.contains_key(&ident)
                 {
                     return Err(format!("error: tried to perform indirection on instance {} that doesn't exist", ident));
@@ -179,7 +178,7 @@ impl Interpreter
                 
                 Ok(())
             }
-            _ => plainerr("error: tried to use indirection on a type that can't be an identifier (only instance IDs (which are numbers) or the special name \"global\" can go on the left side of a . operator)")
+            _ => plainerr("error: tried to use indirection on a type that can't be an identifier (only instance IDs or the special name \"global\" can go on the left side of a . operator)")
         }
     }
     pub (crate) fn sim_EVALUATION(&mut self) -> OpResult
@@ -430,26 +429,15 @@ impl Interpreter
             return plainerr("internal error: WITH instruction requires 1 values on the stack but found 0");
         }
         // NOTE: for with(), the self.top_frame.scopes.len() >= 0xFFFF error case is handled by SCOPE instruction
-        let other_id = self.stack_pop_number().ok_or_else(|| minierr("error: tried to use with() on a non-numeric expression (instance ids and object ids are numeric)"))?.round() as usize;
+        let other_id = self.stack_pop_val().ok_or_else(|| minierr("internal error: tried to use with() on a non-value expression"))?;
         
         let codelen = self.read_usize()?;
         
         let current_pc = self.get_pc();
         
-        if self.global.instances.contains_key(&other_id)
+        if let Value::Object(object_id) = other_id
         {
-            self.top_frame.instancestack.push(other_id);
-            
-            self.top_frame.controlstack.push(Controller::With(WithData{
-                scopes : self.top_frame.scopes.len() as u16,
-                loop_start : current_pc,
-                loop_end : current_pc + codelen,
-                instances : VecDeque::new()
-            }));
-        }
-        else
-        {
-            let instance_id_list = self.global.instances_by_type.get(&other_id).ok_or_else(|| minierr("error: tried to use non-existant instance in with expression"))?;
+            let instance_id_list = self.global.instances_by_type.get(&object_id).ok_or_else(|| minierr("error: tried to use non-existant instance in with expression"))?;
             if let Some(first) = instance_id_list.first()
             {
                 self.top_frame.instancestack.push(*first);
@@ -465,6 +453,28 @@ impl Interpreter
                 // silently skip block if there are no instances of this object type
                 self.add_pc(codelen as usize);
             }
+        }
+        else if let Value::Instance(instance_id) = other_id
+        {
+            if self.global.instances.contains_key(&instance_id)
+            {
+                self.top_frame.instancestack.push(instance_id);
+                
+                self.top_frame.controlstack.push(Controller::With(WithData{
+                    scopes : self.top_frame.scopes.len() as u16,
+                    loop_start : current_pc,
+                    loop_end : current_pc + codelen,
+                    instances : VecDeque::new()
+                }));
+            }
+            else
+            {
+                return plainerr("error: tried to use non-extant instance as argument of with()");
+            }
+        }
+        else
+        {
+            return plainerr("error: tried to use with() with a value that was not an object id or instance id");
         }
         Ok(())
     }

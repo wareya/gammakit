@@ -31,7 +31,7 @@ noopfunc();
 var ab;
 ab = instance_create(Ab);
 instance_add_variable(ab, "id", ab);
-ab.id.y = ab+1;
+// ab.id.y = ab+1; // adding to instance IDs is not allowed
 
 print("basic language features:");
 
@@ -67,7 +67,7 @@ var lasdfiawefd = instance_create(BlankObj);
 var i;
 i = instance_create(Character);
 instance_add_variable(i, "id", i);
-i.id.y = i+1;
+// i.id.y = i+1; // adding to instance IDs is not allowed
 print(i);
 print(i.id);
 print(i.y);
