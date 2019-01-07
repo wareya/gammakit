@@ -14,16 +14,16 @@ use crate::strings::*;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 enum MiniStr {
-    Short([u8; 7]),
+    Short([u8; 8]),
     Long(String)
 }
 
 impl MiniStr {
     fn from(text : &str) -> MiniStr
     {
-        if text.len() <= 7
+        if text.len() <= 8
         {
-            let mut ret : [u8; 7] = [0,0,0,0,0,0,0];
+            let mut ret : [u8; 8] = [0,0,0,0,0,0,0,0];
             for (i, c) in text.bytes().enumerate()
             {
                 ret[i] = c;
