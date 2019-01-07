@@ -78,7 +78,7 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
         Value::Set(set) =>
         {
             let mut ret = String::new();
-            ret.push_str("{");
+            ret.push_str("set {");
             for (i, val) in set.iter().enumerate()
             {
                 if let HashableValue::Text(text) = val
@@ -147,8 +147,7 @@ fn value_op_modulo(left : &Value, right : &Value) -> Result<Value, String>
     {
         (Value::Number(mut left), Value::Number(mut right)) =>
         {
-            let negative_divisor = right < 0.0;
-            if negative_divisor
+            if right < 0.0
             {
                 right = -right;
                 left = -left;
@@ -171,11 +170,77 @@ pub (crate) fn bool_floaty(b : bool) -> f64
 
 pub (crate) fn value_equal(left : &Value, right : &Value) -> Result<bool, String>
 {
+    macro_rules! if_then_return_false { ( $x:expr ) => { if $x { return Ok(false); } } }
     match (left, right)
     {
         (Value::Number(left), Value::Number(right)) => Ok(left==right),
         (Value::Text(left), Value::Text(right)) => Ok(left==right),
-        _ => Ok(false)
+        (Value::Array(left), Value::Array(right)) =>
+        {
+            if_then_return_false!(left.len() != right.len());
+            for (left, right) in left.iter().zip(right.iter())
+            {
+                if_then_return_false!(!value_equal(left, right)?);
+            }
+            Ok(true)
+        }
+        (Value::Dict(left), Value::Dict(right)) =>
+        {
+            if_then_return_false!(left.len() != right.len());
+            for (left_key, left_val) in left.iter()
+            {
+                if let Some(right_val) = right.get(&left_key)
+                {
+                    if_then_return_false!(!value_equal(left_val, right_val)?);
+                }
+                else
+                {
+                    return Ok(false)
+                }
+            }
+            Ok(true)
+        }
+        (Value::Set(left), Value::Set(right)) =>
+        {
+            if_then_return_false!(left.len() != right.len());
+            for left_val in left.iter()
+            {
+                if_then_return_false!(!right.contains(&left_val));
+            }
+            Ok(true)
+        }
+        (Value::Func(left), Value::Func(right)) =>
+        {
+            if_then_return_false!(
+                left.internal != right.internal ||
+                left.name != right.name ||
+                left.userdefdata != right.userdefdata ||
+                left.predefined.is_some() != right.predefined.is_some()
+            );
+            // only applies to lambdas
+            if let (Some(left), Some(right)) = (&left.predefined, &right.predefined)
+            {
+                if_then_return_false!(left.len() != right.len());
+                for (left_key, left_val) in left.iter()
+                {
+                    if let Some(right_val) = right.get(left_key)
+                    {
+                        if_then_return_false!(!value_equal(left_val, right_val)?);
+                    }
+                    else
+                    {
+                        return Ok(false)
+                    }
+                }
+            }
+            // if above block doesn't run then predefineds must be (None, None) because of left.predefined.is_some() != right.predefined.is_some()
+            Ok(true)
+        }
+        // generators are never equal even in their default state
+        (Value::Generator(_), Value::Generator(_)) => Ok(false),
+        (Value::Instance(left), Value::Instance(right)) | (Value::Object(left), Value::Object(right)) => Ok(left==right),
+        (Value::Special(left), Value::Special(right)) => Ok(std::mem::discriminant(&left)==std::mem::discriminant(&right)),
+        _ => Ok(false) // all non-matching type pairs test false
     }
 }
 // FIXME string/array/dict/generator/etc comparison
@@ -185,19 +250,14 @@ fn value_op_equal(left : &Value, right : &Value) -> Result<Value, String>
 }
 fn value_op_not_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
-    match (left, right)
-    {
-        (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left != right))),
-        (Value::Text(left), Value::Text(right)) => Ok(Value::Number(bool_floaty(left != right))),
-        _ => Ok(Value::Number(0.0))
-    }
+    Ok(Value::Number(bool_floaty(!value_equal(left, right)?)))
 }
 fn value_op_greater_or_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
         (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left >= right))),
-        _ => Ok(Value::Number(0.0))
+        _ => value_op_equal(left, right)
     }
 }
 fn value_op_less_or_equal(left : &Value, right : &Value) -> Result<Value, String>
@@ -205,7 +265,7 @@ fn value_op_less_or_equal(left : &Value, right : &Value) -> Result<Value, String
     match (left, right)
     {
         (Value::Number(left), Value::Number(right)) => Ok(Value::Number(bool_floaty(left <= right))),
-        _ => Ok(Value::Number(0.0))
+        _ => value_op_equal(left, right)
     }
 }
 fn value_op_greater(left : &Value, right : &Value) -> Result<Value, String>

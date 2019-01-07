@@ -68,10 +68,6 @@ contains
 
 "global" is a fake/fixed/read-only variable that stores global variables (e.g. global.players). Global functions are accessed as if they were in the current scope, but can be shadowed by local functions.
 
-TODO:
-- equality and inequality for types other than numbers and strings
-- change object and instance IDs to opaque pointers instead of numbers
-
 TODO (sanitation/low-priority):
 - make keys() iterate over dict/set elements in insertion order
 - make sure format_val does the same as the above
@@ -83,6 +79,7 @@ TODO (sanitation/low-priority):
 MAYBE:
 - real structs, copied by value like arrays/dicts are (if you don't want them copied by value just use objects/instances)
 -- maybe just give .attr access syntax to dictionaries? (like js) (maybe use another symbol like -> or : or / so it doesn't have to decide?)
+- integer type?
 
 MAYBE (metaprogramming):
 - give the runtime control over interpreters of its own; runtime panics will invalidate interpreters

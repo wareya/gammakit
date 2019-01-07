@@ -463,3 +463,14 @@ print(set {0, 0, 10, "asdf", "asdf"});
 print(remove(set{0, 1, 10, 16}, 10));
 print(insert(set{}, 10));
 
+print("array equality:");
+print([] == [0], [1] == [0], [0,10,1] == [0,10,1]);
+
+print("dict equality:");
+print({10:10,0:0,1:0,1:7,1:10});
+print({} == {0:0}, {1:0} == {0:1}, {0:0} == {0:1}, {0:0,10:10,1:10} == {10:10,0:0,1:0,1:7,1:10});
+
+print("set equality:");
+print(set {} == set {0}, set {1} == set {0}, set {0,10,1} == set {10,0,1,1,1});
+
+

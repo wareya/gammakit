@@ -86,6 +86,8 @@ pub (crate) struct Frame {
 
 // inaccessible types
 
+#[derive(PartialEq)]
+#[derive(Eq)]
 #[derive(Debug)]
 #[derive(Clone)]
 pub (crate) struct FuncSpec {
@@ -93,10 +95,10 @@ pub (crate) struct FuncSpec {
     pub (super) code: Rc<Vec<u8>>,
     pub (super) startaddr: usize,
     pub (super) endaddr: usize,
-    pub (super) fromobj: bool,
+    pub (super) fromobj: bool, // function is associated with an object type and must be placed in the context of an instance to be used
     pub (super) parentobj: usize,
-    pub (super) forcecontext: usize,
-    pub (super) impassable: bool,
+    pub (super) forcecontext: usize, // the instance to use as context when executing an object function
+    pub (super) impassable: bool, // blocks visibility of scopes outside the called function
     pub (super) generator: bool,
 }
 pub (crate) struct ObjSpec {
@@ -176,7 +178,6 @@ pub struct FuncVal {
     pub (super) userdefdata: Option<FuncSpec>
 }
 
-// value types
 #[derive(Debug)]
 #[derive(Clone)]
 pub struct GeneratorState {

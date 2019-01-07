@@ -773,7 +773,12 @@ impl Interpreter
         {
             let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTDICT instruction failed to collect values from stack"))?;
             let key = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTDICT instruction failed to collect values from stack"))?;
-            mydict.insert(val_to_hashval(key)?, val);
+            let hashval = val_to_hashval(key)?;
+            // stack popping goes in reverse order (most-recently added items first) so we just don't insert items that are already there
+            if !mydict.contains_key(&hashval)
+            {
+                mydict.insert(hashval, val);
+            }
         }
         self.stack_push_val(Value::Dict(mydict));
         Ok(())
