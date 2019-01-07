@@ -143,7 +143,6 @@ $switch$
 $funcdef$
 $objdef$
 $lvar$ $binstateop$ $expr$ ;
-$lvar$ $unstateop$ ;
 $instruction$ ;
 $funccall$ ;
 $invocation_call$ ;

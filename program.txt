@@ -473,4 +473,31 @@ print({} == {0:0}, {1:0} == {0:1}, {0:0} == {0:1}, {0:0,10:10,1:10} == {10:10,0:
 print("set equality:");
 print(set {} == set {0}, set {1} == set {0}, set {0,10,1} == set {10,0,1,1,1});
 
+print("function equality:");
+def makeafunction()
+{
+    def innerfunction()
+    {
+        
+    }
+    return innerfunction;
+}
+
+var func1 = makeafunction();
+var func2 = makeafunction();
+
+print(makeafunction == makeafunction);
+print(func1 == func2);
+print(makeafunction == func2);
+
+print("string equality:");
+print("asdf" == "asdf");
+print("asdf" >= "asdf");
+print("asdf" <= "asdf");
+print("asdf" <= "zxcv");
+print("asdf" < "zxcv");
+
+print("asdf" == "zxcv");
+print("asdf" >= "zxcv");
+print("asdf" > "zxcv");
 

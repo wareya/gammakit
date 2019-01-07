@@ -10,8 +10,7 @@ pub (crate) use self::ops::*;
 
 // internal types
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub (crate) struct IfElseData {
     pub (super) scopes: u16,
     pub (super) if_end: usize,
@@ -19,8 +18,7 @@ pub (crate) struct IfElseData {
 }
 
 // note: for loops are controlled the same way as while loops
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub (crate) struct WhileData {
     pub (super) scopes: u16,
     pub (super) expr_start: usize, // continue destination
@@ -28,8 +26,7 @@ pub (crate) struct WhileData {
     pub (super) loop_end: usize, // continue from here
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub (crate) struct WithData {
     pub (super) scopes: u16,
     pub (super) loop_start: usize,
@@ -37,8 +34,7 @@ pub (crate) struct WithData {
     pub (super) instances: VecDeque<Value>,
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub (crate) struct ForEachData {
     pub (super) scopes: u16,
     pub (super) loop_start: usize,
@@ -47,8 +43,7 @@ pub (crate) struct ForEachData {
     pub (super) values: VecDeque<Value>,
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub (crate) struct SwitchData {
     pub (super) scopes: u16,
     pub (super) blocks: Vec<usize>,
@@ -56,8 +51,7 @@ pub (crate) struct SwitchData {
     pub (super) value: Value,
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub (crate) enum Controller {
     IfElse(IfElseData),
     While(WhileData),
@@ -66,8 +60,7 @@ pub (crate) enum Controller {
     Switch(SwitchData),
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub (crate) struct Frame {
     pub (super) code: Rc<Vec<u8>>,
     pub (super) startpc: usize,
@@ -86,10 +79,7 @@ pub (crate) struct Frame {
 
 // inaccessible types
 
-#[derive(PartialEq)]
-#[derive(Eq)]
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 pub (crate) struct FuncSpec {
     pub (super) varnames: Vec<String>,
     pub (super) code: Rc<Vec<u8>>,
@@ -116,29 +106,25 @@ pub (crate) struct Instance {
 // variable types (i.e. how to access a variable as an lvalue)
 
 // internal to ArrayVar
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub (super) enum NonArrayVariable {
     Indirect(IndirectVar), // x.y.z evaluates x.y before storing it as the instance identity under which to find y
     Direct(DirectVar),
     ActualArray(VecDeque<Value>) // for situations where the compiler doesn't know that EVALUATE is unnecessary, like func()[0]
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub (crate) struct ArrayVar { // for x[y]
     pub (super) location: NonArrayVariable,
     pub (super) indexes: Vec<Value>
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub (crate) enum IndirectSource {
     Ident(usize), // id of an instance
     Global,
 }
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub (crate) struct IndirectVar { // for x.y
     pub (super) source: IndirectSource,
     pub (super) name: String
@@ -155,13 +141,11 @@ impl IndirectVar {
     }
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub (crate) struct DirectVar { // for x
     pub (super) name: String
 }
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub (crate) enum Variable {
     Array(ArrayVar),
     Indirect(IndirectVar),
@@ -169,8 +153,7 @@ pub (crate) enum Variable {
 }
 
 // value types
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct FuncVal {
     pub (super) internal: bool,
     pub (super) name: Option<String>,
@@ -178,19 +161,16 @@ pub struct FuncVal {
     pub (super) userdefdata: Option<FuncSpec>
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct GeneratorState {
     pub (super) frame: Option<Frame>, // stores code, pc, and stacks; becomes None after the generator returns/finalizes or exits through its bottom
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Special {
     Global
 }
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Number(f64),
     Text(String),
@@ -203,15 +183,13 @@ pub enum Value {
     Object(usize),
     Special(Special),
 }
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub (super) enum StackValue {
     Val(Value),
     Var(Variable),
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub enum HashableValue {
     Number(f64),
     Text(String),

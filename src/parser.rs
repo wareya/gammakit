@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::collections::BTreeSet;
 use std::collections::VecDeque;
 use std::time::Instant;
 
@@ -9,26 +10,83 @@ use crate::ast::*;
 use crate::grammar::*;
 use crate::regexholder::RegexHolder;
 use crate::strings::*;
-    
-#[derive(Clone)]
-#[derive(Debug)]
+
+// For performance reasons (i.e. temporary parse error storage is VERY slow otherwise),
+//  we store possible tokens at the point of possible parse errors with a BTreeMap
+//  with short strings stored literally as bytes instead of in a String
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
+enum MiniStr {
+    Short([u8; 8]),
+    Long(String)
+}
+
+impl MiniStr {
+    fn from(text : &str) -> MiniStr
+    {
+        if text.len() <= 8
+        {
+            let mut ret : [u8; 8] = [0,0,0,0,0,0,0,0];
+            for (i, c) in text.bytes().enumerate()
+            {
+                ret[i] = c;
+            }
+            MiniStr::Short(ret)
+        }
+        else
+        {
+            MiniStr::Long(text.to_string())
+        }
+    }
+    fn to_string(self) -> String
+    {
+        match self
+        {
+            MiniStr::Short(bytes) => unsafe { std::str::from_utf8_unchecked(&bytes).to_string() },
+            MiniStr::Long(string) => string
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
 pub (crate) struct ParseError {
     token : usize, // location of the token that caused the error
-    expected : HashSet<String>,
+    expected : BTreeSet<MiniStr>,
 }
 
 impl ParseError {
     pub (crate) fn new(token : usize, text : &str) -> ParseError
     {
-        ParseError{token, expected : vec!(text.to_string()).into_iter().collect()}
+        let mut expected = BTreeSet::new();
+        expected.insert(MiniStr::from(text));
+        ParseError{token, expected}
+    }
+}
+
+pub (crate) fn build_new_error(myself : &mut Option<ParseError>, token : usize, text : &str)
+{
+    match myself
+    {
+        Some(myself) =>
+        {
+            if token > myself.token
+            {
+                *myself = ParseError::new(token, text);
+            }
+            else if token == myself.token
+            {
+                myself.expected.insert(MiniStr::from(text));
+            }
+        }
+        None => *myself = Some(ParseError::new(token, text))
     }
 }
 
 pub (crate) fn build_best_error(myself : &mut Option<ParseError>, other : Option<ParseError>)
 {
-    if let Some(other) = other
+    match (myself.as_mut(), other)
     {
-        if let Some(myself) = myself.as_mut()
+        (Some(myself), Some(other)) =>
         {
             if other.token > myself.token
             {
@@ -42,10 +100,11 @@ pub (crate) fn build_best_error(myself : &mut Option<ParseError>, other : Option
                 }
             }
         }
-        else
+        (None, Some(other)) =>
         {
-            *myself = Some(other);
+            *myself = Some(other)
         }
+        _ => {}
     }
 }
 #[derive(Clone)]
@@ -289,7 +348,7 @@ impl Parser {
     }
 
     // attempts to parse a token list as a particular form of a grammar point
-    fn parse_form(&self, tokens : &VecDeque<LexToken>, index : usize, form : &GrammarForm) -> Result<ParseVecInfo, String>
+    fn parse_form(&self, tokens : &VecDeque<LexToken>, index : usize, form : &GrammarForm, formname : Option<&str>) -> Result<ParseVecInfo, String>
     {
         if tokens.len() == 0
         {
@@ -427,7 +486,7 @@ impl Parser {
                             continue;
                         }
                     }
-                    build_best_error(&mut latesterror, Some(ParseError::new(index+totalconsumed, &text)));
+                    build_new_error(&mut latesterror, index+totalconsumed, &text);
                     return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
                 GrammarToken::Regex(text) =>
@@ -441,7 +500,14 @@ impl Parser {
                             continue;
                         }
                     }
-                    build_best_error(&mut latesterror, Some(ParseError::new(index+totalconsumed, &text)));
+                    if let Some(formname) = formname
+                    {
+                        build_new_error(&mut latesterror, index+totalconsumed, formname);
+                    }
+                    else
+                    {
+                        build_new_error(&mut latesterror, index+totalconsumed, &text);
+                    }
                     return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
                 GrammarToken::Op{text, assoc, precedence} =>
@@ -455,7 +521,7 @@ impl Parser {
                             continue;
                         }
                     }
-                    build_best_error(&mut latesterror, Some(ParseError::new(index+totalconsumed, &text)));
+                    build_new_error(&mut latesterror, index+totalconsumed, &text);
                     return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
                 GrammarToken::RestIsOptional =>
@@ -480,7 +546,16 @@ impl Parser {
         
         for form in &nodetype.forms
         {
-            let (nodes, consumed, error) = self.parse_form(&tokens, index, form)?;
+            let sentname =
+            if nodetype.istoken
+            {
+                Some(nodetype.name.as_str())
+            }
+            else
+            {
+                None
+            };
+            let (nodes, consumed, error) = self.parse_form(&tokens, index, form, sentname)?;
             build_best_error(&mut latesterror, error);
             if let Some(token) = tokens.get(index)
             {
@@ -748,9 +823,9 @@ impl Parser {
             {
                 if let Some(error) = latesterror
                 {
-                    let mut expected : Vec<String> = error.expected.iter().cloned().collect();
+                    let mut expected : Vec<String> = error.expected.into_iter().map(|x| x.to_string()).collect();
                     expected.sort();
-                    if error.expected.len() == 1
+                    if expected.len() == 1
                     {
                         if let Some(expect) = expected.get(0)
                         {
