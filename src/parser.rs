@@ -14,16 +14,16 @@ use crate::strings::*;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 enum MiniStr {
-    Short([u8; 8]),
+    Short([u8; 7]),
     Long(String)
 }
 
 impl MiniStr {
     fn from(text : &str) -> MiniStr
     {
-        if text.len() <= 8
+        if text.len() <= 7
         {
-            let mut ret : [u8; 8] = [0,0,0,0,0,0,0,0];
+            let mut ret : [u8; 7] = [0,0,0,0,0,0,0];
             for (i, c) in text.bytes().enumerate()
             {
                 ret[i] = c;
@@ -40,7 +40,7 @@ impl MiniStr {
     {
         match self
         {
-            MiniStr::Short(bytes) => unsafe { std::str::from_utf8_unchecked(&bytes).to_string() },
+            MiniStr::Short(bytes) => std::str::from_utf8(&bytes).map(|x| x.to_string()).unwrap_or_else(|_| "<err>".to_string()),
             MiniStr::Long(string) => string
         }
     }
