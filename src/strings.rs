@@ -23,12 +23,12 @@ pub (crate) fn unescape(text: &str) -> String
         {
             match c2
             {
-                '\\' => {ret.push(c);}
-                'n' => {ret.push('\n');}
-                'r' => {ret.push('\r');}
-                't' => {ret.push('\t');}
-                '"' => {ret.push('"');}
-                _ => {ret.push(c); ret.push(c2);}
+                '\\' => ret.push(c),
+                'n' => ret.push('\n'),
+                'r' => ret.push('\r'),
+                't' => ret.push('\t'),
+                '"' => ret.push('"'),
+                _ => ret.extend(&[c, c2])
             }
         }
     }
@@ -43,12 +43,12 @@ pub (crate) fn escape(text: &str) -> String
     {
         match c
         {
-            '\\' => {ret.push('\\'); ret.push('\\');}
-            '\n' => {ret.push('\\'); ret.push('n');}
-            '\r' => {ret.push('\\'); ret.push('r');}
-            '\t' => {ret.push('\\'); ret.push('t');}
-            '\"' => {ret.push('\\'); ret.push('"');}
-            _ => {ret.push(c);}
+            '\\' => ret.extend(&['\\', '\\']),
+            '\n' => ret.extend(&['\\', 'n']),
+            '\r' => ret.extend(&['\\', 'r']),
+            '\t' => ret.extend(&['\\', 't']),
+            '\"' => ret.extend(&['\\', '"']),
+            _ => ret.push(c)
         }
     }
     ret
