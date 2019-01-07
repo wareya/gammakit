@@ -1,9 +1,6 @@
 #![allow(clippy::len_zero)]
 
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::collections::BTreeSet;
-use std::collections::VecDeque;
+use std::collections::{HashMap, HashSet, BTreeSet, VecDeque};
 use std::time::Instant;
 
 use crate::ast::*;
@@ -38,6 +35,7 @@ impl MiniStr {
             MiniStr::Long(text.to_string())
         }
     }
+    #[allow(clippy::wrong_self_convention)]
     fn to_string(self) -> String
     {
         match self

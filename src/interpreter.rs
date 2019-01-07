@@ -1,6 +1,4 @@
-use std::collections::VecDeque;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use std::collections::{VecDeque, HashMap, HashSet};
 use std::rc::Rc;
 
 use super::strings::*;
