@@ -254,14 +254,10 @@ impl Interpreter
         
         let object_id = self.list_pop_object(&mut args).or_else(|_| plainerr("error: first argument to instance_create() must be an object"))?;
         
-        let mut instance_id = self.global.instance_id as usize;
+        let instance_id = self.global.instance_id as usize;
         if self.global.instances.len() == !0usize
         {
             return plainerr("error: ran out of instance id space");
-        }
-        while self.global.instances.contains_key(&instance_id)
-        {
-            instance_id += 1;
         }
         let object = self.global.objects.get(&object_id).ok_or_else(|| format!("error: tried to create instance of non-extant object type {}", object_id))?;
         
@@ -283,7 +279,10 @@ impl Interpreter
             self.top_frame.instancestack.push(instance_id);
         }
         
-        self.global.instance_id += 1;
+        while self.global.instances.contains_key(&self.global.instance_id)
+        {
+            self.global.instance_id += 1;
+        }
         
         Ok(Value::Instance(instance_id))
     }
