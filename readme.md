@@ -99,6 +99,7 @@ Gammakit has a small number of built-in bindings. The library user is expected t
 # Roadmap
 
 TODO:
+- "other" and "all"
 - do we want a destroy() event for instance_kill()?
 - defer statement?
 
