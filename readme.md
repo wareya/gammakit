@@ -79,17 +79,20 @@ prints the following output:
 Gammakit has a small number of built-in bindings. The library user is expected to provide any other bindings that their application requires. The user can also choose to not expose the default functions to the interpreter.
 
     print(<any formattable value>)
-    len(string) | len(array) | len(dict) | len(set)
-    keys(array) (returns array of indexes) | keys(dict) (returns array of keys)
-    parse_text(text) (returns ast)
-    compile_text(text) (returns function) (might get removed)
-    compile_ast(ast) (retrurns function)
+
     instance_create(object) (returns an opaque pointer to an instance)
     instance_exists(instance) (returns whether an instance exists)
     instance_kill(instance) (kills an instance)
+
+    len(string/array/dict/set) (returns len)
+    keys(array/dict) (returns array of indexes/keys)
     insert(array, index, val) | insert(dict, key, val) | insert(set, val)
     remove(array, index) | remove(dict, key) | remove(set, val)
-    contains(dict, key) (returns whether) | contains(set, val) (returns whether)
+    contains(dict/set, key) (returns whether)
+
+    parse_text(text) (returns ast)
+    compile_text(text) (returns function) (might get removed)
+    compile_ast(ast) (retrurns function)
 
 "global" is a fake/fixed/read-only variable that stores global variables (e.g. global.players). Global functions are accessed as if they were in the current scope, but can be shadowed by local functions.
 
