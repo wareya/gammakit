@@ -253,26 +253,28 @@ impl Interpreter
         }
         
         let object_id = self.list_pop_object(&mut args).or_else(|_| plainerr("error: first argument to instance_create() must be an object"))?;
-        let instance_id = self.global.instance_id as usize;
+        
+        let mut instance_id = self.global.instance_id as usize;
+        if self.global.instances.len() == !0usize
+        {
+            return plainerr("error: ran out of instance id space");
+        }
+        while self.global.instances.contains_key(&instance_id)
+        {
+            instance_id += 1;
+        }
         let object = self.global.objects.get(&object_id).ok_or_else(|| format!("error: tried to create instance of non-extant object type {}", object_id))?;
         
-        let mut variables = HashMap::new();
-        // FIXME configurable default variables?
-        variables.insert("x".to_string(), Value::Number(0.0));
-        variables.insert("y".to_string(), Value::Number(0.0));
-        let new = Instance { objtype : object_id, ident : instance_id, variables };
-        self.global.instances.insert(instance_id, new); // FIXME: check for id clash
+        self.global.instances.insert(instance_id, Instance { objtype : object_id, ident : instance_id, variables : HashMap::new() });
         
         if let Some(ref mut instance_list) = self.global.instances_by_type.get_mut(&object_id)
         {
-            instance_list.push(instance_id); // gives no clash if there is no clash abovs
+            instance_list.push(instance_id);
         }
         else
         {
             self.global.instances_by_type.insert(object_id, vec!(instance_id));
         }
-        
-        self.global.instance_id += 1;
         
         if let Some(function) = object.functions.get("create")
         {
@@ -280,6 +282,9 @@ impl Interpreter
             self.jump_to_function(&function.clone(), Vec::new(), false, &pseudo_funcvar)?;
             self.top_frame.instancestack.push(instance_id);
         }
+        
+        self.global.instance_id += 1;
+        
         Ok(Value::Instance(instance_id))
     }
     pub (crate) fn sim_func_parse_text(&mut self, mut args : Vec<Value>) -> Result<Value, String>

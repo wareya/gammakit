@@ -32,7 +32,6 @@ var ab;
 ab = instance_create(Ab);
 with(ab)
     far id = ab;
-// ab.id.y = ab+1; // adding to instance IDs is not allowed
 
 print("basic language features:");
 
@@ -41,6 +40,7 @@ obj Character
     def create()
     {
         far localvar = 1;
+        far x = 0, y = 0;
     }
     def printthing(arg)
     {
@@ -69,7 +69,6 @@ var i;
 i = instance_create(Character);
 with(i)
     far id = i;
-// i.id.y = i+1; // adding to instance IDs is not allowed
 print(i);
 print(i.id);
 print(i.y);
