@@ -83,6 +83,8 @@ impl Interpreter
         insert!("compile_text"          , sim_func_compile_text         );
         insert!("compile_ast"           , sim_func_compile_ast          );
         insert!("instance_create"       , sim_func_instance_create      );
+        insert!("instance_exists"       , sim_func_instance_exists      );
+        insert!("instance_kill"         , sim_func_instance_kill        );
         insert!("insert"                , sim_func_insert               );
         insert!("remove"                , sim_func_remove               );
         insert!("contains"              , sim_func_contains             );
@@ -265,11 +267,13 @@ impl Interpreter
         
         if let Some(ref mut instance_list) = self.global.instances_by_type.get_mut(&object_id)
         {
-            instance_list.push(instance_id);
+            instance_list.insert(instance_id);
         }
         else
         {
-            self.global.instances_by_type.insert(object_id, vec!(instance_id));
+            let mut instance_list = BTreeSet::new();
+            instance_list.insert(instance_id);
+            self.global.instances_by_type.insert(object_id, instance_list);
         }
         
         if let Some(function) = object.functions.get("create")
@@ -285,6 +289,36 @@ impl Interpreter
         }
         
         Ok(Value::Instance(instance_id))
+    }
+    pub (crate) fn sim_func_instance_exists(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        if args.len() != 1
+        {
+            return Err(format!("error: wrong number of arguments to instance_create(); expected 1, got {}", args.len()));
+        }
+        
+        let instance_id = self.list_pop_instance(&mut args).or_else(|_| plainerr("error: first argument to instance_create() must be an object"))?;
+        
+        Ok(Value::Number(bool_floaty(self.global.instances.contains_key(&instance_id))))
+    }
+    pub (crate) fn sim_func_instance_kill(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        if args.len() != 1
+        {
+            return Err(format!("error: wrong number of arguments to instance_create(); expected 1, got {}", args.len()));
+        }
+        
+        let instance_id = self.list_pop_instance(&mut args).or_else(|_| plainerr("error: first argument to instance_create() must be an object"))?;
+        
+        if let Some(inst) = self.global.instances.remove(&instance_id)
+        {
+            if let Some(ref mut instance_list) = self.global.instances_by_type.get_mut(&inst.objtype)
+            {
+                instance_list.remove(&instance_id);
+            }
+        }
+        
+        Ok(Value::Number(0.0))
     }
     pub (crate) fn sim_func_parse_text(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {

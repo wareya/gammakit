@@ -436,7 +436,7 @@ impl Interpreter
         
         if let Value::Object(object_id) = other_id
         {
-            let instance_id_list = self.global.instances_by_type.get(&object_id).ok_or_else(|| minierr("error: tried to use non-existant instance in with expression"))?;
+            let instance_id_list : Vec<usize> = self.global.instances_by_type.get(&object_id).ok_or_else(|| minierr("error: tried to use non-existant instance in with expression"))?.iter().cloned().collect();
             if let Some(first) = instance_id_list.first()
             {
                 self.top_frame.instancestack.push(*first);
@@ -738,7 +738,7 @@ impl Interpreter
         
         self.global.objectnames.insert(name.clone(), object_id);
         self.global.objects.insert(object_id, ObjSpec { ident : object_id, name, functions : funcs });
-        self.global.instances_by_type.insert(object_id, Vec::new());
+        self.global.instances_by_type.insert(object_id, BTreeSet::new());
         
         self.global.object_id += 1;
         Ok(())

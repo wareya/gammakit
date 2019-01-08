@@ -94,8 +94,7 @@ Gammakit has a small number of built-in bindings. The library user is expected t
 # Roadmap
 
 TODO:
-- instance_exists() and instance_kill()
-- support sets in keys()
+- do we want a destroy() event for instance_kill()?
 - defer statement
 
 TODO (sanitation/low-priority):

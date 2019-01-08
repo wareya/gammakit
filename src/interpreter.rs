@@ -1,4 +1,4 @@
-use std::collections::{VecDeque, HashMap, HashSet};
+use std::collections::{VecDeque, HashMap, HashSet, BTreeSet};
 use std::rc::Rc;
 
 use super::{strings::*, ast::*, parser::*, bytecode::*, compiler::*};
@@ -35,7 +35,7 @@ struct GlobalState {
     instance_id: usize,
     object_id: usize,
     instances: HashMap<usize, Instance>,
-    instances_by_type: HashMap<usize, Vec<usize>>,
+    instances_by_type: HashMap<usize, BTreeSet<usize>>,
     objectnames: HashMap<String, usize>,
     objects: HashMap<usize, ObjSpec>,
     parser: Option<Parser>,

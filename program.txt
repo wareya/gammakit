@@ -478,3 +478,10 @@ print("asdf" < "zxcv");
 print("asdf" == "zxcv");
 print("asdf" >= "zxcv");
 print("asdf" > "zxcv");
+
+print("instance_exists and instance_kill:");
+
+var timetodie = instance_create(Character);
+print(instance_exists(timetodie));
+instance_kill(timetodie);
+print(instance_exists(timetodie));
