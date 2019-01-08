@@ -18,16 +18,18 @@ pub (crate) fn unescape(text: &str) -> String
         if c != '\\'
         {
             ret.push(c);
-            continue;
         }
-        match chars.pop_front()
+        else if let Some(c2) = chars.pop_front()
         {
-            Some('\\') => ret.push(c),
-            Some('n') => ret.push('\n'),
-            Some('r') => ret.push('\r'),
-            Some('t') => ret.push('\t'),
-            Some('"') => ret.push('"'),
-            _ => ret.extend(&[c, c2])
+            match c2
+            {
+                '\\' => ret.push(c),
+                'n' => ret.push('\n'),
+                'r' => ret.push('\r'),
+                't' => ret.push('\t'),
+                '"' => ret.push('"'),
+                _ => ret.extend(&[c, c2])
+            }
         }
     }
     ret
