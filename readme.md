@@ -100,7 +100,7 @@ Gammakit has a small number of built-in bindings. The library user is expected t
 
 TODO:
 - do we want a destroy() event for instance_kill()?
-- defer statement
+- defer statement?
 
 TODO (sanitation/low-priority):
 - make keys() iterate over dict/set elements in insertion order
