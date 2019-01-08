@@ -53,3 +53,37 @@ pub (crate) fn escape(text: &str) -> String
     }
     ret
 }
+
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
+pub (crate) enum MiniStr {
+    Short([u8; 8]),
+    Long(String)
+}
+
+impl MiniStr {
+    pub (crate) fn from(text : &str) -> MiniStr
+    {
+        if text.len() <= 8
+        {
+            let mut ret : [u8; 8] = [0,0,0,0,0,0,0,0];
+            for (i, c) in text.bytes().enumerate()
+            {
+                ret[i] = c;
+            }
+            MiniStr::Short(ret)
+        }
+        else
+        {
+            MiniStr::Long(text.to_string())
+        }
+    }
+    #[allow(clippy::wrong_self_convention)]
+    pub (crate) fn to_string(self) -> String
+    {
+        match self
+        {
+            MiniStr::Short(bytes) => std::str::from_utf8(&bytes).map(|x| x.to_string()).unwrap_or_else(|_| "<err>".to_string()),
+            MiniStr::Long(string) => string
+        }
+    }
+}

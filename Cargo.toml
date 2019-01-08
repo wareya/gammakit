@@ -3,12 +3,29 @@ name = "gammakit"
 version = "0.1.0"
 authors = ["wareya <wareya@gmail.com>"]
 edition = "2018"
+exclude = [
+    "trash/*",
+]
+
+description = "A toy programming language. No stability guarantees."
+license = "Apache-2.0"
+
+repository = "https://github.com/wareya/gammakit"
+
+categories = ["parser-implementations"]
+
+readme = "readme.md"
+
+[lib]
+doc = true
 
 [dependencies]
 regex = "1"
 
-[profile.release]
-opt-level = 2
-debug = true
-lto = true
+[profile.bench]
+debug = 2
+overflow-checks = true
 
+[profile.test]
+opt-level = 3
+overflow-checks = true

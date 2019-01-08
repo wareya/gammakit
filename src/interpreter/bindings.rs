@@ -76,7 +76,7 @@ impl Interpreter
         self.internal_functions.insert(funcname, func);
     }
     
-    pub (crate) fn insert_default_internal_functions(&mut self)
+    pub fn insert_default_internal_functions(&mut self)
     {
         macro_rules! enrc { ( $y:ident ) => { Rc::new(Interpreter::$y) } }
         macro_rules! insert { ( $x:expr, $y:ident ) => { self.insert_normal_internal_func($x.to_string(), enrc!($y)); } }

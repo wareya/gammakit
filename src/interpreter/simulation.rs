@@ -1,6 +1,4 @@
-#![allow(clippy::cast_lossless)]
-#![allow(clippy::map_entry)]
-#![allow(non_snake_case)]
+#![allow(clippy::cast_lossless, clippy::map_entry, non_snake_case)]
 
 use crate::interpreter::*;
 

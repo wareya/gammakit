@@ -1,8 +1,6 @@
 #![allow(clippy::len_zero)]
 
-use super::strings::*;
-use super::ast::*;
-use super::bytecode::*;
+use super::{strings::*, ast::*, bytecode::*};
 
 fn minierr(mystr : &str) -> String
 {

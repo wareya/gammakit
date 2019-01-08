@@ -1,11 +1,7 @@
 use std::collections::{VecDeque, HashMap, HashSet};
 use std::rc::Rc;
 
-use super::strings::*;
-use super::ast::*;
-use super::parser::*;
-use super::bytecode::*;
-use super::compiler::*;
+use super::{strings::*, ast::*, parser::*, bytecode::*, compiler::*};
 use super::regexholder::RegexHolder;
 
 mod bindings;
@@ -17,11 +13,11 @@ mod types;
 mod variableaccess;
 mod control;
 
-use self::types::*;
+pub use self::types::*;
 
 pub type StepResult = Result<(), Option<String>>;
 type OpResult = Result<(), String>;
-type InternalFunction = Fn(&mut Interpreter, Vec<Value>, bool) -> Result<(Value, bool), String>;
+pub type InternalFunction = Fn(&mut Interpreter, Vec<Value>, bool) -> Result<(Value, bool), String>;
 
 fn minierr(mystr : &'static str) -> String
 {
@@ -34,8 +30,8 @@ fn plainerr<T>(mystr : &'static str) -> Result<T, String>
 
 // global interpreter data
 struct GlobalState {
-    instance_id: usize,// init 100000000
-    object_id: usize,  // init 300000000
+    instance_id: usize,
+    object_id: usize,
     instances: HashMap<usize, Instance>,
     instances_by_type: HashMap<usize, Vec<usize>>,
     objectnames: HashMap<String, usize>,
@@ -153,11 +149,11 @@ impl Interpreter {
     ///
     /// Handles flow control after stepping, not before.
     ///
-    /// If execution can control, Ok(()) is returned.
+    /// If execution can continue, Ok(()) is returned.
     ///
-    /// If execution cannot return, Err(Option<String>) is returned. This includes graceful exits.
+    /// If execution cannot continue, Err(Option<String>) is returned. This includes graceful exits (end of code).
     ///
-    /// If there is an error string (Err(Some(string))), exit was non-graceful (i.e. there was an error). Otherwise (Err(None)), it was graceful.
+    /// If there is an error string (i.e. Err(Some(string))), exit was non-graceful (i.e. there was an error). Otherwise (i.e. Err(None)), it was graceful.
     pub fn step(&mut self) -> StepResult
     {
         self.last_error = None;

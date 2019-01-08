@@ -3,48 +3,12 @@
 use std::collections::{HashMap, HashSet, BTreeSet, VecDeque};
 use std::time::Instant;
 
-use crate::ast::*;
-use crate::grammar::*;
+use crate::{ast::*, grammar::*, strings::*};
 use crate::regexholder::RegexHolder;
-use crate::strings::*;
 
 // For performance reasons (i.e. temporary parse error storage is VERY slow otherwise),
 //  we store possible tokens at the point of possible parse errors with a BTreeMap
 //  with short strings stored literally as bytes instead of in a String
-
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
-enum MiniStr {
-    Short([u8; 8]),
-    Long(String)
-}
-
-impl MiniStr {
-    fn from(text : &str) -> MiniStr
-    {
-        if text.len() <= 8
-        {
-            let mut ret : [u8; 8] = [0,0,0,0,0,0,0,0];
-            for (i, c) in text.bytes().enumerate()
-            {
-                ret[i] = c;
-            }
-            MiniStr::Short(ret)
-        }
-        else
-        {
-            MiniStr::Long(text.to_string())
-        }
-    }
-    #[allow(clippy::wrong_self_convention)]
-    fn to_string(self) -> String
-    {
-        match self
-        {
-            MiniStr::Short(bytes) => std::str::from_utf8(&bytes).map(|x| x.to_string()).unwrap_or_else(|_| "<err>".to_string()),
-            MiniStr::Long(string) => string
-        }
-    }
-}
 
 #[derive(Clone, Debug)]
 pub (crate) struct ParseError {
@@ -133,8 +97,8 @@ fn plainerr<T>(mystr : &str) -> Result<T, String>
 type ParseInfo = (Option<ASTNode>, usize, Option<ParseError>);
 type ParseVecInfo = (Option<Vec<ASTNode>>, usize, Option<ParseError>);
 
-impl Parser {
-    pub fn new() -> Parser
+impl Default for Parser {
+    fn default() -> Parser
     {
         Parser {
             regex_list: Vec::new(),
@@ -148,7 +112,12 @@ impl Parser {
             inited: false
         }
     }
-    
+}
+impl Parser {
+    pub fn new() -> Parser
+    {
+        Parser::default()
+    }
     pub fn init(&mut self, text: &str) -> Result<(), String>
     {
         let start_time = Instant::now();
