@@ -55,7 +55,7 @@ mod tests {
         
         if let Some(err) = &interpreter.last_error
         {
-            println!("{}", err);
+            panic!("{}", err);
         }
         
         // test clearing interpreter state and restarting
@@ -67,7 +67,7 @@ mod tests {
         
         if let Some(err) = &interpreter.last_error
         {
-            println!("{}", err);
+            panic!("{}", err);
         }
         
         Ok(())

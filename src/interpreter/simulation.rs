@@ -378,17 +378,18 @@ impl Interpreter
         
         let mut list : VecDeque<Value> = match val
         {
-            Value::Array(list) => list.clone(),
+            Value::Array(list) => list,
             Value::Dict(mut dict) =>
             {
                 dict.drain().map(|(k, v)|
                 {
                     let mut sublist = VecDeque::new();
-                    sublist.push_back(hashval_to_val(&k));
+                    sublist.push_back(hashval_to_val(k));
                     sublist.push_back(v);
                     Value::Array(sublist)
                 }).collect()
             }
+            Value::Set(mut set) => set.drain().map(|x| hashval_to_val(x)).collect(),
             // TODO: support foreach over generators
             _ => return plainerr("error: value fed to for-each loop must be an array or dictionary")
         };

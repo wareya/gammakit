@@ -385,11 +385,15 @@ print("utf-8にも対応している");
 
 var test_array = ["asdf", 0, ["test", 0]];
 var test_dict = {"asdf" : 1, 0 : "a"};
+var test_set = set {"asdf", 0};
 
 for(thing in test_array)
     print(thing);
 
 for(thing in test_dict)
+    print(thing);
+
+for(thing in test_set)
     print(thing);
 
 for(nothing in [])
@@ -500,4 +504,3 @@ print("asdf" < "zxcv");
 print("asdf" == "zxcv");
 print("asdf" >= "zxcv");
 print("asdf" > "zxcv");
-

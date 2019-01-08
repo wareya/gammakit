@@ -182,8 +182,8 @@ impl Parser {
                         GrammarToken::NameList(text) |
                         GrammarToken::OptionalName(text) |
                         GrammarToken::OptionalNameList(text) |
-                        GrammarToken::SeparatorNameList{text, ..} => {text.clone()}
-                        _ => {"".to_string()}
+                        GrammarToken::SeparatorNameList{text, ..} => text.clone(),
+                        _ => "".to_string()
                     };
                     if name != "" && !self.nodetypemap.contains_key(&name)
                     {

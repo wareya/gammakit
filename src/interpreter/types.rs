@@ -245,12 +245,12 @@ impl Value
     }
 }
 
-pub (crate) fn hashval_to_val(hashval : &HashableValue) -> Value
+pub (crate) fn hashval_to_val(hashval : HashableValue) -> Value
 {
     match hashval
     {
-        HashableValue::Number(val) => Value::Number(*val),
-        HashableValue::Text(val) => Value::Text(val.clone()),
+        HashableValue::Number(val) => Value::Number(val),
+        HashableValue::Text(val) => Value::Text(val),
     }
 }
 pub (crate) fn val_to_hashval(val : Value) -> Result<HashableValue, String>

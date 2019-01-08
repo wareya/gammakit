@@ -144,13 +144,11 @@ impl Interpreter
         {
             Value::Array(array) =>
             {
-                let list = (0..array.len()).map(|i| Value::Number(i as f64)).collect();
-                Ok((Value::Array(list), false))
+                Ok((Value::Array((0..array.len()).map(|i| Value::Number(i as f64)).collect()), false))
             }
-            Value::Dict(dict) =>
+            Value::Dict(mut dict) =>
             {
-                let list = dict.keys().map(|key| hashval_to_val(key)).collect();
-                Ok((Value::Array(list), false))
+                Ok((Value::Array(dict.drain().map(|(key, _)| hashval_to_val(key)).collect()), false))
             }
             _ => plainerr("error: tried to take length of lengthless type")
         }

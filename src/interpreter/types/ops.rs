@@ -44,7 +44,7 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
                     ret.push_str(&format!("\"{}\"", escape(text)));
                     ret.push_str(": ");
                 }
-                else if let Some(part) = format_val(&hashval_to_val(key))
+                else if let Some(part) = format_val(&hashval_to_val(key.clone()))
                 {
                     ret.push_str(&part);
                     ret.push_str(": ");
@@ -85,7 +85,7 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
                 {
                     ret.push_str(&format!("\"{}\"", escape(text)));
                 }
-                else if let Some(part) = format_val(&hashval_to_val(val))
+                else if let Some(part) = format_val(&hashval_to_val(val.clone()))
                 {
                     ret.push_str(&part);
                 }
