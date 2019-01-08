@@ -11,11 +11,17 @@ mod interpreter;
 
 pub use crate::{parser::*, compiler::*, interpreter::*};
 
+/// Gammakit is a high-level scripting language meant for games.
 /// 1) Load a grammar into a string (e.g. grammarsimple.txt)
 /// 2) Call Parser::new() to get a new, uninitialized parser
-/// 3) Initialize the parser with parser.
-///
-///
+/// 3) Initialize the parser with parser.init(&grammar)
+/// 4) Load a program into a vector of Strings. (This will probably be changed to a mere single string later.)
+/// 5) Tokenize the program with parser.tokenize(&lines, false)
+/// 6) Parse the token list with parser.parse_programs(&tokens, &lines, false)
+/// 7) Compile to bytecode with compile_bytecode(&ast)
+/// 8) Create an interpreter with Interpreter::new(&Rc::new(code), Some(parser)) or similar
+/// 9) Optional: insert the default binding functions with interpreter.insert_default_internal_functions()
+/// 10) Run interpreter.step() until it returns Err. Err(None) indicates graceful exit, Err(Some(String))) indicates an error.
 
 #[cfg(test)]
 mod tests {

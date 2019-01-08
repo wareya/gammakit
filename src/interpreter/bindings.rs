@@ -70,17 +70,11 @@ impl Interpreter
     {
         self.internal_functions.insert(funcname, func);
     }
-    fn insert_noreturn_internal_func(&mut self, funcname : String, func : Rc<InternalFunction>)
-    {
-        self.internal_functions_noreturn.insert(funcname.clone());
-        self.internal_functions.insert(funcname, func);
-    }
     
     pub fn insert_default_internal_functions(&mut self)
     {
         macro_rules! enrc { ( $y:ident ) => { Rc::new(Interpreter::$y) } }
         macro_rules! insert { ( $x:expr, $y:ident ) => { self.insert_normal_internal_func($x.to_string(), enrc!($y)); } }
-        macro_rules! insert_noreturn { ( $x:expr, $y:ident ) => { self.insert_noreturn_internal_func($x.to_string(), enrc!($y)); } }
         
         insert!("print"                 , sim_func_print                );
         insert!("len"                   , sim_func_len                  );
@@ -89,36 +83,29 @@ impl Interpreter
         insert!("compile_text"          , sim_func_compile_text         );
         insert!("compile_ast"           , sim_func_compile_ast          );
         insert!("instance_create"       , sim_func_instance_create      );
-        insert!("instance_add_variable" , sim_func_instance_add_variable);
         insert!("insert"                , sim_func_insert               );
         insert!("remove"                , sim_func_remove               );
         insert!("contains"              , sim_func_contains             );
         insert!("round"                 , sim_func_round                );
         insert!("floor"                 , sim_func_floor                );
         insert!("ceil"                  , sim_func_ceil                 );
-        
-        insert_noreturn!("instance_execute", sim_func_instance_execute);
     }
     pub (crate) fn get_internal_function(&self, name : &str) -> Option<Rc<InternalFunction>>
     {
         match_or_none!(self.internal_functions.get(name), Some(f) => Rc::clone(f))
     }
-    pub (crate) fn internal_function_is_noreturn(&mut self, name : &str) -> bool
-    {
-        self.internal_functions_noreturn.contains(name)
-    }
     // last argument is isexpr - as of the time of writing this comment, it's used exclusively by instance_execute
     // second return value is whether the frame was moved - necessary for weird functions like instance_create that implicly call user defined functions, because moving the frame to call user defined functions also moves the original stack
-    pub (crate) fn sim_func_print(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    pub (crate) fn sim_func_print(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
         for arg in args.drain(..).rev()
         {
             let formatted = format_val(&arg).ok_or_else(|| minierr("error: tried to print unprintable value"))?;
             println!("{}", formatted);
         }
-        Ok((Value::Number(0.0), false))
+        Ok(Value::Number(0.0))
     }
-    pub (crate) fn sim_func_len(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    pub (crate) fn sim_func_len(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
@@ -127,13 +114,13 @@ impl Interpreter
         let arg = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
         match arg
         {
-            Value::Text(string) => Ok((Value::Number(string.chars().count() as f64), false)),
-            Value::Array(array) => Ok((Value::Number(array.len() as f64), false)),
-            Value::Dict(dict) => Ok((Value::Number(dict.keys().len() as f64), false)),
+            Value::Text(string) => Ok(Value::Number(string.chars().count() as f64)),
+            Value::Array(array) => Ok(Value::Number(array.len() as f64)),
+            Value::Dict(dict) => Ok(Value::Number(dict.keys().len() as f64)),
             _ => plainerr("error: tried to take length of lengthless type")
         }
     }
-    pub (crate) fn sim_func_keys(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    pub (crate) fn sim_func_keys(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
@@ -144,16 +131,16 @@ impl Interpreter
         {
             Value::Array(array) =>
             {
-                Ok((Value::Array((0..array.len()).map(|i| Value::Number(i as f64)).collect()), false))
+                Ok(Value::Array((0..array.len()).map(|i| Value::Number(i as f64)).collect()))
             }
             Value::Dict(mut dict) =>
             {
-                Ok((Value::Array(dict.drain().map(|(key, _)| hashval_to_val(key)).collect()), false))
+                Ok(Value::Array(dict.drain().map(|(key, _)| hashval_to_val(key)).collect()))
             }
             _ => plainerr("error: tried to take length of lengthless type")
         }
     }
-    pub (crate) fn sim_func_insert(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    pub (crate) fn sim_func_insert(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
         if !matches!(args.len(), 3 | 2)
         {
@@ -172,13 +159,13 @@ impl Interpreter
                     return plainerr("error: tried to insert into an array at an out-of-range index");
                 }
                 array.insert(index as usize, value);
-                Ok((Value::Array(array), false))
+                Ok(Value::Array(array))
             }
             Value::Dict(mut dict) =>
             {
                 let value = args.pop().ok_or_else(|| minierr("error: insert() with a dict also requires a value to insert at the given key"))?;
                 dict.insert(val_to_hashval(key)?, value);
-                Ok((Value::Dict(dict), false))
+                Ok(Value::Dict(dict))
             }
             Value::Set(mut set) =>
             {
@@ -187,12 +174,12 @@ impl Interpreter
                     return plainerr("error: insert() with a set must not be called with a third argument");
                 }
                 set.insert(val_to_hashval(key)?);
-                Ok((Value::Set(set), false))
+                Ok(Value::Set(set))
             }
             _ => plainerr("error: insert() must be called with an array, dictionary, or set as the first argument")
         }
     }
-    pub (crate) fn sim_func_remove(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    pub (crate) fn sim_func_remove(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 2
         {
@@ -210,22 +197,22 @@ impl Interpreter
                     return plainerr("error: tried to remove from an array at an out-of-range index");
                 }
                 array.remove(index as usize);
-                Ok((Value::Array(array), false))
+                Ok(Value::Array(array))
             }
             Value::Dict(mut dict) =>
             {
                 dict.remove(&val_to_hashval(key)?);
-                Ok((Value::Dict(dict), false))
+                Ok(Value::Dict(dict))
             }
             Value::Set(mut set) =>
             {
                 set.remove(&val_to_hashval(key)?);
-                Ok((Value::Set(set), false))
+                Ok(Value::Set(set))
             }
             _ => plainerr("error: remove() must be called with an array, dictionary, or set as its argument")
         }
     }
-    pub (crate) fn sim_func_contains(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    pub (crate) fn sim_func_contains(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 2
         {
@@ -235,30 +222,30 @@ impl Interpreter
         let key = args.pop().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
         match collection
         {
-            Value::Dict(dict) => Ok((Value::Number(bool_floaty(dict.contains_key(&val_to_hashval(key)?))), false)),
-            Value::Set (set ) => Ok((Value::Number(bool_floaty(set .contains    (&val_to_hashval(key)?))), false)),
+            Value::Dict(dict) => Ok(Value::Number(bool_floaty(dict.contains_key(&val_to_hashval(key)?)))),
+            Value::Set (set ) => Ok(Value::Number(bool_floaty(set .contains    (&val_to_hashval(key)?)))),
             _ => plainerr("error: remove() must be called with an array, dictionary, or set as its argument")
         }
     }
-    pub (crate) fn sim_func_round(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    pub (crate) fn sim_func_round(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
         let val = args.pop().ok_or_else(|| minierr("error: wrong number of arguments to round(); expected 1, got 0"))?;
         let num = match_or_err!(val, Value::Number(num) => num, minierr("error: round() must be called with a number as its argument"))?;
-        Ok((Value::Number(num.round()), false))
+        Ok(Value::Number(num.round()))
     }
-    pub (crate) fn sim_func_ceil(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    pub (crate) fn sim_func_ceil(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
         let val = args.pop().ok_or_else(|| minierr("error: wrong number of arguments to ceil(); expected 1, got 0"))?;
         let num = match_or_err!(val, Value::Number(num) => num, minierr("error: ceil() must be called with a number as its argument"))?;
-        Ok((Value::Number(num.ceil()), false))
+        Ok(Value::Number(num.ceil()))
     }
-    pub (crate) fn sim_func_floor(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    pub (crate) fn sim_func_floor(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
         let val = args.pop().ok_or_else(|| minierr("error: wrong number of arguments to floor(); expected 1, got 0"))?;
         let num = match_or_err!(val, Value::Number(num) => num, minierr("error: floor() must be called with a number as its argument"))?;
-        Ok((Value::Number(num.floor()), false))
+        Ok(Value::Number(num.floor()))
     }
-    pub (crate) fn sim_func_instance_create(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    pub (crate) fn sim_func_instance_create(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
@@ -292,61 +279,10 @@ impl Interpreter
             let pseudo_funcvar = FuncVal{internal : false, name : Some("create".to_string()), predefined : None, userdefdata : Some(function.clone())};
             self.jump_to_function(&function.clone(), Vec::new(), false, &pseudo_funcvar)?;
             self.top_frame.instancestack.push(instance_id);
-            Ok((Value::Instance(instance_id), true))
         }
-        else
-        {
-            Ok((Value::Instance(instance_id), false))
-        }
+        Ok(Value::Instance(instance_id))
     }
-    pub (crate) fn sim_func_instance_add_variable(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
-    {
-        if args.len() < 2 || args.len() > 3
-        {
-            return Err(format!("error: wrong number of arguments to instance_add_variable(); expected 2 to 3, got {}", args.len()));
-        }
-        let instance_id = self.list_pop_instance(&mut args).or_else(|_| plainerr("error: first argument to instance_add_variable() must be an instance"))?;
-        let name = self.list_pop_text(&mut args).or_else(|_| plainerr("error: second argument to instance_add_variable() must be a string"))?;
-        
-        if !self.global.regex_holder.is_exact(r"[a-zA-Z_][a-zA-Z_0-9]*", &name)
-        {
-            return Err(format!("error: tried to create a variable with an invalid identifier `{}`\n(note: must exactly match the regex [a-zA-Z_][a-zA-Z_0-9]*)", name));
-        }
-        let inst = self.global.instances.get_mut(&instance_id).ok_or_else(|| format!("error: tried to add variable to instance {} that doesn't exist", instance_id))?;
-        if inst.variables.contains_key(&name)
-        {
-            return plainerr("error: tried to add variable to instance that already had a variable with that name")
-        }
-        inst.variables.insert(name, args.pop().unwrap_or(Value::Number(0.0)));
-        
-        Ok((Value::Number(0.0), false))
-    }
-    pub (crate) fn sim_func_instance_execute(&mut self, mut args : Vec<Value>, isexpr : bool) -> Result<(Value, bool), String>
-    {
-        if args.len() < 2
-        {
-            return Err(format!("error: wrong number of arguments to instance_execute(); expected 2 or more, got {}", args.len()));
-        }
-        let instance_id = self.list_pop_instance(&mut args).or_else(|_| plainerr("error: first argument to instance_execute() must be a number"))?;
-        let func = self.list_pop_func(&mut args).or_else(|_| plainerr("error: second argument to instance_execute() must be a function"))?;
-        
-        if func.internal
-        {
-            return plainerr("error: unsupported: tried to use instance_execute() with an internal function");
-        }
-        let defdata = func.userdefdata.as_ref().ok_or_else(|| minierr("internal error: funcval was non-internal but had no userdefdata"))?;
-        if defdata.generator
-        {
-            return plainerr("error: cannot use instance_execute with a generator");
-        }
-        self.global.instances.get_mut(&instance_id).ok_or_else(|| format!("error: tried to execute function with instance {} that doesn't exist", instance_id))?;
-        
-        self.jump_to_function(defdata, args.into_iter().rev().collect(), isexpr, &func)?;
-        self.top_frame.instancestack.push(instance_id);
-        
-        Ok((Value::Number(0.0), true))
-    }
-    pub (crate) fn sim_func_parse_text(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    pub (crate) fn sim_func_parse_text(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
@@ -361,10 +297,10 @@ impl Interpreter
         
         let ast = parser.parse_program(&tokens, &program_lines, true)?.ok_or_else(|| minierr("error: string failed to parse"))?;
         
-        Ok((ast_to_dict(&ast), false))
+        Ok(ast_to_dict(&ast))
     }
 
-    pub (crate) fn sim_func_compile_ast(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    pub (crate) fn sim_func_compile_ast(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
@@ -376,7 +312,7 @@ impl Interpreter
         let code = compile_bytecode(&ast)?;
         
         // endaddr at the start because Rc::new() moves `code`
-        Ok(
+        Ok
         ( Value::new_funcval
           ( false,
             None,
@@ -391,12 +327,11 @@ impl Interpreter
               forcecontext : 0,
               impassable : true,
               generator : false,
-            }
-            )), false)
-        )
+            })
+        ) )
     }
 
-    pub (crate) fn sim_func_compile_text(&mut self, mut args : Vec<Value>, _ : bool) -> Result<(Value, bool), String>
+    pub (crate) fn sim_func_compile_text(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
@@ -413,7 +348,7 @@ impl Interpreter
         let code = compile_bytecode(&ast)?;
         
         // endaddr at the start because Rc::new() moves `code`
-        Ok(
+        Ok
         ( Value::new_funcval
           ( false,
             None,
@@ -428,8 +363,7 @@ impl Interpreter
               forcecontext : 0,
               impassable : true,
               generator : false,
-            }
-            )), false)
-        )
+            })
+        ) )
     }
 }

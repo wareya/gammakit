@@ -57,17 +57,21 @@ impl Interpreter
             
             let internal_func = self.get_internal_function(&name).ok_or_else(|| minierr("internal error: tried to look up non-extant internal function after it was already referenced in a value (this should be unreachable!)"))?;
             
-            let (ret, moved_frame) = internal_func(self, args, isexpr)?;
-            if isexpr && !self.internal_function_is_noreturn(&name)
+            // some internal functions (e.g. instance_create()) open a new user-function frame
+            // if they do, we need to add the return value to the old frame instead of the current frame
+            let frames_len_before = self.frames.len();
+            let ret = internal_func(self, args)?;
+            if isexpr
             {
-                if !moved_frame
+                match self.frames.len() - frames_len_before
                 {
-                    self.stack_push_val(ret);
-                }
-                else
-                {
-                    let frame = self.frames.last_mut().ok_or_else(|| format!("internal error: couldn't find old frame after calling function `{}` that moves the frame", name))?;
-                    frame.push_val(ret);
+                    0 => self.stack_push_val(ret),
+                    1 =>
+                    {
+                        let frame = self.frames.last_mut().ok_or_else(|| format!("internal error: couldn't find old frame after calling function `{}` that moves the frame", name))?;
+                        frame.push_val(ret);
+                    }
+                    _ => return plainerr("internal error: internal function affected the frame stack in some way other than doing nothing or adding a single frame")
                 }
             }
         }

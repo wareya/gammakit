@@ -2,7 +2,6 @@ use std::collections::{VecDeque, HashMap, HashSet};
 use std::rc::Rc;
 
 use super::{strings::*, ast::*, parser::*, bytecode::*, compiler::*};
-use super::regexholder::RegexHolder;
 
 mod bindings;
 mod internal;
@@ -15,9 +14,12 @@ mod control;
 
 pub use self::types::*;
 
+/// Returned by the step() method of an interpreter.
 pub type StepResult = Result<(), Option<String>>;
 type OpResult = Result<(), String>;
-pub type InternalFunction = Fn(&mut Interpreter, Vec<Value>, bool) -> Result<(Value, bool), String>;
+/// Type signature of functions to be registered as bindings.
+/// The args (Vec<Value>) are provided in reverse order; args.pop() gives the first argument.
+pub type InternalFunction = Fn(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
 
 fn minierr(mystr : &'static str) -> String
 {
@@ -36,7 +38,6 @@ struct GlobalState {
     instances_by_type: HashMap<usize, Vec<usize>>,
     objectnames: HashMap<String, usize>,
     objects: HashMap<usize, ObjSpec>,
-    regex_holder: RegexHolder,
     parser: Option<Parser>,
     variables: HashMap<String, Value>, // accessed as global.varname
     functions: HashMap<String, Value>, // accessed as funcname
@@ -52,7 +53,6 @@ impl GlobalState {
             instances_by_type : HashMap::new(),
             objectnames : HashMap::new(),
             objects : HashMap::new(),
-            regex_holder : RegexHolder::new(),
             parser,
             variables : HashMap::new(),
             functions : HashMap::new(),
@@ -61,6 +61,7 @@ impl GlobalState {
 }
 
 // interpreter state
+/// Interprets compiled bytecode.
 pub struct Interpreter {
     top_frame: Frame,
     frames: Vec<Frame>,
@@ -69,7 +70,6 @@ pub struct Interpreter {
     suppress_for_expr_end: bool,
     // TODO: move to GlobalState?
     internal_functions: HashMap<String, Rc<InternalFunction>>,
-    internal_functions_noreturn: HashSet<String>,
     global: GlobalState,
     /// Last error returned by step(). Gets cleared (reset to None) when step() runs without returning an error.
     pub last_error: Option<String>
@@ -85,7 +85,6 @@ impl Interpreter {
             doexit : false,
             suppress_for_expr_end : false,
             internal_functions : HashMap::new(),
-            internal_functions_noreturn : HashSet::new(),
             global : GlobalState::new(parser),
             last_error : None,
         }

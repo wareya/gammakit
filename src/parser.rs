@@ -70,6 +70,7 @@ pub (crate) fn build_best_error(myself : &mut Option<ParseError>, other : Option
     }
 }
 #[derive(Clone)]
+/// Provides facilities for turning program text into an AST.
 pub struct Parser {
     pub (crate) regex_list : Vec<String>,
     pub (crate) symbol_list : Vec<String>,

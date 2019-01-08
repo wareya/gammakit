@@ -389,7 +389,7 @@ impl Interpreter
                     Value::Array(sublist)
                 }).collect()
             }
-            Value::Set(mut set) => set.drain().map(|x| hashval_to_val(x)).collect(),
+            Value::Set(mut set) => set.drain().map(hashval_to_val).collect(),
             // TODO: support foreach over generators
             _ => return plainerr("error: value fed to for-each loop must be an array or dictionary")
         };

@@ -84,9 +84,7 @@ Gammakit has a small number of built-in bindings. The library user is expected t
     parse_text(text) (returns ast)
     compile_text(text) (returns function) (might get removed)
     compile_ast(ast) (retrurns function)
-    instance_execute(instance, function, args...) (executes a user-defined function within the scope of some instance) (returns a value, unlike with())
     instance_create(object) (returns an opaque pointer to an instance)
-    instance_add_variable(instance, varname, value) (this is a novelty and might get removed)
     insert(array, index, val) | insert(dict, key, val) | insert(set, val)
     remove(array, index) | remove(dict, key) | remove(set, val)
     contains(dict, key) (returns whether) | contains(set, val) (returns whether)
@@ -96,6 +94,7 @@ Gammakit has a small number of built-in bindings. The library user is expected t
 # Roadmap
 
 TODO:
+- instance_exists() and instance_kill()
 - support sets in keys()
 - defer statement
 
@@ -105,7 +104,6 @@ TODO (sanitation/low-priority):
 - make compile_ast() verify that the ast has a coherent "type" (parent, text, operator)
 - some way to add/remove elements of arrays/dicts/sets WITHOUT copying and overwriting them
 - forbid if-else inside an if condition's block with no enclosing braces
-- make parser provide named tokens in parse errors, not just literal tokens
 
 MAYBE:
 - real structs, copied by value like arrays/dicts are (if you don't want them copied by value just use objects/instances)

@@ -30,7 +30,8 @@ noopfunc();
 
 var ab;
 ab = instance_create(Ab);
-instance_add_variable(ab, "id", ab);
+with(ab)
+    far id = ab;
 // ab.id.y = ab+1; // adding to instance IDs is not allowed
 
 print("basic language features:");
@@ -66,30 +67,13 @@ var lasdfiawefd = instance_create(BlankObj);
 
 var i;
 i = instance_create(Character);
-instance_add_variable(i, "id", i);
+with(i)
+    far id = i;
 // i.id.y = i+1; // adding to instance IDs is not allowed
 print(i);
 print(i.id);
 print(i.y);
 print(i.id.y);
-
-def makez(argument)
-{
-    far z = argument;
-}
-
-def printz()
-{
-    print(z);
-}
-
-def printx(argument)
-{
-    print(x);
-    x += 1;
-    print(argument);
-    return 1234;
-}
 
 def asdf()
 {
@@ -99,15 +83,6 @@ def asdf()
 var as = asdf();
 print(as);
 print(asdf()*2);
-
-instance_execute(i, printx, "test");
-var a = instance_execute(i, printx, "test");
-print(a);
-a = print("asdf");
-print(a);
-
-instance_execute(i, makez, "test");
-instance_execute(i, printz);
 
 with(i)
 {

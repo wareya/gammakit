@@ -154,6 +154,7 @@ pub (crate) enum Variable {
 
 // value types
 #[derive(Debug, Clone)]
+/// Intentionally opaque. Wrapped by Value.
 pub struct FuncVal {
     pub (super) internal: bool,
     pub (super) name: Option<String>,
@@ -162,15 +163,17 @@ pub struct FuncVal {
 }
 
 #[derive(Debug, Clone)]
+/// Intentionally opaque. Wrapped by Value.
 pub struct GeneratorState {
     pub (super) frame: Option<Frame>, // stores code, pc, and stacks; becomes None after the generator returns/finalizes or exits through its bottom
 }
-
+/// Used internally for expressions like "global", and possibly in the future "other" and "all".
 #[derive(Debug, Clone)]
 pub enum Special {
     Global
 }
 #[derive(Debug, Clone)]
+/// Stores typed values (e.g. variables after evaluation, raw literal values).
 pub enum Value {
     Number(f64),
     Text(String),
@@ -190,6 +193,7 @@ pub (super) enum StackValue {
 }
 
 #[derive(Debug, Clone)]
+/// Enum of only the kinds of Value that can be used as dict keys or set entries.
 pub enum HashableValue {
     Number(f64),
     Text(String),

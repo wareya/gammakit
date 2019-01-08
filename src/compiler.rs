@@ -898,6 +898,7 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
     Ok(code)
 }
 
+/// Compiles an AST into bytecode.
 pub fn compile_bytecode(ast : &ASTNode) -> Result<Vec<u8>, String>
 {
     compile_astnode(ast, 0)
