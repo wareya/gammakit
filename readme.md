@@ -85,6 +85,8 @@ Gammakit has a small number of built-in bindings. The library user is expected t
     compile_text(text) (returns function) (might get removed)
     compile_ast(ast) (retrurns function)
     instance_create(object) (returns an opaque pointer to an instance)
+    instance_exists(instance) (returns whether an instance exists)
+    instance_kill(instance) (kills an instance)
     insert(array, index, val) | insert(dict, key, val) | insert(set, val)
     remove(array, index) | remove(dict, key) | remove(set, val)
     contains(dict, key) (returns whether) | contains(set, val) (returns whether)
