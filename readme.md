@@ -1,8 +1,8 @@
 # Gammakit
 
-Gammakit is a toy programming language that takes inspiration from GameMaker Language.
+Gammakit is a programming language that takes inspiration from GameMaker Language and aims to be very ergonomic for game logic programming. It's going to be used by Magmakit, a game engine.
 
-Realistically, gammakit is only going to get used by magmakit, a primitive game engine. There are no stability guarantees at all. Anything can change at any time if it makes sense for magmakit. If you decide to use gammakit on your own for some reason, make a hard fork of it.
+Currently, *there are no API stability guarantees in this software at all.* Anything can change at any time if it makes sense for magmakit. If you decide to use gammakit for some reason, make a hard fork of it.
 
 # Features
 
@@ -101,7 +101,7 @@ Gammakit has a small number of built-in bindings. The library user is expected t
 TODO:
 - "other" and "all"
 - do we want a destroy() event for instance_kill()?
-- defer statement?
+- a "defer" statement?
 
 TODO (sanitation/low-priority):
 - make keys() iterate over dict/set elements in insertion order
@@ -121,8 +121,6 @@ MAYBE (metaprogramming):
 - allow interpreters to act like generators
 
 # Other
-
-Disassembler is currently broken due to changing how if statements are compiled.
 
 As of writing, clippy processes gammakit with no complaints. Certain lints are disabled in certain files where they are inappropriate, unhelpful, or generate false positives.
 
