@@ -19,7 +19,7 @@ pub (crate) struct GrammarForm {
     pub (crate) tokens : Vec<GrammarToken>
 }
 
-pub fn default_grammar() -> &'static str
+pub (crate) fn default_grammar() -> &'static str
 {
     include_str!("defaultgrammar.txt")
 }

@@ -9,7 +9,7 @@ mod grammar;
 mod compiler;
 mod interpreter;
 
-pub use crate::{parser::*, compiler::*, interpreter::*, grammar::default_grammar};
+pub use crate::{parser::*, compiler::*, interpreter::*};
 
 /// Gammakit is a high-level scripting language meant for games.
 ///
