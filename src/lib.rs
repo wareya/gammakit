@@ -1,3 +1,19 @@
+//! Gammakit is a high-level scripting language meant for games.
+//!
+//! WARNING: Gammakit is the bespoke programming language of a toy game engine. It is not for general use.
+//!
+//! There are no API stability guarantees of any kind, and anything can change at any time if it makes sense for the game engine.
+//!
+//! If, for some reason, you decide to use gammkit, make a hard fork of it. You're gonna want to change stuff anyway.
+//!
+//! General use:
+//!
+//! 1) Call Parser::new_from_default() to get a new parser initialized with the default parser
+//! 2) Compile program text to bytecode with parser.give_me_bytecode(text) (a helper function)
+//! 3) Create an interpreter with Interpreter::new(&code, Some(parser)) or similar
+//! 4) Optional: insert the default binding functions with interpreter.insert_default_internal_functions()
+//! 5) Run interpreter.step() until it returns Err. Err(None) indicates graceful exit, Err(Some(String))) indicates an error.
+
 #[macro_use]
 mod matches;
 mod strings;
@@ -26,20 +42,6 @@ impl Parser {
         Ok(Rc::new(compile_bytecode(&ast)?))
     }
 }
-
-/// Gammakit is a high-level scripting language meant for games.
-///
-/// WARNING: Gammakit is the bespoke programming language of a toy game engine. It is not for general use.
-///
-/// There are no API stability guarantees of any kind, and anything can change at any time if it makes sense for the game engine.
-///
-/// If, for some reason, you decide to use gammkit, make a hard fork of it. You're gonna want to change stuff anyway.
-///
-/// 1) Call Parser::new_from_default() to get a new parser initialized with the default parser
-/// 2) Compile program text to bytecode with parser.give_me_bytecode(text) (a helper function)
-/// 3) Create an interpreter with Interpreter::new(&code, Some(parser)) or similar
-/// 4) Optional: insert the default binding functions with interpreter.insert_default_internal_functions()
-/// 5) Run interpreter.step() until it returns Err. Err(None) indicates graceful exit, Err(Some(String))) indicates an error.
 
 #[cfg(test)]
 mod tests {
