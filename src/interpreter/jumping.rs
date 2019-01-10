@@ -55,8 +55,10 @@ impl Interpreter
         {
             let name = funcdata.name.ok_or_else(|| minierr("internal error: function variable describing internal function is lacking its function name"))?;
             
-            let internal_func = self.get_internal_function(&name).ok_or_else(|| minierr("internal error: tried to look up non-extant internal function after it was already referenced in a value (this should be unreachable!)"))?;
+            let internal_func_wrapper = self.get_internal_function(&name).ok_or_else(|| minierr("internal error: tried to look up non-extant internal function after it was already referenced in a value (this should be unreachable!)"))?;
             
+            let internal_func = &mut *internal_func_wrapper.try_borrow_mut().or_else(|_| plainerr("error: tried to borrow internal function while it was borrowed elsewhere"))?;
+
             // some internal functions (e.g. instance_create()) open a new user-function frame
             // if they do, we need to add the return value to the old frame instead of the current frame
             let frames_len_before = self.frames.len();

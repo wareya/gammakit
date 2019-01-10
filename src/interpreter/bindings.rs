@@ -66,15 +66,15 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTN
 
 impl Interpreter
 {
-    pub fn insert_normal_internal_func(&mut self, funcname : String, func : Rc<InternalFunction>)
+    pub fn insert_internal_func(&mut self, funcname : String, func : Rc<RefCell<InternalFunction>>)
     {
         self.internal_functions.insert(funcname, func);
     }
     
     pub fn insert_default_internal_functions(&mut self)
     {
-        macro_rules! enrc { ( $y:ident ) => { Rc::new(Interpreter::$y) } }
-        macro_rules! insert { ( $x:expr, $y:ident ) => { self.insert_normal_internal_func($x.to_string(), enrc!($y)); } }
+        macro_rules! enrc { ( $y:ident ) => { Rc::new(RefCell::new(Interpreter::$y)) } }
+        macro_rules! insert { ( $x:expr, $y:ident ) => { self.insert_internal_func($x.to_string(), enrc!($y)); } }
         
         insert!("print"                 , sim_func_print                );
         insert!("len"                   , sim_func_len                  );
@@ -92,7 +92,7 @@ impl Interpreter
         insert!("floor"                 , sim_func_floor                );
         insert!("ceil"                  , sim_func_ceil                 );
     }
-    pub (crate) fn get_internal_function(&self, name : &str) -> Option<Rc<InternalFunction>>
+    pub (crate) fn get_internal_function(&self, name : &str) -> Option<Rc<RefCell<InternalFunction>>>
     {
         match_or_none!(self.internal_functions.get(name), Some(f) => Rc::clone(f))
     }
