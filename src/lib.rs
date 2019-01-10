@@ -15,7 +15,7 @@ use std::rc::Rc;
 
 impl Parser {
     /// optional helper function to simplify the process of compiling from text to bytecode
-    pub fn give_me_bytecode(&mut self, text: &String) -> Result<Rc<Vec<u8>>, String>
+    pub fn give_me_bytecode(&mut self, text: &str) -> Result<Rc<Vec<u8>>, String>
     {
         let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
         
