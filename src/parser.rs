@@ -115,11 +115,19 @@ impl Default for Parser {
     }
 }
 impl Parser {
-    pub fn new() -> Parser
+    pub fn new_from_default() -> Result<Parser, String>
     {
-        Parser::default()
+        let mut parser = Parser::default();
+        parser.init(super::grammar::default_grammar())?;
+        Ok(parser)
     }
-    pub fn init(&mut self, text: &str) -> Result<(), String>
+    pub fn new_from_grammar(grammar : &str) -> Result<Parser, String>
+    {
+        let mut parser = Parser::default();
+        parser.init(grammar)?;
+        Ok(parser)
+    }
+    fn init(&mut self, text: &str) -> Result<(), String>
     {
         let start_time = Instant::now();
         

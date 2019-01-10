@@ -9,19 +9,25 @@ mod grammar;
 mod compiler;
 mod interpreter;
 
-pub use crate::{parser::*, compiler::*, interpreter::*};
+pub use crate::{parser::*, compiler::*, interpreter::*, grammar::default_grammar};
 
 /// Gammakit is a high-level scripting language meant for games.
+///
+/// WARNING: Gammakit is the bespoke programming language of a toy game engine. It is not for general use.
+///
+/// There are no API stability guarantees of any kind, and anything can change at any time if it makes sense for the game engine.
+///
+/// If, for some reason, you decide to use gammkit, make a hard fork of it. You're gonna want to change stuff anyway.
+///
 /// 1) Load a grammar into a string (e.g. grammarsimple.txt)
-/// 2) Call Parser::new() to get a new, uninitialized parser
-/// 3) Initialize the parser with parser.init(&grammar)
-/// 4) Load a program into a vector of Strings. (This will probably be changed to a mere single string later.)
-/// 5) Tokenize the program with parser.tokenize(&lines, false)
-/// 6) Parse the token list with parser.parse_programs(&tokens, &lines, false)
-/// 7) Compile to bytecode with compile_bytecode(&ast)
-/// 8) Create an interpreter with Interpreter::new(&Rc::new(code), Some(parser)) or similar
-/// 9) Optional: insert the default binding functions with interpreter.insert_default_internal_functions()
-/// 10) Run interpreter.step() until it returns Err. Err(None) indicates graceful exit, Err(Some(String))) indicates an error.
+/// 2) Call Parser::new_from_default() to get a new parser initialized with the default parser
+/// 3) Load a program into a vector of Strings. (This will probably be changed to a mere single string later.)
+/// 4) Tokenize the program with parser.tokenize(&lines, false)
+/// 5) Parse the token list with parser.parse_programs(&tokens, &lines, false)
+/// 6) Compile to bytecode with compile_bytecode(&ast)
+/// 7) Create an interpreter with Interpreter::new(&Rc::new(code), Some(parser)) or similar
+/// 8) Optional: insert the default binding functions with interpreter.insert_default_internal_functions()
+/// 9) Run interpreter.step() until it returns Err. Err(None) indicates graceful exit, Err(Some(String))) indicates an error.
 
 #[cfg(test)]
 mod tests {
@@ -35,12 +41,7 @@ mod tests {
     #[test]
     fn test_everything() -> Result<(), String>
     {
-        let mut file = File::open("grammarsimple.txt").or_else(|_| Err("failed to open grammar".to_string()))?;
-        let mut contents = String::new();
-        file.read_to_string(&mut contents).or_else(|_| Err("failed to read grammar into memory".to_string()))?;
-        
-        let mut parser = Parser::new();
-        parser.init(&contents)?;
+        let mut parser = Parser::new_from_default()?;
 
         let mut file2 = File::open("program.txt").or_else(|_| Err("failed to open program".to_string()))?;
         let mut contents2 = String::new();
