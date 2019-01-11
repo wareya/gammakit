@@ -173,7 +173,13 @@ pub enum Special {
     Global
 }
 #[derive(Debug, Clone)]
+pub struct Custom {
+    pub discrim: u64,
+    pub storage: u64,
+}
+
 /// Stores typed values (e.g. variables after evaluation, raw literal values).
+#[derive(Debug, Clone)]
 pub enum Value {
     Number(f64),
     Text(String),
@@ -185,6 +191,7 @@ pub enum Value {
     Instance(usize),
     Object(usize),
     Special(Special),
+    Custom(Custom),
 }
 #[derive(Debug, Clone)]
 pub (super) enum StackValue {

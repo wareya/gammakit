@@ -102,9 +102,12 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
             
             Some(ret)
         }
-        Value::Instance(id) => Some(format!("instance {}", id)),
-        Value::Object(id) => Some(format!("object {}", id)), // TODO: use name?
-        Value::Func(_) | Value::Generator(_) | Value::Special(_) => None
+        Value::Instance(id) => Some(format!("<instance {}>", id)),
+        Value::Object(id) => Some(format!("<object {}>", id)), // TODO: use name?
+        Value::Func(_) => Some("<function>".to_string()),
+        Value::Generator(_) => Some("<generator>".to_string()),
+        Value::Special(_) => Some("<special>".to_string()),
+        Value::Custom(custom) => Some(format!("<custom type discrim:{} storage:{}>", custom.discrim, custom.storage))
     }
 }
 
@@ -240,6 +243,7 @@ pub (crate) fn value_equal(left : &Value, right : &Value) -> Result<bool, String
         (Value::Generator(_), Value::Generator(_)) => Ok(false),
         (Value::Instance(left), Value::Instance(right)) | (Value::Object(left), Value::Object(right)) => Ok(left==right),
         (Value::Special(left), Value::Special(right)) => Ok(std::mem::discriminant(&left)==std::mem::discriminant(&right)),
+        (Value::Custom(left), Value::Custom(right)) => Ok(left.discrim == right.discrim && left.storage == right.storage),
         _ => Ok(false) // all non-matching type pairs test false
     }
 }
