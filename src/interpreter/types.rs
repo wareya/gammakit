@@ -279,8 +279,8 @@ impl std::hash::Hash for HashableValue {
     {
         match self
         {
-            HashableValue::Number(num) => pun_f64_as_u64(*num).hash(state),
-            HashableValue::Text(text) => text.hash(state)
+            HashableValue::Number(num) => {0.hash(state); pun_f64_as_u64(*num).hash(state);}
+            HashableValue::Text(text)  => {1.hash(state); text.hash(state);}
         }
     }
 }
