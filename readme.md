@@ -99,6 +99,7 @@ Gammakit has a small number of built-in bindings. The library user is expected t
 # Roadmap
 
 TODO:
+- "true" and "false" literals
 - "other" and "all"
 - ternary operators
 - a destroy() event for instance_kill()

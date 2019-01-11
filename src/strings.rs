@@ -54,6 +54,16 @@ pub (crate) fn escape(text: &str) -> String
     ret
 }
 
+fn trim_at_null(mystr : &[u8]) -> &[u8]
+{
+    let mut nullpos = 0usize;
+    while nullpos < mystr.len() && mystr[nullpos] != 0
+    {
+        nullpos += 1
+    }
+    &mystr[..nullpos]
+}
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 pub (crate) enum MiniStr {
     Short([u8; 8]),
@@ -70,19 +80,16 @@ impl MiniStr {
             {
                 ret[i] = c;
             }
-            MiniStr::Short(ret)
+            return MiniStr::Short(ret);
         }
-        else
-        {
-            MiniStr::Long(text.to_string())
-        }
+        return MiniStr::Long(text.to_string());
     }
     #[allow(clippy::wrong_self_convention)]
     pub (crate) fn to_string(self) -> String
     {
         match self
         {
-            MiniStr::Short(bytes) => std::str::from_utf8(&bytes).map(|x| x.to_string()).unwrap_or_else(|_| "<err>".to_string()),
+            MiniStr::Short(bytes) => std::str::from_utf8(trim_at_null(&bytes)).map(|x| x.to_string()).unwrap_or_else(|_| "<err>".to_string()),
             MiniStr::Long(string) => string
         }
     }

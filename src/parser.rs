@@ -62,10 +62,7 @@ pub (crate) fn build_best_error(myself : &mut Option<ParseError>, other : Option
                 }
             }
         }
-        (None, Some(other)) =>
-        {
-            *myself = Some(other)
-        }
+        (None, Some(other)) => *myself = Some(other),
         _ => {}
     }
 }
@@ -137,9 +134,7 @@ impl Parser {
     
         while lines.len() > 0
         {
-            macro_rules! pop {
-                () => { lines.pop_front().ok_or_else(|| "tried to access past end of program text".to_string()) };
-            }
+            macro_rules! pop { () => { lines.pop_front().ok_or_else(|| "tried to access past end of program text".to_string()) }; }
             
             let mut line : String = pop!()?;
             if line == ""
@@ -297,8 +292,7 @@ impl Parser {
                         if segment == text.as_str()
                         {
                             // don't tokenize the beginnings of names as actual names
-                            if offset + text.len() + 1 > line.len()
-                               && self.internal_regexes.is_exact(r"[a-zA-Z0-9_]", &slice(&line, (offset+text.len()) as i64, (offset+text.len()+1) as i64))
+                            if offset + text.len() + 1 > line.len() && self.internal_regexes.is_exact(r"[a-zA-Z0-9_]", &slice(&line, (offset+text.len()) as i64, (offset+text.len()+1) as i64))
                             {
                                 continue;
                             }
@@ -476,14 +470,7 @@ impl Parser {
                             continue;
                         }
                     }
-                    if let Some(formname) = formname
-                    {
-                        build_new_error(&mut latesterror, index+totalconsumed, formname);
-                    }
-                    else
-                    {
-                        build_new_error(&mut latesterror, index+totalconsumed, &text);
-                    }
+                    build_new_error(&mut latesterror, index+totalconsumed, formname.unwrap_or(&text));
                     return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
                 GrammarToken::Op{text, assoc, precedence} =>
@@ -822,7 +809,7 @@ impl Parser {
                         let position = token.position;
                         if let Some(line) = lines.get(linenum-1)
                         {
-                            println!("context:\n{}\n{}^", line, " ".repeat(position));
+                            println!("context on line {}:\n{}\n{}^", linenum, line, " ".repeat(position));
                         }
                         else
                         {
