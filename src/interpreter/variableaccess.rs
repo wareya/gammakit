@@ -284,7 +284,7 @@ impl Interpreter
                 {
                     return plainerr("error: tried to index into global function name as though it was an array");
                 }
-                if self.get_internal_function(&dirvar.name).is_some()
+                if self.get_binding(&dirvar.name).is_some() || self.get_simple_binding(&dirvar.name).is_some()
                 {
                     return plainerr("error: tried to index into internal function name as though it was an array");
                 }
@@ -294,12 +294,9 @@ impl Interpreter
             {
                 if value.is_none()
                 {
-                    assign_or_return_indexed(None, &mut Value::Array(array.clone()), &arrayvar.indexes)
+                    return assign_or_return_indexed(None, &mut Value::Array(array.clone()), &arrayvar.indexes);
                 }
-                else
-                {
-                    plainerr("error: tried to assign to a non-variable array value")
-                }
+                plainerr("error: tried to assign to a non-variable array value")
             }
         }
     }
@@ -325,12 +322,9 @@ impl Interpreter
                     {
                         let mut mydata = funcdat.clone();
                         mydata.forcecontext = ident;
-                        Ok(Some(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata))))
+                        return Ok(Some(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata))));
                     }
-                    else
-                    {
-                        Err(format!("error: tried to assign to function `{}` in instance of object type `{}`", indirvar.name, objspec.name))
-                    }
+                    Err(format!("error: tried to assign to function `{}` in instance of object type `{}`", indirvar.name, objspec.name))
                 }
             }
             IndirectSource::Global =>
@@ -348,10 +342,7 @@ impl Interpreter
             {
                 return Ok(Some(Value::Special(Special::Global)));
             }
-            else
-            {
-                return Err(minierr("error: cannot assign to variable called \"global\" (special read-only name)"));
-            }
+            return Err(minierr("error: cannot assign to variable called \"global\" (special read-only name)"));
         }
         if check_frame_dirvar(&mut self.global, &mut self.top_frame, dirvar)
         {
@@ -374,10 +365,7 @@ impl Interpreter
             {
                 return Ok(Some(Value::Object(*var)));
             }
-            else
-            {
-                return Err(format!("error: tried to assign to read-only object name `{}`", dirvar.name));
-            }
+            return Err(format!("error: tried to assign to read-only object name `{}`", dirvar.name));
         }
         if let Some(var) = self.global.functions.get(&dirvar.name)
         {
@@ -385,21 +373,15 @@ impl Interpreter
             {
                 return Ok(Some(var.clone()));
             }
-            else
-            {
-                return Err(format!("error: tried to assign to global function `{}` (no such identifier exists in any other scope, you should declare it with 'var' to override this logic)", dirvar.name));
-            }
+            return Err(format!("error: tried to assign to global function `{}` (no such identifier exists in any other scope, you should declare it with 'var' to override this logic)", dirvar.name));
         }
-        if self.get_internal_function(&dirvar.name).is_some()
+        if self.get_binding(&dirvar.name).is_some() || self.get_simple_binding(&dirvar.name).is_some()
         {
             if value.is_none()
             {
                 return Ok(Some(Value::new_funcval(true, Some(dirvar.name.clone()), None, None)));
             }
-            else
-            {
-                return plainerr("error: tried to assign to internal function name");
-            }
+            return plainerr("error: tried to assign to internal function name");
         }
         
         Err(format!("error: unknown identifier `{}`", dirvar.name))

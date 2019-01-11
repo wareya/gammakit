@@ -27,4 +27,3 @@ macro_rules! match_or_none { ( $expr:expr, $as:pat => $ok:expr ) =>
         _ => None
     }
 } }
-

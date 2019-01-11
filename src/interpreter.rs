@@ -20,7 +20,8 @@ pub type StepResult = Result<(), Option<String>>;
 type OpResult = Result<(), String>;
 /// Type signature of functions to be registered as bindings.
 /// The args (Vec<Value>) are provided in reverse order; args.pop() gives the first argument.
-pub type InternalFunction = FnMut(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
+pub type Binding = FnMut(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
+pub type SimpleBinding = FnMut(Vec<Value>) -> Result<Value, String>;
 
 fn minierr(mystr : &'static str) -> String
 {
@@ -70,7 +71,8 @@ pub struct Interpreter {
     // TODO: look into how to avoid this and why I don't need it for while loops
     suppress_for_expr_end: bool,
     // TODO: move to GlobalState?
-    internal_functions: HashMap<String, Rc<RefCell<InternalFunction>>>,
+    bindings: HashMap<String, Rc<RefCell<Binding>>>,
+    simple_bindings: HashMap<String, Rc<RefCell<SimpleBinding>>>,
     global: GlobalState,
     /// Last error returned by step(). Gets cleared (reset to None) when step() runs without returning an error.
     pub last_error: Option<String>
@@ -85,7 +87,8 @@ impl Interpreter {
             frames : vec!(),
             doexit : false,
             suppress_for_expr_end : false,
-            internal_functions : HashMap::new(),
+            bindings : HashMap::new(),
+            simple_bindings : HashMap::new(),
             global : GlobalState::new(parser),
             last_error : None,
         }

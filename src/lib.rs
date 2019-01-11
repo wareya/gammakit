@@ -11,7 +11,7 @@
 //! 1) Call Parser::new_from_default() to get a new parser initialized with the default parser
 //! 2) Compile program text to bytecode with parser.give_me_bytecode(text) (a helper function)
 //! 3) Create an interpreter with Interpreter::new(&code, Some(parser)) or similar
-//! 4) Optional: insert the default binding functions with interpreter.insert_default_internal_functions()
+//! 4) Optional: insert the default binding functions with interpreter.insert_default_bindings()
 //! 5) Run interpreter.step() until it returns Err. Err(None) indicates graceful exit, Err(Some(String))) indicates an error.
 
 #[macro_use]
@@ -61,7 +61,7 @@ mod tests {
         let code = parser.give_me_bytecode(&program)?;
         
         let mut interpreter = Interpreter::new(&code, Some(parser));
-        interpreter.insert_default_internal_functions();
+        interpreter.insert_default_bindings();
         
         while interpreter.step().is_ok(){}
         

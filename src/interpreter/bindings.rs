@@ -66,15 +66,21 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTN
 
 impl Interpreter
 {
-    pub fn insert_internal_func(&mut self, funcname : String, func : Rc<RefCell<InternalFunction>>)
+    pub fn insert_binding(&mut self, funcname : String, func : Rc<RefCell<Binding>>)
     {
-        self.internal_functions.insert(funcname, func);
+        self.simple_bindings.remove(&funcname);
+        self.bindings.insert(funcname, func);
+    }
+    pub fn insert_simple_binding(&mut self, funcname : String, func : Rc<RefCell<SimpleBinding>>)
+    {
+        self.bindings.remove(&funcname);
+        self.simple_bindings.insert(funcname, func);
     }
     
-    pub fn insert_default_internal_functions(&mut self)
+    pub fn insert_default_bindings(&mut self)
     {
         macro_rules! enrc { ( $y:ident ) => { Rc::new(RefCell::new(Interpreter::$y)) } }
-        macro_rules! insert { ( $x:expr, $y:ident ) => { self.insert_internal_func($x.to_string(), enrc!($y)); } }
+        macro_rules! insert { ( $x:expr, $y:ident ) => { self.insert_binding($x.to_string(), enrc!($y)); } }
         
         insert!("print"                 , sim_func_print                );
         insert!("len"                   , sim_func_len                  );
@@ -92,9 +98,13 @@ impl Interpreter
         insert!("floor"                 , sim_func_floor                );
         insert!("ceil"                  , sim_func_ceil                 );
     }
-    pub (crate) fn get_internal_function(&self, name : &str) -> Option<Rc<RefCell<InternalFunction>>>
+    pub (crate) fn get_binding(&self, name : &str) -> Option<Rc<RefCell<Binding>>>
     {
-        match_or_none!(self.internal_functions.get(name), Some(f) => Rc::clone(f))
+        match_or_none!(self.bindings.get(name), Some(f) => Rc::clone(f))
+    }
+    pub (crate) fn get_simple_binding(&self, name : &str) -> Option<Rc<RefCell<SimpleBinding>>>
+    {
+        match_or_none!(self.simple_bindings.get(name), Some(f) => Rc::clone(f))
     }
     // last argument is isexpr - as of the time of writing this comment, it's used exclusively by instance_execute
     // second return value is whether the frame was moved - necessary for weird functions like instance_create that implicly call user defined functions, because moving the frame to call user defined functions also moves the original stack
