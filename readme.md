@@ -101,7 +101,7 @@ Gammakit has a small number of built-in bindings. The library user is expected t
 TODO:
 - "other" and "all"
 - ternary operators
-- do we want a destroy() event for instance_kill()?
+- a destroy() event for instance_kill()
 - a "defer" statement?
 
 TODO (sanitation/low-priority):

@@ -30,8 +30,6 @@ noopfunc();
 
 var ab;
 ab = instance_create(Ab);
-with(ab)
-    far id = ab;
 
 print("basic language features:");
 
@@ -67,8 +65,6 @@ var lasdfiawefd = instance_create(BlankObj);
 
 var i;
 i = instance_create(Character);
-with(i)
-    far id = i;
 print(i);
 print(i.id);
 print(i.y);
