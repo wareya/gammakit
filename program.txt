@@ -485,3 +485,8 @@ var timetodie = instance_create(Character);
 print(instance_exists(timetodie));
 instance_kill(timetodie);
 print(instance_exists(timetodie));
+
+print("globalvar and simultaneous assignment:");
+
+globalvar dummyvar = 10;
+print(global.dummyvar);

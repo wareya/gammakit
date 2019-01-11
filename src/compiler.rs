@@ -126,9 +126,24 @@ fn compile_declaration(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) 
         }
         if child.children.len() == 3
         {
-            code.push(PUSHNAME);
-            code.extend(name.bytes());
-            code.push(0x00);
+            if ast.child(0)?.text.as_str() == "globalvar"
+            {
+                code.push(PUSHVAR);
+                code.extend("global".bytes());
+                code.push(0x00);
+                
+                code.push(PUSHNAME);
+                code.extend(name.bytes());
+                code.push(0x00);
+                
+                code.push(INDIRECTION);
+            }
+            else
+            {
+                code.push(PUSHNAME);
+                code.extend(name.bytes());
+                code.push(0x00);
+            }
             code.extend(compile_astnode(child.child(2)?, scopedepth)?);
             code.push(BINSTATE);
             code.push(0x00);
