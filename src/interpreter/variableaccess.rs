@@ -336,13 +336,19 @@ impl Interpreter
     }
     fn evaluate_or_store_of_direct(&mut self, dirvar : &DirectVar, value : Option<Value>) -> Result<Option<Value>, String>
     {
-        if dirvar.name == "global"
+        if matches!(dirvar.name.as_str(), "global" | "true" | "false")
         {
             if value.is_none()
             {
-                return Ok(Some(Value::Special(Special::Global)));
+                match dirvar.name.as_str()
+                {
+                    "global" => return Ok(Some(Value::Special(Special::Global))),
+                    "true" => return Ok(Some(Value::Number(1.0))),
+                    "false" => return Ok(Some(Value::Number(0.0))),
+                    _ => return Err(minierr("unreachable internal error about special read-only names"))
+                }
             }
-            return Err(minierr("error: cannot assign to variable called \"global\" (special read-only name)"));
+            return Err(format!("error: cannot assign to variable called \"{}\" (special read-only name)", dirvar.name));
         }
         if check_frame_dirvar(&mut self.global, &mut self.top_frame, dirvar)
         {
