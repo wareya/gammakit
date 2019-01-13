@@ -68,9 +68,6 @@ pub struct Interpreter {
     top_frame: Frame,
     frames: Vec<Frame>,
     doexit: bool,
-    // TODO: look into how to avoid this and why I don't need it for while loops
-    suppress_for_expr_end: bool,
-    // TODO: move to GlobalState?
     bindings: HashMap<String, Rc<RefCell<Binding>>>,
     simple_bindings: HashMap<String, Rc<RefCell<SimpleBinding>>>,
     global: GlobalState,
@@ -86,7 +83,6 @@ impl Interpreter {
             top_frame : Frame::new_root(Rc::clone(code)),
             frames : vec!(),
             doexit : false,
-            suppress_for_expr_end : false,
             bindings : HashMap::new(),
             simple_bindings : HashMap::new(),
             global : GlobalState::new(parser),
@@ -107,7 +103,6 @@ impl Interpreter {
         self.top_frame = Frame::new_root(Rc::clone(code));
         self.frames = vec!();
         self.doexit = false;
-        self.suppress_for_expr_end = false;
         self.last_error = None;
         Ok(())
     }
