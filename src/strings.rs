@@ -82,7 +82,7 @@ impl MiniStr {
             }
             return MiniStr::Short(ret);
         }
-        return MiniStr::Long(text.to_string());
+        MiniStr::Long(text.to_string())
     }
     #[allow(clippy::wrong_self_convention)]
     pub (crate) fn to_string(self) -> String
