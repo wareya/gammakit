@@ -23,7 +23,9 @@ doc = true
 regex = "1"
 
 [profile.bench]
+opt-level = 3
 debug = 2
+incremental = true
 overflow-checks = true
 
 [profile.test]
