@@ -529,7 +529,7 @@ impl Parser {
             {
                 if let Some(nodes) = nodes
                 {
-                    return Ok((Some(ASTNode{text : nodetype.name.clone(), line : token.line, position : token.position, isparent : true, children : nodes, precedence : nodetype.precedence.clone()}), consumed, latesterror));
+                    return Ok((Some(ASTNode{text : nodetype.name.clone(), line : token.line, position : token.position, isparent : true, children : nodes, precedence : nodetype.precedence}), consumed, latesterror));
                 }
             }
         }
