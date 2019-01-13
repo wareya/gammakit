@@ -134,6 +134,7 @@ impl Interpreter {
         
         opfunc(self).map_err(Some)?;
         self.handle_flow_control()?;
+        
         if self.doexit
         {
             Err(None)

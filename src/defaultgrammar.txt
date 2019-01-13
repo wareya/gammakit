@@ -1,13 +1,13 @@
-TOKEN number:
+number: TOKEN
 %[0-9]+\.[0-9]+([eE]([+-])?[0-9]+)?%
 %[0-9]+\.([eE]([+-])?[0-9]+)?%
 %\.[0-9]+([eE]([+-])?[0-9]+)?%
 %[0-9]+([eE]([+-])?[0-9]+)?%
 
-TOKEN string:
+string: TOKEN
 %"([^"\\]|\\["nrt\\])*"%
 
-TOKEN name:
+name: TOKEN
 %[a-zA-Z_][0-9a-zA-Z_]*%
 
 arglist:
@@ -86,16 +86,16 @@ $name$
 expr:
 $binexpr_0$
 
-binexpr_0:
+binexpr_0: LEFTBINEXPR 0
 $binexpr_1$ >>? $binop_0$ $binexpr_0$
 
-binexpr_1:
+binexpr_1: LEFTBINEXPR 1
 $binexpr_2$ >>? $binop_1$ $binexpr_1$
 
-binexpr_2:
+binexpr_2: LEFTBINEXPR 2
 $binexpr_3$ >>? $binop_2$ $binexpr_2$
 
-binexpr_3:
+binexpr_3: LEFTBINEXPR 3
 $lhunop$ >>? $binop_3$ $binexpr_3$
 
 lhunop:
@@ -108,27 +108,27 @@ unop:
 +
 
 binop_0:
-and \l 0
-or \l 0
-&& \l 0
-|| \l 0
+and
+or
+&&
+||
 
 binop_1:
-== \l 1
-!= \l 1
->= \l 1
-<= \l 1
-> \l 1
-< \l 1
+==
+!=
+>=
+<=
+>
+<
 
 binop_2:
-+ \l 2
-- \l 2
++
+-
 
 binop_3:
-* \l 3
-/ \l 3
-% \l 3
+*
+/
+%
 
 invocation_call:
 invoke $lvar$

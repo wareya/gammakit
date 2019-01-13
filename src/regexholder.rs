@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use regex::Regex;
+use regex::{Regex, Captures};
 
 #[derive(Clone)]
 pub (crate) struct RegexHolder {
@@ -31,6 +31,16 @@ impl RegexHolder {
         let regex = Regex::new(&format!("^{}$", regex_text));
         self.exact_regexes.insert(regex_text.to_string(), regex);
         self.is_exact(regex_text, text)
+    }
+    pub (crate) fn captures<'t>(&mut self, regex_text : &str, text : &'t str) -> Option<Captures<'t>>
+    {
+        if let Some(regex) = self.exact_regexes.get(regex_text)
+        {
+            return regex.as_ref().map(|r| r.captures(text)).unwrap_or(None);
+        }
+        let regex = Regex::new(&format!("^{}$", regex_text));
+        self.exact_regexes.insert(regex_text.to_string(), regex);
+        self.captures(regex_text, text)
     }
     pub (crate) fn is_exact_immut(& self, regex_text : &str, text : &str) -> Result<bool, String>
     {

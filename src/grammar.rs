@@ -10,13 +10,12 @@ pub (crate) enum GrammarToken {
     SeparatorNameList{text: String, separator: String},
     Plain(String),
     Regex(String),
-    Op{text: String, assoc: i32, precedence: i32},
     RestIsOptional
 }
 
 #[derive(Clone)]
 pub (crate) struct GrammarForm {
-    pub (crate) tokens : Vec<GrammarToken>
+    pub (crate) tokens : Vec<GrammarToken>,
 }
 
 pub (crate) fn default_grammar() -> &'static str
@@ -95,32 +94,6 @@ impl GrammarForm
             else if re.is_exact(r"\$.+\$", token)
             {
                 ret.tokens.push(GrammarToken::Name(slice(token, 1, -1)));
-            }
-            else if *token == r"\l" || *token == r"\r"
-            {
-                if ret.tokens.len() != 1
-                {
-                    return plainerr("error: operator description line is malformed (associativity sigil in wrong place)");
-                }
-                if let Some(GrammarToken::Plain(ref left)) = ret.tokens.get(0)
-                {
-                    if tokens.len() != 3
-                    {
-                        return plainerr("error: operator description line must consist of exactly three tokens");
-                    }
-                    
-                    let sigil = tokens.get(1).ok_or_else(|| minierr("internal error: failed to get tokens 2 and 1 (third and second) of token list that supposedly had three tokens"))?;
-                    let token = tokens.get(2).ok_or_else(|| minierr("internal error: failed to get tokens 2 and 1 (third and second) of token list that supposedly had three tokens"))?;
-                    
-                    let precedence = token.parse::<i32>().or_else(|_| plainerr(&format!("error: operator precedence is not an integer\n{}", line)))?;
-                    
-                    ret.tokens = vec!(GrammarToken::Op{text: left.to_string(), assoc: if *sigil == r"\l" {1} else {0}, precedence});
-                    return Ok(ret);
-                }
-                else
-                {
-                    return plainerr("error: operator associativity sigil's leftwards token is not a plain text token; or there was an internal error and there is no associativity sigil");
-                }
             }
             else if slice(token, 0, 1) == "$" && token.len() > 1
             {

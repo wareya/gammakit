@@ -1,29 +1,8 @@
-use super::grammar::*;
-
-#[derive(Clone)]
-pub (crate) struct GrammarPoint {
-    pub (crate) name: String,
-    pub (crate) forms: Vec<GrammarForm>,
-    pub (crate) istoken: bool,
-}
-
 #[derive(Clone)]
 pub struct LexToken {
     pub (crate) text: String,
     pub (crate) line: usize,
     pub (crate) position: usize,
-}
-
-#[derive(Clone)]
-pub (crate) struct OpData {
-    pub (crate) isop: bool,
-    pub (crate) assoc: i32,
-    pub (crate) precedence: i32
-}
-
-pub (crate) fn dummy_opdata() -> OpData
-{
-    OpData{isop: false, assoc: 0, precedence: 0}
 }
 
 #[derive(Clone)]
@@ -33,7 +12,7 @@ pub struct ASTNode {
     pub (crate) position: usize,
     pub (crate) isparent: bool,
     pub (crate) children: Vec<ASTNode>,
-    pub (crate) opdata: OpData,
+    pub (crate) precedence: Option<u64>,
 }
 
 impl ASTNode {
@@ -61,5 +40,5 @@ impl ASTNode {
 
 pub (crate) fn dummy_astnode() -> ASTNode
 {
-    ASTNode{text: "".to_string(), line: 0, position: 0, isparent: false, children: Vec::new(), opdata: dummy_opdata()}
+    ASTNode{text: "".to_string(), line: 0, position: 0, isparent: false, children: Vec::new(), precedence: None}
 }

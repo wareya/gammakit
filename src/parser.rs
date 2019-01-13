@@ -66,6 +66,15 @@ pub (crate) fn build_best_error(myself : &mut Option<ParseError>, other : Option
         _ => {}
     }
 }
+
+#[derive(Clone)]
+pub (crate) struct GrammarPoint {
+    pub (crate) name: String,
+    pub (crate) forms: Vec<GrammarForm>,
+    pub (crate) istoken: bool,
+    pub (crate) precedence : Option<u64> // precedence of left-associative binary operator rules
+}
+
 #[derive(Clone)]
 /// Provides facilities for turning program text into an AST.
 pub struct Parser {
@@ -141,12 +150,22 @@ impl Parser {
             {
                 continue;
             }
-            else if self.internal_regexes.is_exact("(TOKEN )?[a-zA-Z_][a-zA-Z_0-9]+:", &line)
+            else if let Some(captures) = self.internal_regexes.captures("([a-zA-Z_][a-zA-Z_0-9]*):[ ]*(TOKEN)?[ ]*(LEFTBINEXPR [0-9]+)?", &line)
             {
-                let istoken = line.starts_with("TOKEN ");
-                let name = slice(&line, if istoken {6} else {0}, -1).to_string();
+                let name = captures.get(1).ok_or_else(|| minierr("unreachable error in parser init getting rule name"))?.as_str().to_string();
+                let istoken = captures.get(2).is_some();
+                let precedence =
+                match captures.get(3)
+                {
+                    Some(x) =>
+                    {
+                        println!("attempting to parse `{}` from `{}`", slice(x.as_str(), 12, 0), x.as_str());
+                        Some(slice(x.as_str(), 12, 0).parse::<u64>().or_else(|_| plainerr("error: LEFTBINEXPR argument must be a positive integer"))?)
+                    }
+                    None => None
+                };
                 // last line is guaranteed to be "" which means we are unable to pop past the end here
-                let mut nodetype : GrammarPoint = GrammarPoint{name, forms: Vec::new(), istoken};
+                let mut nodetype : GrammarPoint = GrammarPoint{name, forms: Vec::new(), istoken, precedence};
                 line = pop!()?;
                 while line != ""
                 {
@@ -451,7 +470,7 @@ impl Parser {
                     {
                         if token.text == *text
                         {
-                            nodes.push(ASTNode{text : token.text.to_string(), line : token.line, position : token.position, isparent: false, children : Vec::new(), opdata : dummy_opdata()});
+                            nodes.push(ASTNode{text : token.text.to_string(), line : token.line, position : token.position, isparent: false, children : Vec::new(), precedence : None});
                             totalconsumed += 1;
                             continue;
                         }
@@ -465,26 +484,12 @@ impl Parser {
                     {
                         if self.internal_regexes.is_exact_immut(text, &token.text)?
                         {
-                            nodes.push(ASTNode{text : token.text.to_string(), line : token.line, position : token.position, isparent: false, children : Vec::new(), opdata : dummy_opdata()});
+                            nodes.push(ASTNode{text : token.text.to_string(), line : token.line, position : token.position, isparent: false, children : Vec::new(), precedence : None});
                             totalconsumed += 1;
                             continue;
                         }
                     }
                     build_new_error(&mut latesterror, index+totalconsumed, formname.unwrap_or(&text));
-                    return Ok((defaultreturn.0, defaultreturn.1, latesterror));
-                }
-                GrammarToken::Op{text, assoc, precedence} =>
-                {
-                    if let Some(token) = tokens.get(index+totalconsumed)
-                    {
-                        if token.text == *text
-                        {
-                            nodes.push(ASTNode{text : token.text.to_string(), line : token.line, position : token.position, isparent: false, children : Vec::new(), opdata : OpData{isop : true, assoc: *assoc, precedence: *precedence}});
-                            totalconsumed += 1;
-                            continue;
-                        }
-                    }
-                    build_new_error(&mut latesterror, index+totalconsumed, &text);
                     return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
                 GrammarToken::RestIsOptional =>
@@ -524,7 +529,7 @@ impl Parser {
             {
                 if let Some(nodes) = nodes
                 {
-                    return Ok((Some(ASTNode{text : nodetype.name.clone(), line : token.line, position : token.position, isparent : true, children : nodes, opdata : dummy_opdata()}), consumed, latesterror));
+                    return Ok((Some(ASTNode{text : nodetype.name.clone(), line : token.line, position : token.position, isparent : true, children : nodes, precedence : nodetype.precedence.clone()}), consumed, latesterror));
                 }
             }
         }
@@ -548,20 +553,13 @@ impl Parser {
     {
         fn is_rotatable_binexpr(a : &ASTNode) -> bool
         {
-            a.isparent && a.children.len() == 3 && a.text.starts_with("binexpr_")
+            a.isparent && a.children.len() == 3 && a.precedence.is_some()
         }
         fn compatible_associativity(a : &ASTNode, b : &ASTNode) -> Result<bool, String>
         {
-            Ok(
-            a.isparent && b.isparent
-            && a.child(0)?.opdata.isop
-            && b.child(0)?.opdata.isop
-            && a.child(0)?.opdata.assoc == 1
-            && b.child(0)?.opdata.assoc == 1
-            && a.child(0)?.opdata.precedence == b.child(0)?.opdata.precedence
-            )
+            Ok(a.isparent && b.isparent && a.child(0)?.precedence == b.child(0)?.precedence)
         }
-        if is_rotatable_binexpr(ast) && is_rotatable_binexpr(ast.child(2)?) && compatible_associativity(ast.child(1)?, ast.child(2)?.child(1)?)?
+        if is_rotatable_binexpr(ast) && is_rotatable_binexpr(ast.child(2)?) && compatible_associativity(ast, ast.child(2)?)?
         {
             Parser::rotate(ast)?;
             Ok(true)
@@ -640,7 +638,7 @@ impl Parser {
                     }
                     while ast.children.len() > 2
                     {
-                        let left = ASTNode{text: "funcexpr".to_string(), line: ast.child(0)?.line, position: ast.child(0)?.position, isparent: true, children: ast.children.drain(0..2).collect(), opdata: dummy_opdata()};
+                        let left = ASTNode{text: "funcexpr".to_string(), line: ast.child(0)?.line, position: ast.child(0)?.position, isparent: true, children: ast.children.drain(0..2).collect(), precedence : None};
                         ast.children.insert(0, left);
                     }
                 }
@@ -648,7 +646,7 @@ impl Parser {
                 {
                     while ast.children.len() > 2
                     {
-                        let left = ASTNode{text: ast.text.clone(), line: ast.child(0)?.line, position: ast.child(0)?.position, isparent: true, children: ast.children.drain(0..2).collect(), opdata: dummy_opdata()};
+                        let left = ASTNode{text: ast.text.clone(), line: ast.child(0)?.line, position: ast.child(0)?.position, isparent: true, children: ast.children.drain(0..2).collect(), precedence : None};
                         ast.children.insert(0, left);
                     }
                 }
@@ -656,7 +654,7 @@ impl Parser {
                 {
                     while ast.children.len() > 2
                     {
-                        let left = ASTNode{text: ast.text.clone(), line: ast.child(0)?.line, position: ast.child(0)?.position, isparent: true, children: ast.children.drain(0..2).collect(), opdata: dummy_opdata()};
+                        let left = ASTNode{text: ast.text.clone(), line: ast.child(0)?.line, position: ast.child(0)?.position, isparent: true, children: ast.children.drain(0..2).collect(), precedence : None};
                         ast.children.insert(0, left);
                     }
                     

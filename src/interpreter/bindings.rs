@@ -19,13 +19,10 @@ pub (crate) fn ast_to_dict(ast : &ASTNode) -> Value
     
     astdict.insert(to_key!("children"), Value::Array(children));
     
-    let mut opdata = HashMap::<HashableValue, Value>::new();
-    
-    opdata.insert(to_key!("isop"), Value::Number(bool_floaty(ast.opdata.isop)));
-    opdata.insert(to_key!("assoc"), Value::Number(ast.opdata.assoc as f64));
-    opdata.insert(to_key!("precedence"), Value::Number(ast.opdata.precedence as f64));
-    
-    astdict.insert(to_key!("opdata"), Value::Dict(opdata));
+    if let Some(precedence) = ast.precedence
+    {
+        astdict.insert(to_key!("precedence"), Value::Number(precedence as f64));
+    }
     
     Value::Dict(astdict)
 }
@@ -36,10 +33,11 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTN
     
     macro_rules! get { ( $as:ident, $dict:expr, $str:expr ) =>
     {
-        match $dict.get(&HashableValue::Text($str.to_string())).ok_or_else(|| format!("error: tried to turn dict into ast, but dict lacked {} field", $str))?
+        match $dict.get(&HashableValue::Text($str.to_string()))
         {
-            Value::$as(this) => Ok(this),
-            _ => Err(format!("error: tried to turn dict into ast, but dict's {} field was of the wrong type", $str))
+            Some(Value::$as(this)) => Ok(this),
+            Some(_) => Err(format!("error: tried to turn dict into ast, but dict's {} field was of the wrong type", $str)),
+            _ => Err(format!("error: tried to turn dict into ast, but dict lacked {} field", $str))
         }
     } }
     
@@ -56,10 +54,7 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTN
         ast.children.push(dict_to_ast(subnode)?);
     }
     
-    let val_opdata = get!(Dict, dict, "opdata")?;
-    ast.opdata.isop = float_booly(*get!(Number, val_opdata, "isop")?);
-    ast.opdata.assoc = get!(Number, val_opdata, "assoc")?.round() as i32;
-    ast.opdata.precedence = get!(Number, val_opdata, "precedence")?.round() as i32;
+    ast.precedence = get!(Number, dict, "precedence").map(|x| x.round() as u64).ok();
     
     Ok(ast)
 }
