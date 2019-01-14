@@ -159,7 +159,6 @@ impl Parser {
                 {
                     Some(x) =>
                     {
-                        println!("attempting to parse `{}` from `{}`", slice(x.as_str(), 12, 0), x.as_str());
                         Some(slice(x.as_str(), 12, 0).parse::<u64>().or_else(|_| plainerr("error: LEFTBINEXPR argument must be a positive integer"))?)
                     }
                     None => None
