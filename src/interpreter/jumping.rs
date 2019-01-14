@@ -2,7 +2,7 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
-    pub (crate) fn jump_to_function(&mut self, function : &FuncSpec, mut args : Vec<Value>, isexpr : bool, funcdata : &FuncVal) -> OpResult
+    pub (crate) fn jump_to_function(&mut self, function : &FuncSpec, mut args : VecDeque<Value>, isexpr : bool, funcdata : &FuncVal) -> OpResult
     {
         if function.generator
         {
@@ -36,7 +36,7 @@ impl Interpreter
         }
         for varname in &function.varnames
         {
-            let arg = args.pop().ok_or_else(|| minierr("internal error: list of arguments to provide to function was shorter than list of argument names (this error should be unreachable!)"))?;
+            let arg = args.pop_front().ok_or_else(|| minierr("internal error: list of arguments to provide to function was shorter than list of argument names (this error should be unreachable!)"))?;
             scope.insert(varname.clone(), arg);
         }
         
@@ -49,7 +49,7 @@ impl Interpreter
         
         Ok(())
     }
-    pub (crate) fn call_function(&mut self, funcdata : FuncVal, args : Vec<Value>, isexpr : bool) -> OpResult
+    pub (crate) fn call_function(&mut self, funcdata : FuncVal, args : VecDeque<Value>, isexpr : bool) -> OpResult
     {
         if funcdata.internal
         {
@@ -115,7 +115,7 @@ impl Interpreter
                     let mut args = args.clone();
                     for varname in &defdata.varnames
                     {
-                        let arg = args.pop().ok_or_else(|| minierr("internal error: list of arguments to provide to function was shorter than list of argument names (this error should be unreachable!)"))?;
+                        let arg = args.pop_front().ok_or_else(|| minierr("internal error: list of arguments to provide to function was shorter than list of argument names (this error should be unreachable!)"))?;
                         scope.insert(varname.clone(), arg);
                     }
                     

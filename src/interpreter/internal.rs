@@ -39,11 +39,11 @@ impl Interpreter
         
         let argcount = match_or_err!(argcount_val, Value::Number(argcount) => argcount, minierr("internal error: number on stack of arguments to function was not a number"))?;
         
-        let mut args = Vec::<Value>::new();
+        let mut args = VecDeque::<Value>::new();
         for _i in 0..(argcount.round() as usize)
         {
             let arg = self.stack_pop_val().ok_or_else(|| minierr("internal error: fewer variables on stack than expected in FUNCEXPR/FUNCCALL"))?;
-            args.push(arg);
+            args.push_front(arg);
         }
         if let StackValue::Var(var) = funcdata
         {
