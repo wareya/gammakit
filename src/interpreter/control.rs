@@ -76,7 +76,6 @@ impl Interpreter {
             }
             else
             {
-                self.top_frame.instancestack.pop();
                 // FIXME do we have to drain scopes here or is it always consistent?
                 *put_controller_back = false;
             }

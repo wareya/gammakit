@@ -144,7 +144,6 @@ fn check_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, dir
 }
 fn access_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, value : Option<Value>, indexes : &[Value]) -> Result<Option<Value>, String>
 {
-    // FIXME: do I even want to search up instance stacks rather than just accessing the main one?
     for scope in frame.scopes.iter_mut().rev()
     {
         if let Some(var) = scope.get_mut(&dirvar.name)
@@ -152,6 +151,7 @@ fn access_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, di
             return assign_or_return_indexed(value, var, indexes);
         }
     }
+    // FIXME: do I even want to search up instance stacks rather than just accessing the main one?
     for id in frame.instancestack.iter_mut().rev()
     {
         if let Some(inst) = global.instances.get_mut(id)
@@ -234,6 +234,7 @@ fn access_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &
     }
     plainerr("internal error: tried to assign to a variable that could not be found")
 }
+
 impl Interpreter
 {
     fn evaluate_or_store_of_array(&mut self, arrayvar : &ArrayVar, value : Option<Value>) -> Result<Option<Value>, String>
@@ -338,18 +339,48 @@ impl Interpreter
     {
         if matches!(dirvar.name.as_str(), "global" | "true" | "false")
         {
-            if value.is_none()
+            if value.is_some()
             {
-                match dirvar.name.as_str()
-                {
-                    "global" => return Ok(Some(Value::Special(Special::Global))),
-                    "true" => return Ok(Some(Value::Number(1.0))),
-                    "false" => return Ok(Some(Value::Number(0.0))),
-                    _ => return Err(minierr("unreachable internal error about special read-only names"))
-                }
+                return Err(format!("error: cannot assign to variable called \"{}\" (special read-only name)", dirvar.name));
             }
-            return Err(format!("error: cannot assign to variable called \"{}\" (special read-only name)", dirvar.name));
+            match dirvar.name.as_str()
+            {
+                "global" => return Ok(Some(Value::Special(Special::Global))),
+                "true" => return Ok(Some(Value::Number(1.0))),
+                "false" => return Ok(Some(Value::Number(0.0))),
+                _ => return Err(minierr("unreachable internal error about special read-only names"))
+            }
         }
+        
+        match dirvar.name.as_str()
+        {
+            "self" =>
+            {
+                if value.is_some()
+                {
+                    return Err(format!("error: cannot assign to variable called \"{}\" (special read-only name)", dirvar.name));
+                }
+                if let Some(id) = self.top_frame.instancestack.last()
+                {
+                    return Ok(Some(Value::Instance(*id)));
+                }
+                return plainerr("error: tried to access `self` while not inside of instance scope");
+            },
+            "other" =>
+            {
+                if value.is_some()
+                {
+                    return Err(format!("error: cannot assign to variable called \"{}\" (special read-only name)", dirvar.name));
+                }
+                if let Some(id) = self.top_frame.instancestack.get(self.top_frame.instancestack.len()-2)
+                {
+                    return Ok(Some(Value::Instance(*id)));
+                }
+                return plainerr("error: tried to access `other` while not inside of at least two instance scopes");
+            },
+            _ => ()
+        }
+        
         if check_frame_dirvar(&mut self.global, &mut self.top_frame, dirvar)
         {
             return access_frame_dirvar(&mut self.global, &mut self.top_frame, dirvar, value);
@@ -365,6 +396,7 @@ impl Interpreter
                 if frame.impassable { break; }
             }
         }
+        
         if let Some(var) = self.global.objectnames.get(&dirvar.name)
         {
             if value.is_none()

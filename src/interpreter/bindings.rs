@@ -285,9 +285,10 @@ impl Interpreter
         
         if let Some(function) = object.functions.get("create")
         {
-            let pseudo_funcvar = FuncVal{internal : false, name : Some("create".to_string()), predefined : None, userdefdata : Some(function.clone())};
-            self.jump_to_function(&function.clone(), Vec::new(), false, &pseudo_funcvar)?;
-            self.top_frame.instancestack.push(instance_id);
+            let mut mydata = function.clone();
+            mydata.forcecontext = instance_id;
+            let pseudo_funcvar = FuncVal{internal : false, name : Some("create".to_string()), predefined : None, userdefdata : Some(mydata)};
+            self.call_function(pseudo_funcvar, Vec::new(), false)?;
         }
         
         while self.global.instances.contains_key(&self.global.instance_id)

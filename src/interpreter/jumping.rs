@@ -17,7 +17,7 @@ impl Interpreter
             return plainerr("error: provided too many arguments to function");
         }
         
-        let mut frameswapper = Frame::new_from_call(Rc::clone(&function.code), function.startaddr, function.endaddr, isexpr, function.impassable, false);
+        let mut frameswapper = Frame::new_from_call(Rc::clone(&function.code), function.startaddr, function.endaddr, isexpr, if function.impassable {None} else {Some(&self.top_frame)}, false);
         std::mem::swap(&mut frameswapper, &mut self.top_frame);
         self.frames.push(frameswapper);
         
@@ -105,7 +105,7 @@ impl Interpreter
                     {
                         return plainerr("error: provided too many arguments to function");
                     }
-                    let mut new_frame = Frame::new_from_call(Rc::clone(&defdata.code), defdata.startaddr, defdata.endaddr, true, true, true);
+                    let mut new_frame = Frame::new_from_call(Rc::clone(&defdata.code), defdata.startaddr, defdata.endaddr, true, None, true);
                     
                     let scope = new_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: no scope in top frame despite just making it in jump_to_function (this error should be unreachable!)"))?;
                     if let Some(ref name) = funcdata.name

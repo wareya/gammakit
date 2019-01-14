@@ -99,8 +99,6 @@ Gammakit has a small number of built-in bindings. The library user is expected t
 # Roadmap
 
 TODO:
-- "true" and "false" literals
-- "other" and "all"
 - ternary operators
 - a destroy() event for instance_kill()
 - a "defer" statement?
@@ -113,6 +111,7 @@ TODO (sanitation/low-priority):
 - forbid if-else inside an if condition's block with no enclosing braces
 
 MAYBE:
+- "all"? (vs "other", "self")
 - real structs, copied by value like arrays/dicts are (if you don't want them copied by value just use objects/instances)
 -- maybe just give .attr access syntax to dictionaries? (like js) (maybe use another symbol like -> or : or / so it doesn't have to decide?)
 - integer type?
