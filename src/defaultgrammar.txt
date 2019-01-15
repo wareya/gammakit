@@ -57,7 +57,6 @@ $lambda$
 $arraybody$
 $dictbody$
 $setbody$
-$number$
 $string$
 $name$
 
@@ -66,6 +65,7 @@ invoke $lvar$
 
 simplexpr:
 ( $expr$ )
+$rvar$
 $invocation_expr$
 $lambda$
 $arraybody$
@@ -73,11 +73,10 @@ $dictbody$
 $setbody$
 $number$
 $string$
-$rvar$
+$name$
 
 rvar:
 $rhunexpr$
-$name$
 
 lvar:
 $rhunexpr$

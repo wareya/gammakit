@@ -130,7 +130,7 @@ impl Interpreter {
         }
         let op = self.pull_single_from_code()?;
         
-        let opfunc = match_or_err!(self.get_opfunc(op), Some(opfunc) => opfunc, Some(format!("internal error: unknown operation 0x{:02X}\nline: {}", op, self.top_frame.currline)))?;
+        let opfunc = match_or_err!(self.get_opfunc(op), Some(opfunc) => opfunc, Some(format!("internal error: unknown operation 0x{:02X}", op)))?;
         
         opfunc(self).map_err(Some)?;
         self.handle_flow_control()?;
@@ -157,7 +157,7 @@ impl Interpreter {
     {
         self.last_error = None;
         let ret = self.step_internal();
-        self.last_error = ret.clone().err().unwrap_or(None);
+        self.last_error = ret.clone().err().unwrap_or(None).map(|x| format!("{}\nline:{}", x, self.top_frame.currline));
         ret
     }
 }
