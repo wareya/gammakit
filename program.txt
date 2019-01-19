@@ -504,3 +504,10 @@ print("Hello, "+"world!" == "Hello, world!");
 print("string repetition test:");
 print("/\\"*8.7);
 print("/\\"*8.7 == "/\\/\\/\\/\\/\\/\\/\\/\\");
+
+print("set length:");
+print(len(set {}));
+print(len(set {1, 1043, 1, 1, 2}));
+
+print("printraw:");
+printraw("a", "s", "d", "f", "\n");

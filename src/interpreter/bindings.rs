@@ -78,6 +78,7 @@ impl Interpreter
         macro_rules! insert { ( $x:expr, $y:ident ) => { self.insert_binding($x.to_string(), enrc!($y)); } }
         
         insert!("print"                 , sim_func_print                );
+        insert!("printraw"              , sim_func_printraw             );
         insert!("len"                   , sim_func_len                  );
         insert!("keys"                  , sim_func_keys                 );
         insert!("parse_text"            , sim_func_parse_text           );
@@ -101,14 +102,21 @@ impl Interpreter
     {
         match_or_none!(self.simple_bindings.get(name), Some(f) => Rc::clone(f))
     }
-    // last argument is isexpr - as of the time of writing this comment, it's used exclusively by instance_execute
-    // second return value is whether the frame was moved - necessary for weird functions like instance_create that implicly call user defined functions, because moving the frame to call user defined functions also moves the original stack
     pub (crate) fn sim_func_print(&mut self, mut args : VecDeque<Value>) -> Result<Value, String>
     {
         for arg in args.drain(..)
         {
             let formatted = format_val(&arg).ok_or_else(|| minierr("error: tried to print unprintable value"))?;
             println!("{}", formatted);
+        }
+        Ok(Value::Number(0.0))
+    }
+    pub (crate) fn sim_func_printraw(&mut self, mut args : VecDeque<Value>) -> Result<Value, String>
+    {
+        for arg in args.drain(..)
+        {
+            let formatted = format_val(&arg).ok_or_else(|| minierr("error: tried to print unprintable value"))?;
+            print!("{}", formatted);
         }
         Ok(Value::Number(0.0))
     }
@@ -124,6 +132,7 @@ impl Interpreter
             Value::Text(string) => Ok(Value::Number(string.chars().count() as f64)),
             Value::Array(array) => Ok(Value::Number(array.len() as f64)),
             Value::Dict(dict) => Ok(Value::Number(dict.keys().len() as f64)),
+            Value::Set(set) => Ok(Value::Number(set.len() as f64)),
             _ => plainerr("error: tried to take length of lengthless type")
         }
     }
