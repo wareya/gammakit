@@ -500,3 +500,7 @@ print([0, 1, 2, 3, 4][0]);
 print("string concatenation test:");
 print("Hello, "+"world!");
 print("Hello, "+"world!" == "Hello, world!");
+
+print("string repetition test:");
+print("/\\"*8.7);
+print("/\\"*8.7 == "/\\/\\/\\/\\/\\/\\/\\/\\");

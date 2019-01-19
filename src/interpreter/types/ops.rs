@@ -134,6 +134,7 @@ fn value_op_multiply(left : &Value, right : &Value) -> Result<Value, String>
     match (left, right)
     {
         (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left*right)),
+        (Value::Text(left), Value::Number(right)) => Ok(Value::Text(left.repeat(right.floor() as usize))),
         _ => Err("types incompatible with multiplication".to_string())
     }
 }
