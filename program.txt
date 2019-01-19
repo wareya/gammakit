@@ -511,3 +511,7 @@ print(len(set {1, 1043, 1, 1, 2}));
 
 print("printraw:");
 printraw("a", "s", "d", "f", "\n");
+
+print("insert() with strings:");
+print(insert("HelloWorld!", 5, " "));
+print(insert("HelloWorld!", 5, " ") == insert("Hello!", -1, " World"));

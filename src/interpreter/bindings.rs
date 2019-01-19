@@ -145,14 +145,8 @@ impl Interpreter
         let arg = args.pop_front().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
         match arg
         {
-            Value::Array(array) =>
-            {
-                Ok(Value::Array((0..array.len()).map(|i| Value::Number(i as f64)).collect()))
-            }
-            Value::Dict(mut dict) =>
-            {
-                Ok(Value::Array(dict.drain().map(|(key, _)| hashval_to_val(key)).collect()))
-            }
+            Value::Array(array) => Ok(Value::Array((0..array.len()).map(|i| Value::Number(i as f64)).collect())),
+            Value::Dict(mut dict) => Ok(Value::Array(dict.drain().map(|(key, _)| hashval_to_val(key)).collect())),
             _ => plainerr("error: tried to take length of lengthless type")
         }
     }
@@ -166,6 +160,20 @@ impl Interpreter
         let key = args.pop_front().ok_or_else(|| minierr("internal error: this should be unreachable"))?;
         match collection
         {
+            Value::Text(string) =>
+            {
+                let value = args.pop_front().ok_or_else(|| minierr("error: insert() with an array also requires a value to insert at the given index"))?;
+                if let Value::Text(value) = value
+                {
+                    let chars : Vec<char> = string.chars().collect();
+                    let index = match_or_err!(key, Value::Number(index) => index.round() as isize, minierr("error: tried to insert into an array with a non-number index"))?;
+                    let index = if index < 0 {chars.len() - (-index as usize)} else {index as usize} as usize;
+                    let left = chars.get(0..index).ok_or_else(|| minierr("error: tried to insert into a string at an out-of-range index"))?;
+                    let right = chars.get(index..chars.len()).ok_or_else(|| minierr("error: tried to insert into a string at an out-of-range index"))?;
+                    return Ok(Value::Text(format!("{}{}{}", left.iter().collect::<String>(), value, right.iter().collect::<String>())));
+                }
+                plainerr("error: tried to insert a non-string into a string with insert()")
+            }
             Value::Array(mut array) =>
             {
                 let value = args.pop_front().ok_or_else(|| minierr("error: insert() with an array also requires a value to insert at the given index"))?;
