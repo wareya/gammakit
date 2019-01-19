@@ -781,10 +781,15 @@ impl Parser {
             
             if consumed != tokens.len() || raw_ast.is_none()
             {
-                if let Some(error) = latesterror
+                if let Some(mut error) = latesterror
                 {
                     let mut expected : Vec<String> = error.expected.into_iter().map(|x| x.to_string()).collect();
                     expected.sort();
+                    let onepast = error.token == tokens.len();
+                    if onepast
+                    {
+                        error.token -= 1;
+                    }
                     if expected.len() == 1
                     {
                         if let Some(expect) = expected.get(0)
@@ -803,7 +808,11 @@ impl Parser {
                     if let Some(token) = tokens.get(error.token)
                     {
                         let linenum = token.line;
-                        let position = token.position;
+                        let mut position = token.position;
+                        if onepast
+                        {
+                            position += 1;
+                        }
                         if let Some(line) = lines.get(linenum-1)
                         {
                             println!("context on line {}:\n{}\n{}^", linenum, line, " ".repeat(position));
@@ -812,10 +821,14 @@ impl Parser {
                         {
                             println!("internal error: failed to grab context text for parse error");
                         }
+                        if onepast
+                        {
+                            println!("note: this is past the end of your program; you probably have an unclosed block delimiter (or something similar) way, way up there somewhere");
+                        }
                     }
                     else
                     {
-                        println!("internal error: failed to grab context info for parse error");
+                        println!("internal error: failed to grab context info for parse error; token number {} out of {}", error.token, tokens.len());
                     }
                 }
                 else

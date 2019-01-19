@@ -117,6 +117,7 @@ fn value_op_add(left : &Value, right : &Value) -> Result<Value, String>
     match (left, right)
     {
         (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left+right)),
+        (Value::Text(left), Value::Text(right)) => Ok(Value::Text(format!("{}{}", left, right))),
         _ => Err("types incompatible with addition".to_string())
     }
 }
