@@ -99,7 +99,7 @@ Gammakit has a small number of built-in bindings. The library user is expected t
 # Roadmap
 
 TODO:
-- insert()/remove() for strings
+- remove() for strings
 - slice() for arrays and strings
 - ternary operators
 - a destroy() event for instance_kill()
