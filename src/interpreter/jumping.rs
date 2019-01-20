@@ -1,8 +1,9 @@
 use crate::interpreter::*;
+use crate::interpreter::bindings::VecHelpers;
 
 impl Interpreter
 {
-    pub (crate) fn jump_to_function(&mut self, function : &FuncSpec, mut args : VecDeque<Value>, isexpr : bool, funcdata : &FuncVal) -> OpResult
+    pub (crate) fn jump_to_function(&mut self, function : &FuncSpec, mut args : Vec<Value>, isexpr : bool, funcdata : &FuncVal) -> OpResult
     {
         if function.generator
         {
@@ -34,9 +35,9 @@ impl Interpreter
         {
             scope.insert(name.clone(), Value::Func(Box::new(funcdata.clone())));
         }
-        for varname in &function.varnames
+        for (i, varname) in function.varnames.iter().enumerate()
         {
-            let arg = args.pop_front().ok_or_else(|| minierr("internal error: list of arguments to provide to function was shorter than list of argument names (this error should be unreachable!)"))?;
+            let arg = args.extract(i).ok_or_else(|| minierr("internal error: list of arguments to provide to function was shorter than list of argument names (this error should be unreachable!)"))?;
             scope.insert(varname.clone(), arg);
         }
         
@@ -49,7 +50,7 @@ impl Interpreter
         
         Ok(())
     }
-    pub (crate) fn call_function(&mut self, funcdata : FuncVal, args : VecDeque<Value>, isexpr : bool) -> OpResult
+    pub (crate) fn call_function(&mut self, funcdata : FuncVal, args : Vec<Value>, isexpr : bool) -> OpResult
     {
         if funcdata.internal
         {
@@ -112,10 +113,10 @@ impl Interpreter
                     {
                         scope.insert(name.clone(), Value::Func(Box::new(funcdata.clone())));
                     }
-                    let mut args = args.clone();
-                    for varname in &defdata.varnames
+                    
+                    for (i, varname) in defdata.varnames.iter().enumerate()
                     {
-                        let arg = args.pop_front().ok_or_else(|| minierr("internal error: list of arguments to provide to function was shorter than list of argument names (this error should be unreachable!)"))?;
+                        let arg = args.get(i).cloned().ok_or_else(|| minierr("internal error: list of arguments to provide to function was shorter than list of argument names (this error should be unreachable!)"))?;
                         scope.insert(varname.clone(), arg);
                     }
                     

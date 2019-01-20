@@ -378,17 +378,8 @@ impl Interpreter
         
         let mut list : VecDeque<Value> = match val
         {
-            Value::Array(list) => list,
-            Value::Dict(mut dict) =>
-            {
-                dict.drain().map(|(k, v)|
-                {
-                    let mut sublist = VecDeque::new();
-                    sublist.push_back(hashval_to_val(k));
-                    sublist.push_back(v);
-                    Value::Array(sublist)
-                }).collect()
-            }
+            Value::Array(mut list) => list.drain(..).collect(),
+            Value::Dict(mut dict) => dict.drain().map(|(k, v)| Value::Array(vec!(hashval_to_val(k), v))).collect(),
             Value::Set(mut set) => set.drain().map(hashval_to_val).collect(),
             // TODO: support foreach over generators
             _ => return plainerr("error: value fed to for-each loop must be an array or dictionary")
@@ -396,7 +387,7 @@ impl Interpreter
         
         let codelen = self.read_usize()?;
         
-        if let Some(first_val) = list.remove(0)
+        if let Some(first_val) = list.pop_front()
         {
             let current_pc = self.get_pc();
             self.top_frame.controlstack.push(Controller::ForEach(ForEachData{
@@ -750,11 +741,11 @@ impl Interpreter
         {
             return Err(format!("internal error: not enough values on stack for COLLECTARRAY instruction to build array (need {}, have {})", numvals, self.stack_len()));
         }
-        let mut myarray = VecDeque::<Value>::new();
+        let mut myarray = Vec::new();
         for _ in 0..numvals
         {
             let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTARRAY instruction failed to collect values from stack (this error should be unreachable!)"))?;
-            myarray.push_front(val);
+            myarray.insert(0, val);
         }
         self.stack_push_val(Value::Array(myarray));
         Ok(())

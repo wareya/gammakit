@@ -106,9 +106,10 @@ TODO:
 - a "defer" statement?
 
 TODO (sanitation/low-priority):
+- replace instances of "as" with instances of "from"
 - make keys() iterate over dict/set elements in insertion order
 - make sure format_val does the same as the above
-- make compile_ast() verify that the ast has a coherent "type" (parent, text, operator)
+- replace parent/text AST node stuff with enum
 - some way to add/remove elements of arrays/dicts/sets WITHOUT copying and overwriting them
 - forbid if-else inside an if condition's block with no enclosing braces
 

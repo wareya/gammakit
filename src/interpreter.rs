@@ -19,9 +19,8 @@ pub use self::types::*;
 pub type StepResult = Result<(), Option<String>>;
 type OpResult = Result<(), String>;
 /// Type signature of functions to be registered as bindings.
-/// The args (Vec<Value>) are provided in reverse order; args.pop() gives the first argument.
-pub type Binding = FnMut(&mut Interpreter, VecDeque<Value>) -> Result<Value, String>;
-pub type SimpleBinding = FnMut(VecDeque<Value>) -> Result<Value, String>;
+pub type Binding = FnMut(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
+pub type SimpleBinding = FnMut(Vec<Value>) -> Result<Value, String>;
 
 fn minierr(mystr : &'static str) -> String
 {

@@ -1,22 +1,23 @@
 use crate::interpreter::*;
 
-macro_rules! deque_pop_front_generic {
+macro_rules! vec_pop_front_generic {
     ( $list:expr, $x:ident ) =>
     {
-        if let Some(val) = $list.pop_front()
+        if !$list.is_empty()
         {
+            let val = $list.remove(0);
             if let Value::$x(ret) = val
             {
-                Ok(ret)
+                Some(ret)
             }
             else
             {
-                Err(1)
+                None
             }
         }
         else
         {
-            Err(0)
+            None
         }
     }
 }
@@ -53,23 +54,21 @@ impl Interpreter
         Ok(byte)
     }
     
-    // second val: 0: no value on stack; 1: value on stack was of the wrong type
-    
-    pub (crate) fn deque_pop_front_instance(&mut self, args : &mut VecDeque<Value>) -> Result<usize, i32>
+    pub (crate) fn vec_pop_front_instance(&mut self, args : &mut Vec<Value>) -> Option<usize>
     {
-        deque_pop_front_generic!(args, Instance)
+        vec_pop_front_generic!(args, Instance)
     }
-    pub (crate) fn deque_pop_front_object(&mut self, args : &mut VecDeque<Value>) -> Result<usize, i32>
+    pub (crate) fn vec_pop_front_object(&mut self, args : &mut Vec<Value>) -> Option<usize>
     {
-        deque_pop_front_generic!(args, Object)
+        vec_pop_front_generic!(args, Object)
     }
-    pub (crate) fn deque_pop_front_text(&mut self, args : &mut VecDeque<Value>) -> Result<String, i32>
+    pub (crate) fn vec_pop_front_text(&mut self, args : &mut Vec<Value>) -> Option<String>
     {
-        deque_pop_front_generic!(args, Text)
+        vec_pop_front_generic!(args, Text)
     }
-    pub (crate) fn deque_pop_front_dict(&mut self, args : &mut VecDeque<Value>) -> Result<HashMap<HashableValue, Value>, i32>
+    pub (crate) fn vec_pop_front_dict(&mut self, args : &mut Vec<Value>) -> Option<HashMap<HashableValue, Value>>
     {
-        deque_pop_front_generic!(args, Dict)
+        vec_pop_front_generic!(args, Dict)
     }
     pub (crate) fn read_u16(&mut self) -> Result<u16, String>
     {

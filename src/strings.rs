@@ -1,12 +1,26 @@
 use std::collections::VecDeque;
 
+pub (crate) fn slice_any<T>(collection : &[T], start : i64, end : i64) -> Option<&[T]>
+{
+    let u_start = if start < 0 {collection.len() - (-start as usize)} else {start as usize};
+    let u_end   = if end   < 0 {collection.len() - (-end   as usize)} else {end   as usize};
+    
+    collection.get(u_start..u_end)
+}
 pub (crate) fn slice(text : &str, start : i64, end : i64) -> String
 {
-    let chars : Vec<char> = text.chars().collect();
-    let u_start = if start <  0 {chars.len() - (-start as usize)} else {start as usize};
-    let u_end   = if end   <= 0 {chars.len() - (-end   as usize)} else {end   as usize};
+    slice_any(&text.chars().collect::<Vec<char>>(), start, end).map(|chars| chars.into_iter().collect()).unwrap_or_else(|| "".to_string())
+}
+
+pub (crate) fn slice_any_to_end<T>(collection : &[T], start : i64) -> Option<&[T]>
+{
+    let u_start = if start < 0 {collection.len() - (-start as usize)} else {start as usize};
     
-    chars.get(u_start..u_end).map(|chars| chars.into_iter().collect()).unwrap_or_else(|| "".to_string())
+    collection.get(u_start..)
+}
+pub (crate) fn slice_to_end(text : &str, start : i64) -> String
+{
+    slice_any_to_end(&text.chars().collect::<Vec<char>>(), start).map(|chars| chars.into_iter().collect()).unwrap_or_else(|| "".to_string())
 }
 
 pub (crate) fn unescape(text: &str) -> String

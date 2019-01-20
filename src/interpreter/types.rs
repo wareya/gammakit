@@ -110,7 +110,7 @@ pub (crate) struct Instance {
 pub (super) enum NonArrayVariable {
     Indirect(IndirectVar), // x.y.z evaluates x.y before storing it as the instance identity under which to find y
     Direct(DirectVar),
-    ActualArray(VecDeque<Value>) // for situations where the compiler doesn't know that EVALUATE is unnecessary, like func()[0]
+    ActualArray(Vec<Value>) // for situations where the compiler doesn't know that EVALUATE is unnecessary, like func()[0]
 }
 
 #[derive(Debug, Clone)]
@@ -183,7 +183,7 @@ pub struct Custom {
 pub enum Value {
     Number(f64),
     Text(String),
-    Array(VecDeque<Value>),
+    Array(Vec<Value>),
     Dict(HashMap<HashableValue, Value>),
     Set(HashSet<HashableValue>),
     Func(Box<FuncVal>),
