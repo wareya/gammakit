@@ -15,10 +15,7 @@ pub (crate) fn unpack_u16(vec : &[u8]) -> Result<u16, String>
     {
         return Err("tried to unpack u16 from buffer of size other than 2 bytes".to_string());
     }
-    Ok
-    (
-        (get(vec, 1)? as u16) | ((get(vec, 0)? as u16)<<8)
-    )
+    Ok((get(vec, 1)? as u16) | ((get(vec, 0)? as u16)<<8))
 }
 
 pub (crate) fn pack_u64(num : u64) -> Vec<u8>
@@ -32,11 +29,8 @@ pub (crate) fn unpack_u64(vec : &[u8]) ->  Result<u64, String>
     {
         return Err("tried to unpack u64 from buffer of size other than 8 bytes".to_string());
     }
-    Ok
-    (
-        (   get(vec, 7)? as u64)      | ((get(vec, 6)? as u64)<< 8) | ((get(vec, 5)? as u64)<<16) | ((get(vec, 4)? as u64)<<24)
-        | ((get(vec, 3)? as u64)<<32) | ((get(vec, 2)? as u64)<<40) | ((get(vec, 1)? as u64)<<48) | ((get(vec, 0)? as u64)<<56)
-    )
+    Ok ((   get(vec, 7)? as u64)      | ((get(vec, 6)? as u64)<< 8) | ((get(vec, 5)? as u64)<<16) | ((get(vec, 4)? as u64)<<24)
+         |((get(vec, 3)? as u64)<<32) | ((get(vec, 2)? as u64)<<40) | ((get(vec, 1)? as u64)<<48) | ((get(vec, 0)? as u64)<<56))
 }
 
 pub (crate) fn pun_f64_as_u64(num : f64) -> u64

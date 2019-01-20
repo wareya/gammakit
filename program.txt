@@ -519,3 +519,10 @@ print(insert("HelloWorld!", 5, " ") == insert("Hello!", -1, " World"));
 print("slicing:");
 print(slice("０１２", 1, 2));
 print(slice([0, 1, 2], 1, 2));
+
+print("declaration-and-assignment evaluation order:");
+var flei = "test";
+{
+    var flei = flei*2;
+    print(flei);
+}

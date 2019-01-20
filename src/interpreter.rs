@@ -134,13 +134,10 @@ impl Interpreter {
         opfunc(self).map_err(Some)?;
         self.handle_flow_control()?;
         
-        if self.doexit
+        match self.doexit
         {
-            Err(None)
-        }
-        else
-        {
-            Ok(())
+            true => Err(None),
+            false => Ok(())
         }
     }
     /// Steps the interpreter by a single operation.

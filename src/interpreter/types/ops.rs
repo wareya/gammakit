@@ -102,7 +102,7 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
             
             Some(ret)
         }
-        Value::Instance(id) => Some(format!("<instance {}>", id)),
+        Value::Instance(id) => Some(format!("<instance {}>", id)), // TODO: include object name?
         Value::Object(id) => Some(format!("<object {}>", id)), // TODO: use name?
         Value::Func(_) => Some("<function>".to_string()),
         Value::Generator(_) => Some("<generator>".to_string()),

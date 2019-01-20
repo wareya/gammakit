@@ -150,40 +150,29 @@ impl Parser {
             {
                 continue;
             }
-            else if let Some(captures) = self.internal_regexes.captures("([a-zA-Z_][a-zA-Z_0-9]*):[ ]*(TOKEN)?[ ]*(LEFTBINEXPR [0-9]+)?", &line)
+            let captures = self.internal_regexes.captures("([a-zA-Z_][a-zA-Z_0-9]*):[ ]*(TOKEN)?[ ]*(LEFTBINEXPR [0-9]+)?", &line)
+                .ok_or_else(|| minierr(&format!("general syntax error\noffending line:\n{}", line)))?;
+            let name = captures.get(1).ok_or_else(|| minierr("unreachable error in parser init getting rule name"))?.as_str().to_string();
+            let istoken = captures.get(2).is_some();
+            let precedence =
+            match captures.get(3)
             {
-                let name = captures.get(1).ok_or_else(|| minierr("unreachable error in parser init getting rule name"))?.as_str().to_string();
-                let istoken = captures.get(2).is_some();
-                let precedence =
-                match captures.get(3)
-                {
-                    Some(x) =>
-                    {
-                        Some(slice_to_end(x.as_str(), 12).parse::<u64>().or_else(|_| plainerr("error: LEFTBINEXPR argument must be a positive integer"))?)
-                    }
-                    None => None
-                };
-                // last line is guaranteed to be "" which means we are unable to pop past the end here
-                let mut nodetype : GrammarPoint = GrammarPoint{name, forms: Vec::new(), istoken, precedence};
+                Some(x) => Some(slice_to_end(x.as_str(), 12).parse::<u64>().or_else(|_| plainerr("error: LEFTBINEXPR argument must be a positive integer"))?),
+                None => None
+            };
+            // last line is guaranteed to be "" which means we are unable to pop past the end here
+            let mut nodetype : GrammarPoint = GrammarPoint{name, forms: Vec::new(), istoken, precedence};
+            line = pop!()?;
+            while line != ""
+            {
+                nodetype.forms.push(GrammarForm::new(&line, self, istoken)?);
                 line = pop!()?;
-                while line != ""
-                {
-                    nodetype.forms.push(GrammarForm::new(&line, self, istoken)?);
-                    line = pop!()?;
-                }
-                if !self.nodetypemap.contains_key(&nodetype.name)
-                {
-                    self.nodetypemap.insert(nodetype.name.clone(), nodetype);
-                }
-                else
-                {
-                    return plainerr(&format!("error: node type `{}` declared twice", nodetype.name));
-                }
             }
-            else
+            if self.nodetypemap.contains_key(&nodetype.name)
             {
-                return plainerr(&format!("general syntax error\noffending line:\n{}", line));
+                return plainerr(&format!("error: node type `{}` declared twice", nodetype.name));
             }
+            self.nodetypemap.insert(nodetype.name.clone(), nodetype);
         }
         
         for regex in &self.regex_set

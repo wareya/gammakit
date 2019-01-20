@@ -94,8 +94,7 @@ impl Interpreter
     pub (crate) fn sim_PUSHVAR(&mut self) -> OpResult
     {
         let name = self.read_string()?;
-        let dirvar = Variable::Direct(DirectVar{name : name.clone()}); // FIXME suboptimal but helps error message
-        let val = self.evaluate_or_store(&dirvar, None)?.ok_or_else(|| format!("error: tried to evaluate non-extant variable `{}`", name))?;
+        let val = self.evaluate_or_store(&Variable::Direct(DirectVar{name}), None)?.ok_or_else(|| format!("error: tried to evaluate non-extant variable"))?;
         self.stack_push_val(val);
         Ok(())
     }
@@ -167,17 +166,12 @@ impl Interpreter
                     return Err(format!("error: tried to perform indirection on instance {} that doesn't exist", ident));
                 }
                 self.stack_push_var(IndirectVar::from_ident(ident, name));
-                
-                Ok(())
             }
             Value::Special(Special::Global) =>
-            {
-                self.stack_push_var(IndirectVar::from_global(name));
-                
-                Ok(())
-            }
-            _ => plainerr("error: tried to use indirection on a type that can't be an identifier (only instance IDs or the special name \"global\" can go on the left side of a . operator)")
+                self.stack_push_var(IndirectVar::from_global(name)),
+            _ => return plainerr("error: tried to use indirection on a type that can't be an identifier (only instance IDs or the special name \"global\" can go on the left side of a . operator)")
         }
+        Ok(())
     }
     pub (crate) fn sim_EVALUATION(&mut self) -> OpResult
     {
@@ -195,9 +189,7 @@ impl Interpreter
                 self.stack_push_val(value);
             }
             Variable::Direct(var) =>
-            {
-                return Err(format!("internal error: tried to evaluate direct variable `{}`\n(note: the evaluation instruction is for indirect (id.y) variables and array (arr[0]) variables; bytecode metaprogramming for dynamic direct variable access is unsupported)", var.name));
-            }
+                return Err(format!("internal error: tried to evaluate direct variable `{}`\n(note: the evaluation instruction is for indirect (id.y) variables and array (arr[0]) variables)", var.name)),
         }
         Ok(())
     }
@@ -291,7 +283,7 @@ impl Interpreter
         match controller
         {
             Controller::While(data) => (data.scopes, data.expr_start),
-            _ => return plainerr("FIXME: unimplemented CONTINUE out from non for/while loop")
+            _ => return plainerr("FIXME: unimplemented CONTINUE out from non-for/while loop")
         };
         
         self.drain_scopes(scopes);
@@ -444,27 +436,22 @@ impl Interpreter
                 self.add_pc(codelen as usize);
             }
         }
-        else if let Value::Instance(instance_id) = other_id
+        else 
         {
-            if self.global.instances.contains_key(&instance_id)
-            {
-                self.top_frame.instancestack.push(instance_id);
-                
-                self.top_frame.controlstack.push(Controller::With(WithData{
-                    scopes : self.top_frame.scopes.len() as u16,
-                    loop_start : current_pc,
-                    loop_end : current_pc + codelen,
-                    instances : VecDeque::new()
-                }));
-            }
-            else
+            let instance_id = match_or_err!(other_id, Value::Instance(x) => x, minierr("error: tried to use with() with a value that was not an object id or instance id"))?;
+            if !self.global.instances.contains_key(&instance_id)
             {
                 return plainerr("error: tried to use non-extant instance as argument of with()");
             }
-        }
-        else
-        {
-            return plainerr("error: tried to use with() with a value that was not an object id or instance id");
+            
+            self.top_frame.instancestack.push(instance_id);
+            
+            self.top_frame.controlstack.push(Controller::With(WithData{
+                scopes : self.top_frame.scopes.len() as u16,
+                loop_start : current_pc,
+                loop_end : current_pc + codelen,
+                instances : VecDeque::new()
+            }));
         }
         Ok(())
     }
@@ -505,7 +492,7 @@ impl Interpreter
         
         let which_case = self.read_u16()?;
         
-        let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref switchdata)) => switchdata, minierr("internal error: SWITCHCASE instruction outside of switch statement"))?;
+        let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref x)) => x, minierr("internal error: SWITCHCASE instruction outside of switch statement"))?;
         
         if ops::value_equal(&value, &switchdata.value)?
         {
@@ -517,14 +504,14 @@ impl Interpreter
     pub (crate) fn sim_SWITCHDEFAULT(&mut self) -> OpResult
     {
         let which_case = self.read_u16()?;
-        let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref switchdata)) => switchdata, minierr("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
+        let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref x)) => x, minierr("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
         self.set_pc(*switchdata.blocks.get(which_case as usize).ok_or_else(|| minierr("internal error: which_case in SWITCHDEFAULT was too large"))?);
         
         Ok(())
     }
     pub (crate) fn sim_SWITCHEXIT(&mut self) -> OpResult
     {
-        let switchdata = match_or_err!(self.top_frame.controlstack.pop(), Some(Controller::Switch(switchdata)) => switchdata, minierr("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
+        let switchdata = match_or_err!(self.top_frame.controlstack.pop(), Some(Controller::Switch(x)) => x, minierr("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
         self.set_pc(switchdata.exit);
         
         Ok(())

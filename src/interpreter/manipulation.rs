@@ -1,26 +1,20 @@
 use crate::interpreter::*;
 
-macro_rules! vec_pop_front_generic {
-    ( $list:expr, $x:ident ) =>
+macro_rules! vec_pop_front_generic { ( $list:expr, $x:ident ) =>
+{
+    if !$list.is_empty()
     {
-        if !$list.is_empty()
+        match $list.remove(0)
         {
-            let val = $list.remove(0);
-            if let Value::$x(ret) = val
-            {
-                Some(ret)
-            }
-            else
-            {
-                None
-            }
-        }
-        else
-        {
-            None
+            Value::$x(ret) => Some(ret),
+            _ => None
         }
     }
-}
+    else
+    {
+        None
+    }
+} }
 
 impl Interpreter
 {
@@ -102,11 +96,8 @@ impl Interpreter
     pub (crate) fn read_function(&mut self, subroutine : bool, generator : bool) -> Result<(String, FuncSpec), String>
     {
         let code = self.get_code();
-        
         let name = self.read_string()?;
-        
         let argcount = self.read_u16()?;
-        
         let bodylen = self.read_usize()?;
         
         let mut args = Vec::<String>::new();
@@ -192,10 +183,7 @@ impl Interpreter
             {
                 break;
             }
-            else
-            {
-                self.top_frame.controlstack.pop();
-            }
+            self.top_frame.controlstack.pop();
         }
     }
 }

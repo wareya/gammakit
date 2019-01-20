@@ -110,8 +110,8 @@ fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
                             _ => return plainerr("internal error: broken logic in compiling return/yield AST node")
                         }
                     }
-                _ => return plainerr("internal error: unhandled type of instruction")
-            }
+                    _ => return plainerr("internal error: unhandled type of instruction")
+                }
             _ => return Err(format!("internal error: unhandled type of statement `{}`", ast.child(0)?.text))
         }
     }
@@ -127,6 +127,24 @@ fn compile_declaration(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) 
     for child in ast.child_slice(1, 0)?
     {
         let name = &child.child(0)?.child(0)?.text;
+        
+        // evaluate right hand side of assignment, if there is one, BEFORE declaring the variable
+        if child.children.len() == 3
+        {
+            match ast.child(0)?.text.as_str()
+            {
+                "globalvar" =>
+                {
+                    compile_string_with_prefix(code, PUSHVAR, "global");
+                    compile_string_with_prefix(code, PUSHNAME, &name);
+                    code.push(INDIRECTION);
+                }
+                _ => compile_string_with_prefix(code, PUSHNAME, &name)
+            }
+            code.extend(compile_astnode(child.child(2)?, scopedepth)?);
+        }
+        
+        // declare the variable
         compile_string_with_prefix(code, PUSHNAME, &name);
         match ast.child(0)?.text.as_str()
         {
@@ -135,19 +153,10 @@ fn compile_declaration(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) 
             "globalvar" => code.push(DECLGLOBALVAR),
             _ => return plainerr("internal error: non-var/far prefix to declaration")
         }
+        
+        // perform the assignment to the newly-declared variable
         if child.children.len() == 3
         {
-            if ast.child(0)?.text.as_str() == "globalvar"
-            {
-                compile_string_with_prefix(code, PUSHVAR, "global");
-                compile_string_with_prefix(code, PUSHNAME, &name);
-                code.push(INDIRECTION);
-            }
-            else
-            {
-                compile_string_with_prefix(code, PUSHNAME, &name);
-            }
-            code.extend(compile_astnode(child.child(2)?, scopedepth)?);
             code.push(BINSTATE);
             code.push(0x00);
         }
@@ -177,14 +186,12 @@ fn compile_function(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> 
         code.extend(pack_u16(0))
     }
     code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
-    
-    if ast.text == "funccall"
+     
+    match ast.text.as_str()
     {
-        code.push(FUNCCALL);
-    }
-    else
-    {
-        code.push(FUNCEXPR);
+        "funccall" => code.push(FUNCCALL),
+        "funcexpr" => code.push(FUNCEXPR),
+        _ => return plainerr("internal error: unknown function invocation type in compile_function")
     }
     Ok(())
 }
