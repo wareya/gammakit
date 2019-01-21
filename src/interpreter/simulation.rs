@@ -94,7 +94,7 @@ impl Interpreter
     pub (crate) fn sim_PUSHVAR(&mut self) -> OpResult
     {
         let name = self.read_string()?;
-        let val = self.evaluate_or_store(&Variable::Direct(DirectVar{name}), None)?.ok_or_else(|| format!("error: tried to evaluate non-extant variable"))?;
+        let val = self.evaluate_or_store(&Variable::Direct(DirectVar{name}), None)?.ok_or_else(|| minierr("error: tried to evaluate non-extant variable"))?;
         self.stack_push_val(val);
         Ok(())
     }
@@ -793,11 +793,15 @@ impl Interpreter
                 self.stack_push_var(Variable::Array(arrayvar));
             }
             StackValue::Var(Variable::Direct(dirvar)) =>
-                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(index).into_iter().collect() } )),
+                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(index) } )),
             StackValue::Var(Variable::Indirect(indirvar)) =>
-                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(index).into_iter().collect() } )),
+                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(index) } )),
             StackValue::Val(Value::Array(array)) =>
-                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualArray(array), indexes : vec!(index).into_iter().collect() } )),
+                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualArray(array), indexes : vec!(index) } )),
+            StackValue::Val(Value::Dict(dict)) =>
+                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualDict(dict), indexes : vec!(index) } )),
+            StackValue::Val(Value::Text(string)) =>
+                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualText(string), indexes : vec!(index) } )),
             _ =>
                 return plainerr("error: tried to use array indexing on a non-indexable value"),
         }

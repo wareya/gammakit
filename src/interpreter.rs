@@ -127,18 +127,18 @@ impl Interpreter {
         {
             return Err(Some(minierr("internal error: simulation stepped while outside of the range of the frame it was in")));
         }
-        let op = self.pull_single_from_code()?;
         
+        let op = self.pull_single_from_code()?;
         let opfunc = match_or_err!(self.get_opfunc(op), Some(opfunc) => opfunc, Some(format!("internal error: unknown operation 0x{:02X}", op)))?;
         
         opfunc(self).map_err(Some)?;
         self.handle_flow_control()?;
         
-        match self.doexit
+        if self.doexit
         {
-            true => Err(None),
-            false => Ok(())
+            return Err(None);
         }
+        Ok(())
     }
     /// Steps the interpreter by a single operation.
     ///
@@ -151,7 +151,6 @@ impl Interpreter {
     /// If there is an error string (i.e. Err(Some(string))), exit was non-graceful (i.e. there was an error). Otherwise (i.e. Err(None)), it was graceful.
     pub fn step(&mut self) -> StepResult
     {
-        self.last_error = None;
         let ret = self.step_internal();
         self.last_error = ret.clone().err().unwrap_or(None).map(|x| format!("{}\nline:{}", x, self.top_frame.currline));
         ret

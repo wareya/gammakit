@@ -575,23 +575,9 @@ fn compile_funcdef(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> 
 }
 fn compile_lambda(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
-    let mut captures = Vec::<&ASTNode>::new();
-    for child in ast.child(0)?.child_slice(1, -1)?
-    {
-        captures.push(&child);
-    }
-    
-    let mut args = Vec::<&ASTNode>::new();
-    for child in ast.child(1)?.child_slice(1, -1)?
-    {
-        args.push(&child);
-    }
-    
-    let mut statements = Vec::<&ASTNode>::new();
-    for child in ast.child(2)?.child_slice(1, -1)?
-    {
-        statements.push(&child);
-    }
+    let captures : Vec<&ASTNode> = ast.child(0)?.child_slice(1, -1)?.iter().collect();
+    let args : Vec<&ASTNode> = ast.child(1)?.child_slice(1, -1)?.iter().collect();
+    let statements : Vec<&ASTNode> = ast.child(2)?.child_slice(1, -1)?.iter().collect();
                    
     let mut argbytes = Vec::<u8>::new();
     for arg in &args
@@ -655,7 +641,7 @@ fn compile_arraybody(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
     {
         if expression.text == "unusedcomma"
         {
-            break
+            break;
         }
         childexprs.extend(compile_astnode(expression, scopedepth)?);
         elementcount += 1;

@@ -107,10 +107,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                     Ok(Some(Value::Text(newstr)))
                 }
             }
-            _ =>
-            {
-                plainerr("error: tried to index into a non-array, non-dict value")
-            }
+            _ => plainerr("error: tried to index into a non-array, non-dict value")
         }
     }
     else
@@ -224,10 +221,7 @@ fn access_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &
                         return Ok(Some(Value::new_funcval(false, Some(dirvar.name.clone()), None, Some(mydata))));
                         // FIXME is this good behavior?
                     }
-                    else
-                    {
-                        return Err(format!("error: tried to assign to function `{}` in instance of object type `{}`", dirvar.name, objspec.name));
-                    }
+                    return Err(format!("error: tried to assign to function `{}` in instance of object type `{}`", dirvar.name, objspec.name));
                 }
             }
         }
@@ -248,9 +242,7 @@ impl Interpreter
                     IndirectSource::Ident(ident) =>
                     {
                         let instance = self.global.instances.get_mut(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, ident))?;
-                        
                         let var = instance.variables.get_mut(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, ident))?;
-                        
                         assign_or_return_indexed(value, var, &arrayvar.indexes)
                     }
                     IndirectSource::Global =>
@@ -291,13 +283,29 @@ impl Interpreter
                 }
                 Err(format!("error: unknown variable `{}`", dirvar.name))
             }
-            NonArrayVariable::ActualArray(ref array) =>
+            NonArrayVariable::ActualArray(array) =>
             {
                 if value.is_none()
                 {
                     return assign_or_return_indexed(None, &mut Value::Array(array.clone()), &arrayvar.indexes);
                 }
-                plainerr("error: tried to assign to a non-variable array value")
+                plainerr("error: tried to assign to an index of a non-variable array value")
+            }
+            NonArrayVariable::ActualDict(dict) =>
+            {
+                if value.is_none()
+                {
+                    return assign_or_return_indexed(None, &mut Value::Dict(dict.clone()), &arrayvar.indexes);
+                }
+                plainerr("error: tried to assign to an index of a non-variable dict value")
+            }
+            NonArrayVariable::ActualText(string) =>
+            {
+                if value.is_none()
+                {
+                    return assign_or_return_indexed(None, &mut Value::Text(string.clone()), &arrayvar.indexes);
+                }
+                plainerr("error: tried to assign to an index of a non-variable string value")
             }
         }
     }
@@ -368,7 +376,7 @@ impl Interpreter
             },
             "other" =>
             {
-                if value.is_some()
+                if value.is_none()
                 {
                     return Err(format!("error: cannot assign to variable called \"{}\" (special read-only name)", dirvar.name));
                 }
@@ -429,18 +437,9 @@ impl Interpreter
     {
         match &variable
         {
-            Variable::Array(ref arrayvar) =>
-            {
-                self.evaluate_or_store_of_array(arrayvar, value)
-            }
-            Variable::Indirect(ref indirvar) =>
-            {
-                self.evaluate_or_store_of_indirect(indirvar, value)
-            }
-            Variable::Direct(ref dirvar) =>
-            {
-                self.evaluate_or_store_of_direct(dirvar, value)
-            }
+            Variable::Array(ref arrayvar) => self.evaluate_or_store_of_array(arrayvar, value),
+            Variable::Indirect(ref indirvar) => self.evaluate_or_store_of_indirect(indirvar, value),
+            Variable::Direct(ref dirvar) => self.evaluate_or_store_of_direct(dirvar, value),
         }
     }
 }

@@ -108,8 +108,7 @@ impl Interpreter
     
     pub fn insert_default_bindings(&mut self)
     {
-        macro_rules! enrc { ( $y:ident ) => { Rc::new(RefCell::new(Interpreter::$y)) } }
-        macro_rules! insert { ( $x:expr, $y:ident ) => { self.insert_binding($x.to_string(), enrc!($y)); } }
+        macro_rules! insert { ( $x:expr, $y:ident ) => { self.insert_binding($x.to_string(), Rc::new(RefCell::new(Interpreter::$y))); } }
         
         insert!("print"                 , sim_func_print                );
         insert!("printraw"              , sim_func_printraw             );
@@ -184,8 +183,8 @@ impl Interpreter
         match collection
         {
             Value::Text(string) => slice_any(&string.chars().collect::<Vec<char>>(), start, end).map(|array| Value::Text(array.iter().cloned().collect())).ok_or_else(|| minierr("error: slice() on string went out of range")),
-            Value::Array(array) => slice_any(&array, start, end).map(|array| Value::Array(array.iter().cloned().collect())).ok_or_else(|| minierr("error: slice() on array went out of range")),
-            _ => plainerr("error: tried to take length of lengthless type")
+            Value::Array(array) => slice_any(&array, start, end).map(|array| Value::Array(array.to_vec())).ok_or_else(|| minierr("error: slice() on array went out of range")),
+            _ => plainerr("error: tried to slice lengthless type")
         }
     }
     pub (crate) fn sim_func_keys(&mut self, mut args : Vec<Value>) -> Result<Value, String>
@@ -217,7 +216,7 @@ impl Interpreter
                 if let Value::Text(value) = args.extract(2).ok_or_else(|| minierr("error: insert() with a string also requires a value to insert at the given index"))?
                 {
                     let chars : Vec<char> = string.chars().collect();
-                    let index = match_or_err!(key, Value::Number(index) => index.round() as isize, minierr("error: tried to insert into an array with a non-number index"))?;
+                    let index = match_or_err!(key, Value::Number(index) => index.round() as isize, minierr("error: tried to insert into a string with a non-number index"))?;
                     let index = if index < 0 {chars.len() - (-index as usize)} else {index as usize} as usize;
                     let left = chars.get(0..index).ok_or_else(|| minierr("error: tried to insert into a string at an out-of-range index"))?;
                     let right = chars.get(index..chars.len()).ok_or_else(|| minierr("error: tried to insert into a string at an out-of-range index"))?;
@@ -264,6 +263,15 @@ impl Interpreter
         let key = args.expect_extract(1)?;
         match collection
         {
+            Value::Text(string) =>
+            {
+                let chars : Vec<char> = string.chars().collect();
+                let index = match_or_err!(key, Value::Number(index) => index.round() as isize, minierr("error: tried to remove from a string with a non-number index"))?;
+                let index = if index < 0 {chars.len() - (-index as usize)} else {index as usize} as usize;
+                let left = chars.get(0..index).ok_or_else(|| minierr("error: tried to remove from a string at an out-of-range index"))?;
+                let right = chars.get(index+1..chars.len()).ok_or_else(|| minierr("error: tried to remove from a string at an out-of-range index"))?;
+                Ok(Value::Text(format!("{}{}", left.iter().collect::<String>(), right.iter().collect::<String>())))
+            }
             Value::Array(mut array) =>
             {
                 let index = match_or_err!(key, Value::Number(index) => index.round() as isize, minierr("error: tried to remove from an array with a non-number index"))?;

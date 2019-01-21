@@ -110,7 +110,9 @@ pub (crate) struct Instance {
 pub (super) enum NonArrayVariable {
     Indirect(IndirectVar), // x.y.z evaluates x.y before storing it as the instance identity under which to find y
     Direct(DirectVar),
-    ActualArray(Vec<Value>) // for situations where the compiler doesn't know that EVALUATE is unnecessary, like func()[0]
+    ActualArray(Vec<Value>),
+    ActualDict(HashMap<HashableValue, Value>),
+    ActualText(String)
 }
 
 #[derive(Debug, Clone)]

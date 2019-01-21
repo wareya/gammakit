@@ -421,6 +421,7 @@ changed_dict = remove(changed_dict, "asdf");
 
 print(changed_array);
 print(changed_dict);
+print(remove("HelloX, World!", 5));
 
 print("contains():");
 
@@ -526,3 +527,8 @@ var flei = "test";
     var flei = flei*2;
     print(flei);
 }
+
+print("indexing into literal arrays, dicts, and strings:");
+print([0,1,2,3,4][3]);
+print({"asdf" : 0}["asdf"]);
+print("asdf"[0], "asdf"[3]);
