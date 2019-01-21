@@ -105,6 +105,7 @@ Gammakit has a small number of built-in bindings. The library user is expected t
 TODO:
 - ternary operators
 - a destroy() event for instance_kill()
+- associated functions for certain types that operate on variables rather than values (this will probably be emulated just like += and -=)
 - a "defer" statement?
 
 TODO (sanitation/low-priority):
@@ -112,7 +113,6 @@ TODO (sanitation/low-priority):
 - make keys() iterate over dict/set elements in insertion order
 - make sure format_val does the same as the above
 - replace parent/text AST node stuff with enum
-- some way to add/remove elements of arrays/dicts/sets WITHOUT copying and overwriting them
 - forbid if-else inside an if condition's block with no enclosing braces
 
 MAYBE:
