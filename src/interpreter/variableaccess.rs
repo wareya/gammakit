@@ -376,7 +376,7 @@ impl Interpreter
             },
             "other" =>
             {
-                if value.is_none()
+                if value.is_some()
                 {
                     return Err(format!("error: cannot assign to variable called \"{}\" (special read-only name)", dirvar.name));
                 }
