@@ -24,14 +24,15 @@ fn plainerr(mystr : &'static str) -> Result<Option<Value>, String>
 
 fn assign_or_return(value : Option<Value>, var : &mut Value) -> Result<Option<Value>, String>
 {
-    if let Some(value) = value
+    match value
     {
-        *var = value;
-        Ok(None)
-    }
-    else
-    {
-        Ok(Some(var.clone()))
+        Some(Value::Special(_)) => plainerr("error: tried to assign a special value to a variable"),
+        Some(value) =>
+        {
+            *var = value;
+            Ok(None)
+        }
+        _ => Ok(Some(var.clone()))
     }
 }
 
