@@ -583,129 +583,37 @@ impl Parser {
             {
                 ast.children.pop();
             }
-            while (ast.text.starts_with("binexpr_") || ast.text == "simplexpr" || ast.text == "supersimplexpr") && ast.children.len() == 1
+            while (ast.text.starts_with("binexpr_") || ast.text == "simplexpr" || ast.text == "parenexpr" || ast.text == "supersimplexpr") && ast.children.len() == 1
             {
-                // FIXME no idea if this works lol
                 let mut temp = Vec::new();
                 std::mem::swap(&mut temp, &mut ast.children);
                 let dummy = temp.get_mut(0).ok_or_else(|| minierr("internal error: could not access child that was supposed to be there in expression summarization"))?;
                 std::mem::swap(ast, dummy);
             }
+            
             match ast.text.as_str()
             {
-                "funcargs" =>
+                "objdef" =>
                 {
-                    if ast.children.len() >= 2
-                    && ast.child(0)?.text == "(" && !ast.child(0)?.isparent
-                    && ast.last_child()?.text == ")" && !ast.last_child()?.isparent
+                    if ast.children.len() < 3
                     {
-                        ast.children.pop();
-                        ast.children.remove(0);
+                        return plainerr("internal error: objdef AST node does not have at least 3 children");
+                    }
+                    for child in ast.child_slice(3, -1)?
+                    {
+                        if matches!(child.child(1)?.child(0)?.text.as_str(), "create" | "destroy")
+                           && (child.child(3)?.isparent || child.child(3)?.text != ")")
+                        {
+                            return plainerr(&format!("error: `{}` function of object must not have any arguments", child.child(1)?.child(0)?.text));
+                        }
                     }
                 }
                 "funccall" =>
                 {
-                    if ast.children.len() == 1
+                    if ast.child(0)?.last_child()?.child(0)?.text != "funcargs"
                     {
-                        self.parse_tweak_ast(ast.child_mut(0)?)?;
-                        if ast.child(0)?.text == "arrayexpr"
-                        {
-                            return plainerr("error: tried to use array indexing expression as statement");
-                        }
-                        if ast.child(0)?.text == "indirection"
-                        {
-                            return plainerr("error: tried to use indirection expression as statement");
-                        }
-                        if ast.child(0)?.text != "funcexpr"
-                        {
-                            return plainerr("error: tried to use unknown right-handed-expansion expression as statement");
-                        }
-                        let mut temp = Vec::new();
-                        std::mem::swap(&mut temp, &mut ast.child_mut(0)?.children);
-                        std::mem::swap(&mut temp, &mut ast.children);
+                        return plainerr("error: tried to use non-function expression as a funccall statement");
                     }
-                    while ast.children.len() > 2
-                    {
-                        let left = ASTNode{text: "funcexpr".to_string(), line: ast.child(0)?.line, position: ast.child(0)?.position, isparent: true, children: ast.children.drain(0..2).collect(), precedence : None};
-                        ast.children.insert(0, left);
-                    }
-                }
-                "arrayref" =>
-                {
-                    while ast.children.len() > 2
-                    {
-                        let left = ASTNode{text: ast.text.clone(), line: ast.child(0)?.line, position: ast.child(0)?.position, isparent: true, children: ast.children.drain(0..2).collect(), precedence : None};
-                        ast.children.insert(0, left);
-                    }
-                }
-                "rhunexpr" =>
-                {
-                    while ast.children.len() > 2
-                    {
-                        let left = ASTNode{text: ast.text.clone(), line: ast.child(0)?.line, position: ast.child(0)?.position, isparent: true, children: ast.children.drain(0..2).collect(), precedence : None};
-                        ast.children.insert(0, left);
-                    }
-                    
-                    if ast.children.len() != 2
-                    {
-                        return plainerr("internal error: transformed rhunexpr doesn't have exactly two children");
-                    }
-                    if ast.child(1)?.children.len() != 1
-                    {
-                        return plainerr("internal error: right child of transformed rhunexpr doesn't have exactly one child");
-                    }
-                    
-                    if ast.child(1)?.child(0)?.text == "funcargs"
-                    {
-                        ast.text = "funcexpr".to_string();
-                        let mut temp = dummy_astnode();
-                        std::mem::swap(&mut temp, ast.child_mut(1)?.child_mut(0)?);
-                        std::mem::swap(&mut temp, ast.child_mut(1)?);
-                    }
-                    else if ast.child(1)?.child(0)?.text == "arrayindex"
-                    {
-                        ast.text = "arrayexpr".to_string();
-                        let mut temp = dummy_astnode();
-                        std::mem::swap(&mut temp, ast.child_mut(1)?.child_mut(0)?);
-                        std::mem::swap(&mut temp, ast.child_mut(1)?);
-                    }
-                    else if ast.child(1)?.child(0)?.text == "indirection"
-                    {
-                        ast.text = "indirection".to_string();
-                        let mut temp = dummy_astnode();
-                        std::mem::swap(&mut temp, ast.child_mut(1)?.child_mut(0)?.child_mut(1)?);
-                        std::mem::swap(&mut temp, ast.child_mut(1)?);
-                    }
-                    else
-                    {
-                        return plainerr("internal error: rhunexpr doesn't contain funcargs | arrayindex | indirection");
-                    }
-                }
-                "ifcondition" | "whilecondition" | "withstatement" =>
-                {
-                    if ast.children.len() < 5
-                    {
-                        return plainerr("internal error: if/while/with loop doesn't have at least 5 children (this includes its parens) (it should have a token, paren, expr, paren, block)");
-                    }
-                    ast.children.remove(3); // )
-                    ast.children.remove(1); // (
-                }
-                "foreach" =>
-                {
-                    if ast.children.len() != 7
-                    {
-                        return plainerr("internal error: foreach loop doesn't have exactly 7 children (this includes its parens) (it should have a token, paren, expr, paren, block)");
-                    }
-                    ast.children.remove(5); // )
-                    ast.children.remove(3); // "in"
-                    ast.children.remove(1); // (
-                }
-                "switch" =>
-                {
-                    ast.children.pop(); // }
-                    ast.children.remove(4); // {
-                    ast.children.remove(3); // )
-                    ast.children.remove(1); // (
                 }
                 _ => {}
             }
@@ -718,39 +626,6 @@ impl Parser {
         Ok(())
     }
     
-    fn verify_ast(&self, ast : &ASTNode) -> Result<(), String>
-    {
-        if ast.isparent
-        {
-            if ast.text == "objdef"
-            {
-                if ast.children.len() < 3
-                {
-                    return plainerr("internal error: objdef AST node does not have at least 3 children");
-                }
-                for child in ast.child_slice(3, -1)?
-                {
-                    if matches!(child.child(1)?.child(0)?.text.as_str(), "create" | "destroy")
-                       && (child.child(3)?.isparent || child.child(3)?.text != ")")
-                    {
-                        return plainerr(&format!("error: `{}` function of object must not have any arguments", child.child(1)?.child(0)?.text));
-                    }
-                }
-            }
-            
-            if matches!(ast.text.as_str(), "funccall" | "funcexpr" | "arrayref")
-               && ast.children.len() != 2
-            {
-                return plainerr("broken ast node");
-            }
-            
-            for child in &ast.children
-            {
-                self.verify_ast(&child)?;
-            }
-        }
-        Ok(())
-    }
     pub fn parse_program(&self, tokens : &VecDeque<LexToken>, lines : &[String], silent: bool) -> Result<Option<ASTNode>, String>
     {
         let start_time = Instant::now();
@@ -848,12 +723,6 @@ impl Parser {
                     println!("tweaking AST...");
                 }
                 self.parse_tweak_ast(&mut ast)?;
-                
-                if !silent
-                {
-                    println!("verifying AST...");
-                }
-                self.verify_ast(&ast)?;
                 
                 if !silent
                 {

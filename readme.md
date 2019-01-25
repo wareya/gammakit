@@ -112,8 +112,10 @@ TODO:
 - ternary operators
 - various helpful string and array functions
 - a destroy() event for instance_kill()
-- associated functions for certain types that operate on variables rather than values (this will probably be emulated just like += and -=)
+- associated functions for certain types that operate on variables rather than values
 - a "defer" statement?
+- inheritance? how would it work? func_super()-based?
+- globalsubdef?
 
 TODO (sanitation/low-priority):
 - replace instances of "as" with instances of "from"

@@ -16,8 +16,8 @@ $expr$...,
 funcargs:
 ( $arglist$? )
 
-funccall:
-$rhunexpr$
+arrayindex:
+[ $expr$ ]
 
 indirection:
 . $name$
@@ -30,8 +30,8 @@ $indirection$
 rhunexpr:
 $supersimplexpr$ $rhunexpr_right$+
 
-arrayindex:
-[ $expr$ ]
+funccall:
+$rhunexpr$
 
 unusedcomma:
 ,
@@ -51,8 +51,11 @@ setbody:
 set { }
 set { $expr$..., $unusedcomma$? }
 
-supersimplexpr:
+parenexpr:
 ( $expr$ )
+
+supersimplexpr:
+$parenexpr$
 $lambda$
 $arraybody$
 $dictbody$
@@ -64,7 +67,7 @@ invocation_expr:
 invoke $lvar$
 
 simplexpr:
-( $expr$ )
+$parenexpr$
 $rvar$
 $invocation_expr$
 $lambda$
@@ -132,8 +135,21 @@ binop_3:
 invocation_call:
 invoke $lvar$
 
-statement:
+blankstatement:
+;
+
+statementlist:
 { $statement$* }
+
+binstate:
+$lvar$ $binstateop$ $expr$
+
+unstate:
+$lvar$ $unstateop$
+
+statement:
+$blankstatement$
+$statementlist$
 $declaration$ ;
 $condition$
 $foreach$
@@ -141,7 +157,8 @@ $withstatement$
 $switch$
 $funcdef$
 $objdef$
-$lvar$ $binstateop$ $expr$ ;
+$binstate$ ;
+$unstate$ ;
 $instruction$ ;
 $funccall$ ;
 $invocation_call$ ;
@@ -163,16 +180,16 @@ $whilecondition$
 $forcondition$
 
 withstatement:
-with ( $expr$ ) $block$
+with $parenexpr$ $block$
 
 whilecondition:
-while ( $expr$ ) $block$
+while $parenexpr$ $block$
 
 barestatement:
-{ $statement$* }
+$statementlist$
 $declaration$
-$lvar$ $binstateop$ $expr$
-$lvar$ $unstateop$
+$binstate$
+$unstate$
 $funccall$
 
 forcondition:
@@ -182,7 +199,7 @@ foreach:
 for ( $name$ in $expr$ ) $block$
 
 ifcondition:
-if ( $expr$ ) $block$ >>? else $block$
+if $parenexpr$ $block$ >>? else $block$
 
 block:
 $statement$
@@ -237,7 +254,10 @@ lambdabody:
 { $statement$* }
 
 switch:
-switch ( $expr$ ) { $switchcase$+ $switchdefault$? }
+switch ( $expr$ ) { $switchcases$ }
+
+switchcases:
+$switchcase$+ $switchdefault$?
 
 switchcase:
 case $expr$..., : $nakedblock$

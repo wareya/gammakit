@@ -8,7 +8,11 @@ impl Interpreter
     }
     pub (super) fn stack_pop_val(&mut self) -> Option<Value>
     {
-        self.top_frame.pop_val()
+        match self.top_frame.pop()?
+        {
+            StackValue::Var(var) => self.evaluate_or_store(&var, None).ok()?,
+            StackValue::Val(val) => Some(val)
+        }
     }
     pub (super) fn stack_pop_var(&mut self) -> Option<Variable>
     {
@@ -33,28 +37,27 @@ impl Interpreter
     
     pub (super) fn handle_func_call_or_expr(&mut self, isexpr : bool) -> OpResult
     {
-        let funcdata = self.stack_pop().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR/FUNCCALL"))?;
         let argcount_val = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR/FUNCCALL"))?;
         
         let argcount = match_or_err!(argcount_val, Value::Number(argcount) => argcount, minierr("internal error: number on stack of arguments to function was not a number"))?;
+        let argcount = argcount.round() as usize;
+        
+        if argcount > self.stack_len()
+        {
+            return plainerr("internal error: fewer values on stack than expected in FUNCEXPR/FUNCCALL");
+        }
         
         let mut args = Vec::<Value>::new();
-        for _i in 0..(argcount.round() as usize)
+        for _i in 0..argcount
         {
-            args.insert(0, self.stack_pop_val().ok_or_else(|| minierr("internal error: fewer variables on stack than expected in FUNCEXPR/FUNCCALL"))?);
+            args.insert(0, self.stack_pop_val().ok_or_else(|| minierr("internal error: expected values, got variable on stack in FUNCEXPR/FUNCCALL"))?);
         }
-        if let StackValue::Var(var) = funcdata
-        {
-            let funcdata_val = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: variable meant to hold function data in FUNCEXPR/FUNCCALL was invalid"))?;
-            
-            let funcdata = match_or_err!(funcdata_val, Value::Func(funcdata) => funcdata, minierr("internal error: variable meant to hold function data in FUNCEXPR/FUNCCALL was not holding function data"))?;
-            self.call_function(*funcdata, args, isexpr)?;
-        }
-        else
-        {
-            let funcdata = match_or_err!(funcdata, StackValue::Val(Value::Func(funcdata)) => funcdata, minierr("internal error: value meant to hold function data in FUNCEXPR/FUNCCALL was not holding function data"))?;
-            self.call_function(*funcdata, args, isexpr)?;
-        }
+        
+        let funcdata = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR/FUNCCALL"))?;
+        
+        let funcdata = match_or_err!(funcdata, Value::Func(funcdata) => funcdata, minierr("internal error: value meant to hold function data in FUNCEXPR/FUNCCALL was not holding function data"))?;
+        self.call_function(*funcdata, args, isexpr)?;
+        
         Ok(())
     }
     

@@ -30,63 +30,68 @@ fn compile_unscope(code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String
     Ok(())
 }
 
+fn compile_binstate(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    let operator = &ast.child(1)?.child(0)?.text;
+    let op = get_assignment_type(operator).ok_or_else(|| minierr(&format!("internal error: unhandled or unsupported type of binary statement {}", operator)))?;
+    
+    code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
+    code.extend(compile_astnode(ast.child(2)?, scopedepth)?);
+    code.push(BINSTATE);
+    code.push(op);
+    
+    Ok(())
+}
+fn compile_unstate(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    let operator = &ast.child(1)?.child(0)?.text;
+    
+    code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
+    code.push(UNSTATE);
+    match operator.as_str()
+    {
+        "++" => code.push(0x00),
+        "--" => code.push(0x01),
+        _ => return Err(format!("internal error: unhandled or unsupported type of unary statement {}", operator))
+    }
+    
+    Ok(())
+}
+fn compile_with(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    let expr = compile_astnode(ast.child(1)?, scopedepth)?;
+    let block = compile_astnode(ast.child(2)?, scopedepth)?;
+    
+    code.extend(expr);
+    code.push(WITH);
+    code.extend(pack_u64(block.len() as u64));
+    code.extend(block);
+    
+    Ok(())
+}
+
 fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     code.push(LINENUM);
     code.extend(pack_u64(ast.line as u64));
-    if !ast.child(0)?.isparent && !ast.last_child()?.isparent && ast.child(0)?.text == "{" && ast.last_child()?.text == "}"
-    {
-        code.push(SCOPE);
-        for child in ast.child_slice(1, -1)?
-        {
-            code.extend(compile_astnode(child, scopedepth+1)?);
-        }
-        compile_unscope(code, scopedepth)?;
-    }
-    else if ast.children.len() == 3 && ast.child(1)?.isparent && ast.child(1)?.text == "binstateop"
-    {
-        let operator = &ast.child(1)?.child(0)?.text;
-        code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
-        code.extend(compile_astnode(ast.child(2)?, scopedepth)?);
-        code.push(BINSTATE);
-        let op = get_assignment_type(operator).ok_or_else(|| minierr(&format!("internal error: unhandled or unsupported type of binary statement {}", operator)))?;
-        code.push(op);
-    }
-    else if ast.children.len() == 2 && ast.child(1)?.isparent && ast.child(1)?.text == "unstateop"
-    {
-        let operator = &ast.child(1)?.child(0)?.text;
-        code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
-        code.push(UNSTATE);
-        match operator.as_str()
-        {
-            "++" => code.push(0x00),
-            "--" => code.push(0x01),
-            _ => return Err(format!("internal error: unhandled or unsupported type of unary statement {}", operator))
-        }
-    }
-    else if ast.child(0)?.isparent
+    
+    if ast.child(0)?.isparent
     {
         match ast.child(0)?.text.as_str()
         {
+            "blankstatement" => {}
+            "binstate" =>
+                compile_binstate(ast.child(0)?, code, scopedepth)?,
+            "unstate" =>
+                compile_unstate(ast.child(0)?, code, scopedepth)?,
             "withstatement" =>
-            {
-                let ast = &ast.child(0)?;
-                
-                let expr = compile_astnode(ast.child(1)?, scopedepth)?;
-                let block = compile_astnode(ast.child(2)?, scopedepth)?;
-                
-                code.extend(expr);
-                code.push(WITH);
-                code.extend(pack_u64(block.len() as u64));
-                code.extend(block);
-            }
-            "declaration" | "funccall" | "funcexpr" | "funcdef" | "objdef" | "invocation_call" | "foreach"  | "switch" =>
+                compile_with(ast.child(0)?, code, scopedepth)?,
+            "declaration" | "funccall" | "funcexpr" | "funcdef" | "objdef" | "invocation_call" | "foreach"  | "switch" | "statementlist" =>
                 code.extend(compile_astnode(ast.child(0)?, scopedepth)?),
-            
             "condition" =>
                 code.extend(compile_astnode(ast.child(0)?.child(0)?, scopedepth)?),
-            
             "instruction" =>
+                // FIXME move to function
                 match ast.child(0)?.child(0)?.text.as_str()
                 {
                     "break" => code.push(BREAK),
@@ -164,42 +169,94 @@ fn compile_declaration(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) 
     Ok(())
 }
 
-fn compile_function(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+fn compile_arrayindex(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
-    if ast.child(1)?.children.len() > 0
+    code.extend(compile_astnode(ast.child(1)?, scopedepth)?);
+    code.push(ARRAYEXPR);
+    
+    Ok(())
+}
+fn compile_indirection(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), String>
+{
+    compile_string_with_prefix(code, PUSHNAME, &ast.child(1)?.child(0)?.text); // FIXME make this use PUSHSTR
+    code.push(INDIRECTION);
+    
+    Ok(())
+}
+fn compile_funcargs(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    let args = &ast.child(1)?.children;
+    if args.len() > 0xFFFF
     {
-        let children = &ast.child(1)?.child(0)?.children;
-        if children.len() > 0xFFFF
+        return plainerr("internal error: more than 0xFFFF (around 65000) arguments to single function");
+    }
+    for child in args
+    {
+        code.extend(compile_astnode(child, scopedepth)?);
+    }
+    code.push(PUSHSHORT);
+    code.extend(pack_u16(args.len() as u16));
+    code.push(FUNCEXPR);
+    
+    Ok(())
+}
+
+fn compile_rhunexpr_inner(nodes : &[ASTNode], code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    match nodes.len()
+    {
+        0 => return plainerr("error: rhunexpr has no children"),
+        1 =>
         {
-            return plainerr("internal error: more than 0xFFFF (around 65000) arguments to single function");
+            let node = &nodes[0];
+            if node.isparent && node.text == "name"
+            {
+                compile_string_with_prefix(code, PUSHNAME, &node.child(0)?.text);
+            }
+            else
+            {
+                code.extend(compile_astnode(node, scopedepth)?);
+            }
         }
-        for child in children
+        _ =>
         {
-            code.extend(compile_astnode(child, scopedepth)?);
+            compile_rhunexpr_inner(&nodes[..nodes.len()-1], code, scopedepth)?;
+            let end = nodes[nodes.len()-1].child(0)?;
+            match end.text.as_str()
+            {
+                "funcargs" => compile_funcargs(end, code, scopedepth)?,
+                "arrayindex" => compile_arrayindex(end, code, scopedepth)?,
+                "indirection" => compile_indirection(end, code, scopedepth)?,
+                _ => return plainerr("error: rhunexpr contains unknown final node")
+            }
         }
-        code.push(PUSHSHORT);
-        code.extend(pack_u16(children.len() as u16))
     }
-    else
+    Ok(())
+}
+
+fn compile_rhunexpr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    compile_rhunexpr_inner(&ast.children[..], code, scopedepth)
+}
+fn compile_funccall(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    let mut subcode = vec!();
+    compile_rhunexpr(ast, &mut subcode, scopedepth)?;
+    
+    match subcode.pop()
     {
-        code.push(PUSHSHORT);
-        code.extend(pack_u16(0))
+        Some(FUNCEXPR) => subcode.push(FUNCCALL),
+        Some(_) => return plainerr("internal error: tried to use an indexing expression or indirection expression as a statement (this is supposed to be caught by parse_tweak_ast)"),
+        None => return plainerr("internal error: compiled child of funccall node was empty")
     }
-    code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
-     
-    match ast.text.as_str()
-    {
-        "funccall" => code.push(FUNCCALL),
-        "funcexpr" => code.push(FUNCEXPR),
-        _ => return plainerr("internal error: unknown function invocation type in compile_function")
-    }
+    code.extend(subcode);
     Ok(())
 }
 
 fn compile_block(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     let sentinel = &ast.child(0)?.child(0)?;
-    if !sentinel.isparent && sentinel.text == "{"
+    if sentinel.isparent && sentinel.text == "statementlist"
     {
         code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
     }
@@ -286,7 +343,7 @@ impl Case {
 
 fn compile_switch(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
-    code.extend(compile_astnode(ast.child(1)?, scopedepth)?);
+    code.extend(compile_astnode(ast.child(2)?, scopedepth)?);
     
     // SWITCH (u8)
     // num cases (u16)
@@ -294,13 +351,16 @@ fn compile_switch(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Re
     // case label expressions... (arbitrary)
     // case blocks... (arbitrary)
     
+    
+    let cases = ast.child(5)?;
+    
     code.push(SWITCH);
-    code.extend(pack_u16((ast.children.len()-2) as u16));
+    code.extend(pack_u16(cases.children.len() as u16));
     
     let mut labels = vec!();
     let mut blocks = vec!();
     
-    for node in ast.child_slice(2, 0)?
+    for node in &cases.children
     {
         let case = Case::compile(node, blocks.len() as u16, scopedepth)?;
         labels.extend(case.labels);
@@ -308,7 +368,7 @@ fn compile_switch(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Re
         blocks.push(case.block);
     }
     labels.push(SWITCHEXIT);
-    if blocks.len() != ast.children.len()-2
+    if blocks.len() != cases.children.len()
     {
         return plainerr("error: broken switch node");
     }
@@ -342,17 +402,17 @@ fn compile_whilecondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usiz
 }
 fn compile_foreach(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
-    if !ast.child(1)?.isparent || ast.child(1)?.text != "name"
+    if !ast.child(2)?.isparent || ast.child(2)?.text != "name"
     {
-        return plainerr("error: second child (index 1) of `foreach` must be a `name`");
+        return plainerr("error: child index 2 of `foreach` must be a `name`");
     }
     
     code.push(SCOPE);
     
-    let block = compile_astnode(ast.child(3)?, scopedepth+1)?;
+    let block = compile_astnode(ast.child(6)?, scopedepth+1)?;
     
-    compile_string_with_prefix(code, PUSHNAME, &ast.child(1)?.child(0)?.text);
-    code.extend(compile_astnode(ast.child(2)?, scopedepth+1)?);
+    compile_string_with_prefix(code, PUSHNAME, &ast.child(2)?.child(0)?.text);
+    code.extend(compile_astnode(ast.child(4)?, scopedepth+1)?);
     code.push(FOREACH);
     code.extend(pack_u64(block.len() as u64));
     code.extend(block);
@@ -413,14 +473,14 @@ fn compile_forcondition(ast : &ASTNode, code : &mut Vec<u8>, mut scopedepth : us
     let sentinel = &ast.last_child()?.child(0)?.child(0)?;
     if !sentinel.isparent && sentinel.text == "{"
     {
-        block = compile_astnode(ast.last_child()?.child(0)?, scopedepth)?;
+        block = compile_astnode(ast.last_child()?, scopedepth)?;
         post = if let Some(ref body) = header_node_2 {compile_astnode(&body, scopedepth)?} else {Vec::<u8>::new()};
     }
     else
     {
         block = Vec::<u8>::new();
         block.push(SCOPE);
-        block.extend(compile_astnode(ast.last_child()?.child(0)?, scopedepth+1)?);
+        block.extend(compile_astnode(ast.last_child()?, scopedepth+1)?);
         post = if let Some(ref body) = header_node_2 {compile_astnode(&body, scopedepth+1)?} else {Vec::<u8>::new()};
         compile_unscope(code, scopedepth)?;
     }
@@ -450,12 +510,8 @@ fn compile_expr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Resu
     code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
     Ok(())
 }
-fn compile_simplexpr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+fn compile_parenexpr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
-    if ast.children.len() != 3 || ast.child(0)?.isparent || ast.child(2)?.isparent || ast.child(0)?.text != "(" || ast.child(2)?.text != ")"
-    { 
-        return plainerr("internal error: unhandled form of simplexpr");
-    }
     code.extend(compile_astnode(ast.child(1)?, scopedepth)?);
     Ok(())
 }
@@ -483,37 +539,25 @@ fn compile_name(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Res
 
 fn compile_lvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
-    if ast.children.len() != 1
-    {
-        return plainerr("internal error: malformed lvar reference node");
-    }
     if ast.child(0)?.text == "name"
     {
         compile_string_with_prefix(code, PUSHNAME, &ast.child(0)?.child(0)?.text);
     }
     else
     {
-        code.extend(compile_astnode(ast.child(0)?, scopedepth)?)
+        code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
     }
     Ok(())
 }
 fn compile_rvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
-    if ast.children.len() != 1
-    {
-        return plainerr("internal error: malformed rvar reference node");
-    }
     if ast.child(0)?.text == "name"
     {
-        compile_string_with_prefix(code, PUSHVAR, &ast.child(0)?.child(0)?.text);
+        compile_string_with_prefix(code, PUSHNAME, &ast.child(0)?.child(0)?.text);
     }
     else
     {
-        code.extend(compile_astnode(ast.child(0)?, scopedepth)?);;
-        if ast.child(0)?.isparent && matches!(ast.child(0)?.text.as_str(), "indirection" | "arrayexpr")
-        {
-            code.push(EVALUATION);
-        }
+        code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
     }
     Ok(())
 }
@@ -691,33 +735,6 @@ fn compile_setbody(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> R
     
     Ok(())
 }
-fn compile_arrayexpr(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
-{
-    if ast.child(0)?.isparent && ast.child(0)?.text == "name"
-    {
-        compile_string_with_prefix(code, PUSHNAME, &ast.child(0)?.child(0)?.text);
-    }
-    else
-    {
-        code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
-    }
-    code.extend(compile_astnode(ast.child(1)?.child(1)?, scopedepth)?);
-    code.push(ARRAYEXPR);
-    
-    Ok(())
-}
-fn compile_indirection(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
-{
-    code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
-    if ast.child(0)?.text == "indirection"
-    {
-        code.push(EVALUATION);
-    }
-    compile_string_with_prefix(code, PUSHNAME, &ast.child(1)?.child(0)?.text);
-    code.push(INDIRECTION);
-    
-    Ok(())
-}
 fn compile_lhunop(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     if ast.children.len() == 0
@@ -771,7 +788,7 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
 {
     if !ast.isparent
     {
-        return plainerr("error: tried to compile non-parent ast node");
+        panic!("error: tried to compile non-parent ast node");
     }
     let mut code = Vec::<u8>::new();
     
@@ -784,7 +801,7 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
         code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
         let op = get_binop_type(ast.child(1)?.child(0)?.text.as_str()).ok_or_else(|| minierr("internal error: unhandled type of binary expression"))?;
         
-        let mut finalcode =  compile_astnode(ast.child(2)?, scopedepth)?;
+        let mut finalcode = compile_astnode(ast.child(2)?, scopedepth)?;
         finalcode.push(BINOP);
         finalcode.push(op);
         
@@ -814,12 +831,25 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
             }
             "statement" | "barestatement" =>
                 compile_statement(ast, &mut code, scopedepth)?,
+            "statementlist" =>
+            // FIXME move to function
+                if ast.children.len() >= 3
+                {
+                    code.push(SCOPE);
+                    for child in ast.child_slice(1, -1)?
+                    {
+                        code.extend(compile_astnode(child, scopedepth+1)?);
+                    }
+                    compile_unscope(&mut code, scopedepth)?;
+                },
             "declaration" =>
                 compile_declaration(ast, &mut code, scopedepth)?,
             "name" =>
                 compile_name(ast, &mut code, scopedepth)?,
-            "funccall" | "funcexpr" =>
-                compile_function(ast, &mut code, scopedepth)?,
+            "rhunexpr" =>
+                compile_rhunexpr(ast, &mut code, scopedepth)?,
+            "funccall" =>
+                compile_funccall(ast, &mut code, scopedepth)?,
             "ifcondition" =>
                 compile_ifcondition(ast, &mut code, scopedepth)?,
             "whilecondition" =>
@@ -830,18 +860,16 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
                 compile_foreach(ast, &mut code, scopedepth)?,
             "switch" =>
                 compile_switch(ast, &mut code, scopedepth)?,
-            "expr" =>
+            "expr" | "simplexpr" =>
                 compile_expr(ast, &mut code, scopedepth)?,
-            "simplexpr" =>
-                compile_simplexpr(ast, &mut code, scopedepth)?,
+            "parenexpr" =>
+                compile_parenexpr(ast, &mut code, scopedepth)?,
             "number" =>
                 compile_number(ast, &mut code, scopedepth)?,
             "string" =>
                 compile_string(ast, &mut code, scopedepth)?,
             "lvar" =>
                 compile_lvar(ast, &mut code, scopedepth)?,
-            "rvar" =>
-                compile_rvar(ast, &mut code, scopedepth)?,
             "funcdef" =>
                 compile_funcdef(ast, &mut code, scopedepth)?,
             "lambda" =>
@@ -854,10 +882,6 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
                 compile_dictbody(ast, &mut code, scopedepth)?,
             "setbody" =>
                 compile_setbody(ast, &mut code, scopedepth)?,
-            "arrayexpr" =>
-                compile_arrayexpr(ast, &mut code, scopedepth)?,
-            "indirection" =>
-                compile_indirection(ast, &mut code, scopedepth)?,
             "lhunop" =>
                 compile_lhunop(ast, &mut code, scopedepth)?,
             "invocation_call" =>
@@ -868,8 +892,11 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
                 compile_block(ast, &mut code, scopedepth)?,
             "nakedblock" =>
                 compile_nakedblock(ast, &mut code, scopedepth)?,
+            "rvar" =>
+                compile_rvar(ast, &mut code, scopedepth)?,
             _ =>
-                Err(format!("internal error: unhandled ast node type `{}` in compiler", ast.text))?,
+                //Err(format!("internal error: unhandled ast node type `{}` in compiler", ast.text))?,
+                panic!("internal error: unhandled ast node type `{}` in compiler", ast.text)
         }
     }
     Ok(code)
