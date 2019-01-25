@@ -6,13 +6,17 @@ impl Interpreter
     {
         self.top_frame.len()
     }
-    pub (super) fn stack_pop_val(&mut self) -> Option<Value>
+    pub (super) fn stack_pop_val_or_var(&mut self) -> Option<Value>
     {
         match self.top_frame.pop()?
         {
             StackValue::Var(var) => self.evaluate_or_store(&var, None).ok()?,
             StackValue::Val(val) => Some(val)
         }
+    }
+    pub (super) fn stack_pop_val(&mut self) -> Option<Value>
+    {
+        self.top_frame.pop_val()
     }
     pub (super) fn stack_pop_var(&mut self) -> Option<Variable>
     {
@@ -53,7 +57,7 @@ impl Interpreter
             args.insert(0, self.stack_pop_val().ok_or_else(|| minierr("internal error: expected values, got variable on stack in FUNCEXPR/FUNCCALL"))?);
         }
         
-        let funcdata = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR/FUNCCALL"))?;
+        let funcdata = self.stack_pop_val_or_var().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR/FUNCCALL"))?;
         
         let funcdata = match_or_err!(funcdata, Value::Func(funcdata) => funcdata, minierr("internal error: value meant to hold function data in FUNCEXPR/FUNCCALL was not holding function data"))?;
         self.call_function(*funcdata, args, isexpr)?;

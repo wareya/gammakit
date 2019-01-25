@@ -225,12 +225,10 @@ impl Frame {
     {
         self.stack.len()
     }
-    /*
     pub (super) fn pop_val(&mut self) -> Option<Value>
     {
         match_or_none!(self.stack.pop(), Some(StackValue::Val(r)) => r)
     }
-    */
     pub (super) fn pop_var(&mut self) -> Option<Variable>
     {
         match_or_none!(self.stack.pop(), Some(StackValue::Var(r)) => r)

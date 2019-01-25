@@ -253,6 +253,33 @@ fn compile_funccall(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> 
     Ok(())
 }
 
+fn compile_rvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    let mut subcode = compile_astnode(ast.child(0)?, scopedepth)?;
+    
+    match subcode.pop()
+    {
+        Some(INDIRECTION) => subcode.extend(&[INDIRECTION, EVALUATION]),
+        Some(ARRAYEXPR) => subcode.extend(&[ARRAYEXPR, EVALUATION]),
+        Some(other) => subcode.push(other),
+        None => return plainerr("internal error: compiled child of rvar node was empty")
+    }
+    code.extend(subcode);
+    Ok(())
+}
+fn compile_lvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    if ast.child(0)?.text == "name"
+    {
+        compile_string_with_prefix(code, PUSHNAME, &ast.child(0)?.child(0)?.text);
+    }
+    else
+    {
+        code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
+    }
+    Ok(())
+}
+
 fn compile_block(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     let sentinel = &ast.child(0)?.child(0)?;
@@ -534,31 +561,6 @@ fn compile_string(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> R
 fn compile_name(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), String>
 {
     compile_string_with_prefix(code, PUSHVAR, &ast.child(0)?.text);
-    Ok(())
-}
-
-fn compile_lvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
-{
-    if ast.child(0)?.text == "name"
-    {
-        compile_string_with_prefix(code, PUSHNAME, &ast.child(0)?.child(0)?.text);
-    }
-    else
-    {
-        code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
-    }
-    Ok(())
-}
-fn compile_rvar(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
-{
-    if ast.child(0)?.text == "name"
-    {
-        compile_string_with_prefix(code, PUSHNAME, &ast.child(0)?.child(0)?.text);
-    }
-    else
-    {
-        code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
-    }
     Ok(())
 }
 fn compile_funcdef(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), String>
@@ -868,8 +870,6 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
                 compile_number(ast, &mut code, scopedepth)?,
             "string" =>
                 compile_string(ast, &mut code, scopedepth)?,
-            "lvar" =>
-                compile_lvar(ast, &mut code, scopedepth)?,
             "funcdef" =>
                 compile_funcdef(ast, &mut code, scopedepth)?,
             "lambda" =>
@@ -892,6 +892,8 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
                 compile_block(ast, &mut code, scopedepth)?,
             "nakedblock" =>
                 compile_nakedblock(ast, &mut code, scopedepth)?,
+            "lvar" =>
+                compile_lvar(ast, &mut code, scopedepth)?,
             "rvar" =>
                 compile_rvar(ast, &mut code, scopedepth)?,
             _ =>
