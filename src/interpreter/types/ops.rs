@@ -244,7 +244,7 @@ pub (crate) fn value_equal(left : &Value, right : &Value) -> Result<bool, String
         // generators are never equal even in their default state
         (Value::Generator(_), Value::Generator(_)) => Ok(false),
         (Value::Instance(left), Value::Instance(right)) | (Value::Object(left), Value::Object(right)) => Ok(left==right),
-        (Value::Special(left), Value::Special(right)) => Ok(std::mem::discriminant(&left)==std::mem::discriminant(&right)),
+        (Value::Special(left), Value::Special(right)) => Ok(std::mem::discriminant(left)==std::mem::discriminant(right)),
         (Value::Custom(left), Value::Custom(right)) => Ok(left.discrim == right.discrim && left.storage == right.storage),
         _ => Ok(false) // all non-matching type pairs test false
     }
