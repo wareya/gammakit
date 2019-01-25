@@ -179,7 +179,6 @@ impl Interpreter
         {
             return Err(format!("internal error: EVALUATION instruction requires 1 values on the stack but only found {}", self.stack_len()));
         }
-        println!("{:?}", self.top_frame.stack);
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: failed to find a variable on the stack in EVALUATION"))?;
         let value = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just storing a variable"))?;
         self.stack_push_val(value);
