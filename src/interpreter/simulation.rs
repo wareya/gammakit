@@ -156,7 +156,8 @@ impl Interpreter
             return Err(format!("internal error: INDIRECTION instruction requires 2 values on the stack but only found {}", self.stack_len()));
         }
         let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to perform INDIRECTION operation with a right-hand side that wasn't a name"))?;
-        let source = self.stack_pop_val_or_var().ok_or_else(|| minierr("internal error: failed to get source from stack in INDIRECTION operation"))?;
+        // FIXME support indirection into fake member functions
+        let source = self.stack_pop_val().ok_or_else(|| minierr("internal error: failed to get source from stack in INDIRECTION operation"))?;
         match source
         {
             Value::Instance(ident) =>
@@ -181,6 +182,7 @@ impl Interpreter
         }
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: failed to find a variable on the stack in EVALUATION"))?;
         let value = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just storing a variable"))?;
+        println!("running EVALUATION");
         self.stack_push_val(value);
         Ok(())
     }

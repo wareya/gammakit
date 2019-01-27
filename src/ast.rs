@@ -1,4 +1,5 @@
 #[derive(Clone)]
+#[derive(Debug)]
 pub struct LexToken {
     pub (crate) text: String,
     pub (crate) line: usize,
@@ -6,6 +7,7 @@ pub struct LexToken {
 }
 
 #[derive(Clone)]
+#[derive(Debug)]
 pub struct ASTNode {
     pub (crate) text: String,
     pub (crate) line: usize,

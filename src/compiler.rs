@@ -176,15 +176,25 @@ fn compile_arrayindex(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -
     
     Ok(())
 }
-fn compile_indirection(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), String>
+fn compile_indirection(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize, left_is_var : bool) -> Result<(), String>
 {
+    if left_is_var
+    {
+        code.push(EVALUATION);
+    }
+    
     compile_string_with_prefix(code, PUSHNAME, &ast.child(1)?.child(0)?.text); // FIXME make this use PUSHSTR
     code.push(INDIRECTION);
     
     Ok(())
 }
-fn compile_funcargs(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+fn compile_funcargs(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize, left_is_var : bool) -> Result<(), String>
 {
+    if left_is_var
+    {
+        code.push(EVALUATION);
+    }
+    
     let args = &ast.child(1)?.children;
     if args.len() > 0xFFFF
     {
@@ -199,6 +209,23 @@ fn compile_funcargs(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> 
     code.push(FUNCEXPR);
     
     Ok(())
+}
+
+fn rhunexpr_left_type_is_variable(node : &ASTNode) -> bool
+{
+    match node.text.as_str()
+    {
+        "name" => true,
+        "rhunexpr_right" =>
+        {
+            match node.child(0)
+            {
+                Ok(node) => matches!(node.text.as_str(), "indirection" | "arrayindex"),
+                _ => false
+            }
+        }
+        _ => false
+    }
 }
 
 fn compile_rhunexpr_inner(nodes : &[ASTNode], code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
@@ -221,12 +248,13 @@ fn compile_rhunexpr_inner(nodes : &[ASTNode], code : &mut Vec<u8>, scopedepth : 
         _ =>
         {
             compile_rhunexpr_inner(&nodes[..nodes.len()-1], code, scopedepth)?;
+            let left_is_var = rhunexpr_left_type_is_variable(&nodes[nodes.len()-2]);
             let end = nodes[nodes.len()-1].child(0)?;
             match end.text.as_str()
             {
-                "funcargs" => compile_funcargs(end, code, scopedepth)?,
+                "funcargs" => compile_funcargs(end, code, scopedepth, left_is_var)?,
                 "arrayindex" => compile_arrayindex(end, code, scopedepth)?,
-                "indirection" => compile_indirection(end, code, scopedepth)?,
+                "indirection" => compile_indirection(end, code, scopedepth, left_is_var)?,
                 _ => return plainerr("error: rhunexpr contains unknown final node")
             }
         }

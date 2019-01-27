@@ -110,12 +110,13 @@ If you use with() while inside of an instance scope, then "other" will dereferen
 
 TODO:
 - ternary operators
-- various helpful string and array functions
 - a destroy() event for instance_kill()
 - associated functions for certain types that operate on variables rather than values
+- various helpful string and array functions
 - a "defer" statement?
 - inheritance? how would it work? func_super()-based?
 - globalsubdef?
+- global constants?
 
 TODO (sanitation/low-priority):
 - replace instances of "as" with instances of "from"
