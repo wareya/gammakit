@@ -149,7 +149,8 @@ var countdown = [](x)
 
 countdown(10);
 
-print(len(trash));
+print("length:");
+print(trash->len());
 
 var myarray = [0, 10, 2594];
 
@@ -174,7 +175,7 @@ print(newdict);
 print(mydict);
 print(mybad);
 
-var mykeys = keys(mydict);
+var mykeys = mydict->keys();
 
 for(var j = 0; j < 10; j++)
     print(j);
@@ -205,7 +206,7 @@ def rewrite(ast, callback)
     ast = callback(ast);
     if(ast["isparent"])
     {
-        var max = len(ast["children"]);
+        var max = ast["children"]->len();
         for(var i = 0; i < max; i += 1)
             ast["children"][i] = rewrite(ast["children"][i], callback);
     }
@@ -214,8 +215,8 @@ def rewrite(ast, callback)
 
 myotherast = rewrite(myotherast, [](ast)
 {
-    if(ast["isparent"] and ast["text"] == "string" and len(ast["children"]) > 0)
-        if(!ast["children"][0]["isparent"] and !contains(ast["children"][0], "precedence") and ast["children"][0]["text"] == "\"toast\"")
+    if(ast["isparent"] and ast["text"] == "string" and ast["children"]->len() > 0)
+        if(!ast["children"][0]["isparent"] and !ast["children"][0]->contains("precedence") and ast["children"][0]["text"] == "\"toast\"")
             ast["children"][0]["text"] = "\"not toast\"";
     return ast;
 });
@@ -408,25 +409,33 @@ case 0:
 
 print("insert():");
 
-var changed_array = insert(insert(insert([], 0, 10), 0, 5), 1, 7);
-var changed_dict = insert(insert(insert({}, 0, 10), "asdf", 5), "asdf", 7);
+var changed_array = [];
+changed_array->insert(0, 10);
+changed_array->insert(0, 5);
+changed_array->insert(1, 7);
+var changed_dict = {};
+changed_dict->insert(0, 10);
+changed_dict->insert("asdf", 5);
+changed_dict->insert("asdf", 7);
 
 print(changed_array);
 print(changed_dict);
 
 print("remove():");
 
-changed_array = remove(changed_array, 1);
-changed_dict = remove(changed_dict, "asdf");
+print(changed_array->remove(1));
+print(changed_dict->remove("asdf"));
 
 print(changed_array);
 print(changed_dict);
-print(remove("HelloX, World!", 5));
+var badstring_remove_test = "HelloX, World!";
+badstring_remove_test->remove(5);
+print(badstring_remove_test);
 
 print("contains():");
 
-print(contains(changed_dict, 0), contains(changed_dict, "notthere"));
-print(contains(set{10}, 10), contains(set{10}, 0));
+print(changed_dict->contains(0), changed_dict->contains("notthere"));
+print(set{10}->contains(10), set{10}->contains(0));
 
 
 print("round(), floor(), ceil():");
@@ -435,8 +444,13 @@ print(round(0.49999), round(0.5), floor(0.9), ceil(0.1));
 print("sets:");
 
 print(set {0, 0, 10, "asdf", "asdf"});
-print(remove(set{0, 1, 10, 16}, 10));
-print(insert(set{}, 10));
+
+var badset = set{0, 1, 10, 16};
+badset->remove(10);
+print(badset);
+badset = set{};
+badset->insert(10);
+print(badset);
 
 print("array equality:");
 print([] == [0], [1] == [0], [0,10,1] == [0,10,1]);
@@ -507,19 +521,23 @@ print("/\\"*8.7);
 print("/\\"*8.7 == "/\\/\\/\\/\\/\\/\\/\\/\\");
 
 print("set length:");
-print(len(set {}));
-print(len(set {1, 1043, 1, 1, 2}));
+print(set {}->len());
+print(set {1, 1043, 1, 1, 2}->len());
 
 print("printraw:");
 printraw("a", "s", "d", "f", "\n");
 
 print("insert() with strings:");
-print(insert("HelloWorld!", 5, " "));
-print(insert("HelloWorld!", 5, " ") == insert("Hello!", -1, " World"));
+var badstring = "HelloWorld!";
+badstring->insert(5, " ");
+print(badstring);
+var badstring2 = "Hello!";
+badstring2->insert(-1, " World");
+print(badstring == badstring2);
 
 print("slicing:");
-print(slice("０１２", 1, 2));
-print(slice([0, 1, 2], 1, 2));
+print("０１２"->slice(1, 2));
+print([0, 1, 2]->slice(1, 2));
 
 print("declaration-and-assignment evaluation order:");
 var flei = "test";
@@ -532,3 +550,7 @@ print("indexing into literal arrays, dicts, and strings:");
 print([0,1,2,3,4][3]);
 print({"asdf" : 0}["asdf"]);
 print("asdf"[0], "asdf"[3]);
+
+print("dismembering:");
+var badarray = [0, 1, 2, 3];
+print(badarray->len());

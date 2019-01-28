@@ -22,6 +22,22 @@ type OpResult = Result<(), String>;
 pub type Binding = FnMut(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
 pub type SimpleBinding = FnMut(Vec<Value>) -> Result<Value, String>;
 
+pub enum ArrowRet {
+    Immut(Value),
+    Mut{var: Value, ret: Value},
+}
+impl ArrowRet {
+    pub (super) fn into_parts(self) -> (Option<Value>, Value)
+    {
+        match self
+        {
+            ArrowRet::Immut(ret) => (None, ret),
+            ArrowRet::Mut{var, ret} => (Some(var), ret)
+        }
+    }
+}
+pub type ArrowBinding = FnMut(Value, Vec<Value>) -> Result<ArrowRet, String>;
+
 fn minierr(mystr : &'static str) -> String
 {
     mystr.to_string()
@@ -69,6 +85,7 @@ pub struct Interpreter {
     doexit: bool,
     bindings: HashMap<String, Rc<RefCell<Binding>>>,
     simple_bindings: HashMap<String, Rc<RefCell<SimpleBinding>>>,
+    arrow_bindings: HashMap<String, Rc<RefCell<ArrowBinding>>>,
     global: GlobalState,
     /// Last error returned by step(). Gets cleared (reset to None) when step() runs without returning an error.
     pub last_error: Option<String>
@@ -84,6 +101,7 @@ impl Interpreter {
             doexit : false,
             bindings : HashMap::new(),
             simple_bindings : HashMap::new(),
+            arrow_bindings : HashMap::new(),
             global : GlobalState::new(parser),
             last_error : None,
         }

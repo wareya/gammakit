@@ -31,9 +31,49 @@ impl Interpreter
         self.top_frame.push(stackvalue)
     }
     
+    fn call_arrow_function(&mut self, subfuncval : SubFuncVal, args : Vec<Value>, isexpr : bool) -> OpResult
+    {
+        if let Some(binding_wrapper) = self.get_arrow_binding(&subfuncval.name)
+        {
+            let binding = &mut *binding_wrapper.try_borrow_mut().or_else(|_| plainerr("error: tried to borrow internal function while it was borrowed elsewhere"))?;
+            
+            match subfuncval.source
+            {
+                StackValue::Val(val) =>
+                {
+                    let (_, ret) = binding(val, args)?.into_parts();
+                    if isexpr
+                    {
+                        self.stack_push_val(ret);
+                    }
+                }
+                StackValue::Var(source) =>
+                {
+                    let val = self.evaluate_or_store(&source, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just accessing a variable"))?;
+                    let (var, ret) = binding(val, args)?.into_parts();
+                    
+                    if let Some(var) = var
+                    {
+                        self.evaluate_or_store(&source, Some(var))?;
+                    }
+                    
+                    if isexpr
+                    {
+                        self.stack_push_val(ret);
+                    }
+                }
+            };
+        }
+        else
+        {
+            return Err(format!("internal error: no such arrow function `{}`", subfuncval.name))
+        }
+        
+        Ok(())
+    }
+    
     pub (super) fn handle_func_call_or_expr(&mut self, isexpr : bool) -> OpResult
     {
-        println!("{:?}", self.top_frame.stack);
         let argcount_val = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR/FUNCCALL"))?;
         
         let argcount = match_or_err!(argcount_val, Value::Number(argcount) => argcount, minierr("internal error: number on stack of arguments to function was not a number"))?;
@@ -52,8 +92,12 @@ impl Interpreter
         
         let funcdata = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR/FUNCCALL"))?;
         
-        let funcdata = match_or_err!(funcdata, Value::Func(funcdata) => funcdata, minierr("internal error: value meant to hold function data in FUNCEXPR/FUNCCALL was not holding function data"))?;
-        self.call_function(*funcdata, args, isexpr)?;
+        match funcdata
+        {
+            Value::Func(funcdata) => self.call_function(*funcdata, args, isexpr)?,
+            Value::SubFunc(subfuncval) => self.call_arrow_function(*subfuncval, args, isexpr)?,
+            _ => return plainerr("internal error: value meant to hold function data in FUNCEXPR/FUNCCALL was not holding function data")
+        }
         
         Ok(())
     }

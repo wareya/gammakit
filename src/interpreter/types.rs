@@ -156,6 +156,7 @@ pub (crate) enum Variable {
 
 // value types
 #[derive(Debug, Clone)]
+// TODO split into InternalFuncVal and FuncVal
 /// Intentionally opaque. Wrapped by Value.
 pub struct FuncVal {
     pub (super) internal: bool,
@@ -169,7 +170,7 @@ pub struct FuncVal {
 pub struct GeneratorState {
     pub (super) frame: Option<Frame>, // stores code, pc, and stacks; becomes None after the generator returns/finalizes or exits through its bottom
 }
-/// Used internally for expressions like "global", and possibly in the future "other" and "all".
+/// Used internally for expressions like "global",
 #[derive(Debug, Clone)]
 pub enum Special {
     Global
@@ -178,6 +179,12 @@ pub enum Special {
 pub struct Custom {
     pub discrim: u64,
     pub storage: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct SubFuncVal {
+    pub (super) source: StackValue,
+    pub (super) name: String
 }
 
 /// Stores typed values (e.g. variables after evaluation, raw literal values).
@@ -192,8 +199,10 @@ pub enum Value {
     Generator(GeneratorState),
     Instance(usize),
     Object(usize),
-    Special(Special),
     Custom(Custom),
+    // cannot be assigned
+    Special(Special),
+    SubFunc(Box<SubFuncVal>),
 }
 #[derive(Debug, Clone)]
 pub (super) enum StackValue {

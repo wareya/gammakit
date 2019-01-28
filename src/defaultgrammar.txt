@@ -22,8 +22,12 @@ arrayindex:
 indirection:
 . $name$
 
+dismember:
+-> $name$
+
 rhunexpr_right:
 $funcargs$
+$dismember$
 $arrayindex$
 $indirection$
 

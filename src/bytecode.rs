@@ -104,6 +104,7 @@ pub (crate) const SHORTCIRCUITIFFALSE : u8 = 0x99;
 pub (crate) const INDIRECTION : u8 = 0xA0;
 pub (crate) const EVALUATION : u8 = 0xA1;
 pub (crate) const ARRAYEXPR : u8 = 0xA2;
+pub (crate) const DISMEMBER : u8 = 0xA3;
 
 pub (crate) const FUNCDEF : u8 = 0xB0;
 pub (crate) const LAMBDA : u8 = 0xB1;

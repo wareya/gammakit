@@ -211,6 +211,14 @@ fn compile_funcargs(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize, lef
     Ok(())
 }
 
+fn compile_dismember(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), String>
+{
+    compile_string_with_prefix(code, PUSHNAME, &ast.child(1)?.child(0)?.text); // FIXME make this use PUSHSTR
+    code.push(DISMEMBER);
+    
+    Ok(())
+}
+
 fn rhunexpr_left_type_is_variable(node : &ASTNode) -> bool
 {
     match node.text.as_str()
@@ -253,6 +261,7 @@ fn compile_rhunexpr_inner(nodes : &[ASTNode], code : &mut Vec<u8>, scopedepth : 
             match end.text.as_str()
             {
                 "funcargs" => compile_funcargs(end, code, scopedepth, left_is_var)?,
+                "dismember" => compile_dismember(end, code, scopedepth)?,
                 "arrayindex" => compile_arrayindex(end, code, scopedepth)?,
                 "indirection" => compile_indirection(end, code, scopedepth, left_is_var)?,
                 _ => return plainerr("error: rhunexpr contains unknown final node")

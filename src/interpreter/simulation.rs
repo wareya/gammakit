@@ -25,6 +25,7 @@ impl Interpreter
             SHORTCIRCUITIFTRUE => enbox!(sim_SHORTCIRCUITIFTRUE),
             SHORTCIRCUITIFFALSE => enbox!(sim_SHORTCIRCUITIFFALSE),
             INDIRECTION => enbox!(sim_INDIRECTION),
+            DISMEMBER => enbox!(sim_DISMEMBER),
             EVALUATION => enbox!(sim_EVALUATION),
             FUNCCALL => enbox!(sim_FUNCCALL),
             FUNCEXPR => enbox!(sim_FUNCEXPR),
@@ -174,6 +175,19 @@ impl Interpreter
         }
         Ok(())
     }
+    pub (crate) fn sim_DISMEMBER(&mut self) -> OpResult
+    {
+        if self.stack_len() < 2
+        {
+            return Err(format!("internal error: DISMEMBER instruction requires 2 values on the stack but only found {}", self.stack_len()));
+        }
+        let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to perform DISMEMBER operation with a right-hand side that wasn't a name"))?;
+        // FIXME support indirection into fake member functions
+        let source = self.stack_pop().ok_or_else(|| minierr("internal error: failed to get source from stack in DISMEMBER operation"))?;
+        
+        self.stack_push_val(Value::SubFunc(Box::new(SubFuncVal{source, name})));
+        Ok(())
+    }
     pub (crate) fn sim_EVALUATION(&mut self) -> OpResult
     {
         if self.stack_len() < 1
@@ -181,8 +195,7 @@ impl Interpreter
             return Err(format!("internal error: EVALUATION instruction requires 1 values on the stack but only found {}", self.stack_len()));
         }
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: failed to find a variable on the stack in EVALUATION"))?;
-        let value = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just storing a variable"))?;
-        println!("running EVALUATION");
+        let value = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just accessing a variable"))?;
         self.stack_push_val(value);
         Ok(())
     }

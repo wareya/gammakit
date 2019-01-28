@@ -106,8 +106,9 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
         Value::Object(id) => Some(format!("<object {}>", id)), // TODO: use name?
         Value::Func(_) => Some("<function>".to_string()),
         Value::Generator(_) => Some("<generator>".to_string()),
+        Value::Custom(custom) => Some(format!("<custom type discrim:{} storage:{}>", custom.discrim, custom.storage)),
         Value::Special(_) => Some("<special>".to_string()),
-        Value::Custom(custom) => Some(format!("<custom type discrim:{} storage:{}>", custom.discrim, custom.storage))
+        Value::SubFunc(_) => Some("<subfunc reference>".to_string()),
     }
 }
 

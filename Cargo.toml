@@ -23,11 +23,11 @@ doc = true
 regex = "1"
 
 [profile.bench]
-opt-level = 1
+opt-level = 3
 debug = 2
 incremental = true
 overflow-checks = true
 
 [profile.test]
-opt-level = 2
+opt-level = 3
 overflow-checks = true

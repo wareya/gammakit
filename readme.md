@@ -6,7 +6,7 @@ Currently, *there are no API stability guarantees in this software at all.* Anyt
 
 # Features
 
-As of writing, Gammakit is under 5000 lines of code, not counting blank lines or lines with just comments.
+As of writing, Gammakit is approximately 5000 lines of code, not counting blank lines or lines with just comments. Gammakit aims to be
 
 Some random features:
 
@@ -46,7 +46,7 @@ For example, the following code:
         ast = callback(ast);
         if(ast["isparent"])
         {
-            var max = len(ast["children"]);
+            var max = ast["children"]->len();
             for(var i = 0; i < max; i += 1)
                 ast["children"][i] = rewrite(ast["children"][i], callback);
         }
@@ -55,8 +55,8 @@ For example, the following code:
 
     myotherast = rewrite(myotherast, [](ast)
     {
-        if(ast["isparent"] and ast["text"] == "string" and len(ast["children"]) > 0)
-            if(!ast["children"][0]["isparent"] and !contains(ast["children"][0], "precedence") and ast["children"][0]["text"] == "\"toast\"")
+        if(ast["isparent"] and ast["text"] == "string" and ast["children"]->len() > 0)
+            if(!ast["children"][0]["isparent"] and !ast["children"][0]->contains("precedence") and ast["children"][0]["text"] == "\"toast\"")
                 ast["children"][0]["text"] = "\"not toast\"";
         return ast;
     });
@@ -85,18 +85,26 @@ Gammakit has a small number of built-in bindings. The library user is expected t
     instance_exists(instance) (returns whether an instance exists)
     instance_kill(instance) (kills an instance)
 
-    len(string/array/dict/set) (returns len)
-    keys(array/dict) (returns array of indexes/keys)
-    slice(string | array, start, end) (returns sliced string/array)
-    insert(array, index, val) | insert(dict, key, val) | insert(set, val)
-    remove(string, index) | remove(array, index) | remove(dict, key) | remove(set, val)
-    contains(dict/set, key) (returns whether)
-
     parse_text(text) (returns ast)
     compile_text(text) (returns function)
     compile_ast(ast) (returns function)
     
-    round|floor|ceil(number) (returns rounded/floored/ceiled number)
+    round/floor/ceil(number) (returns rounded/floored/ceiled number)
+
+The following bindings are special "arrow" bindings, and are invoked as e.g. myarray->len().
+
+    string/array/dict/set->len() (returns len)
+    array/dict->keys() (returns array of indexes/keys)
+    string/array->slice(start, end) (returns sliced string/array)
+    dict/set->contains(key) (returns whether it contains the given key)
+
+Some arrow bindings can mutate the variable they're called on, in addition to returning a value. insert() returns 0.0 (nothing), and remove() returns the element that was removed (except for sets, where it returns 0.0).
+    
+    array/dict->insert(index/key, val)
+    set->insert(val)
+    string/array/dict/set->remove(index/index/key/val) (returns removed element, except for sets, which return 0.0)
+
+If an arrow function meant to mutate a variable is called on a literal value, no error is thrown, the mutation step is just skipped.
 
 "global" is a fake/fixed/read-only variable that stores global variables (e.g. global.players). Global functions are accessed as if they were in the current scope, but can be shadowed by local functions.
 
@@ -111,10 +119,9 @@ If you use with() while inside of an instance scope, then "other" will dereferen
 TODO:
 - ternary operators
 - a destroy() event for instance_kill()
-- associated functions for certain types that operate on variables rather than values
 - various helpful string and array functions
 - a "defer" statement?
-- inheritance? how would it work? func_super()-based?
+- inheritance? how would it work? like func_super()?
 - globalsubdef?
 - global constants?
 
