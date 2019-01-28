@@ -348,7 +348,7 @@ impl Interpreter
     
     pub (crate) fn sim_subfunc_len(myself : Value, args : Vec<Value>) -> Result<ArrowRet, String>
     {
-        if args.len() != 0
+        if !args.is_empty()
         {
             return Err(format!("error: wrong number of arguments to len(); expected 0, got {}", args.len()));
         }
@@ -364,7 +364,7 @@ impl Interpreter
     }
     pub (crate) fn sim_subfunc_keys(myself : Value, args : Vec<Value>) -> Result<ArrowRet, String>
     {
-        if args.len() != 0
+        if !args.is_empty()
         {
             return Err(format!("error: wrong number of arguments to keys(); expected 0, got {}", args.len()));
         }
@@ -492,7 +492,7 @@ impl Interpreter
                 let index = if index < 0 {chars.len() - (-index as usize)} else {index as usize} as usize;
                 
                 let left = chars.get(0..index).ok_or_else(|| minierr("error: tried to remove from a string at an out-of-range index"))?.iter().collect::<String>();
-                let mid = chars.get(index..index+1).ok_or_else(|| minierr("error: tried to remove from a string at an out-of-range index"))?.iter().collect::<String>();
+                let mid = chars.get(index..=index).ok_or_else(|| minierr("error: tried to remove from a string at an out-of-range index"))?.iter().collect::<String>();
                 let right = chars.get(index+1..chars.len()).ok_or_else(|| minierr("error: tried to remove from a string at an out-of-range index"))?.iter().collect::<String>();
                 
                 let newstr = Value::Text(format!("{}{}", left, right));
