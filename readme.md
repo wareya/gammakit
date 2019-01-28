@@ -11,25 +11,25 @@ As of writing, Gammakit is approximately 5000 lines of code, not counting blank 
 Some random features:
 
 - GameMaker-like objects
--- instance_create and instance_kill
--- instance varibles with "far" (as opposed to "var")
--- object functions with "def" (instance-context only, static object functions not supported)
--- Inheritance is not supported yet but probably will be in the future
+- - instance_create and instance_kill
+- - instance varibles with "far" (as opposed to "var")
+- - object functions with "def" (instance-context only, static object functions not supported)
+- - Inheritance is not supported yet but probably will be in the future
 - Lexically scoped
--- Lexical scope is emulated; interior functions don't close over the scope they're defined in
+- - Lexical scope is emulated; interior functions don't close over the scope they're defined in
 - Dynamically typed
--- Types: Number (f64), Text (utf-8 string), Array, Dict, Set, Func, Generator, Instance, Object, Special
+- - Types: Number (f64), Text (utf-8 string), Array, Dict, Set, Func, Generator, Instance, Object, Special
 - Arrays, dictionaries (keys may only be numbers or strings), and sets are copied by value, not reference
 - Switch statement where case blocks have their own scope, with no fallthrough, not even explicit fallthrough
--- Basically a glorified if-else chain where the switch value is only evaluated and stored once
--- Case labels are, consequently, allowed to be arbitrary expressions
+- - Basically a glorified if-else chain where the switch value is only evaluated and stored once
+- - Case labels are, consequently, allowed to be arbitrary expressions
 - User-defined functions are constructed at runtime and can be passed around
 - Lambdas
--- Capture by value, assigned to specific variable names, not by closing over the scope they're defined in
+- - Capture by value, assigned to specific variable names, not by closing over the scope they're defined in
 - Generators
--- Separate initialization and invocation
--- The generator state value returned by initialiation truth-tests as whether the generator has finalized
--- Using the invoke statement on a generator state value resumes its execution until it yields or returns
+- - Separate initialization and invocation
+- - The generator state value returned by initialiation truth-tests as whether the generator has finalized
+- - Using the invoke statement on a generator state value resumes its execution until it yields or returns
 - Runtime metaprogramming - procedural code generation with text and/or ASTs, compiles into a bytecode function that you can call several times
 
 For example, the following code:
