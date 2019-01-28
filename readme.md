@@ -18,7 +18,7 @@ Some random features:
 - Lexically scoped
 - - Lexical scope is emulated; interior functions don't close over the scope they're defined in
 - Dynamically typed
-- - Types: Number (f64), Text (utf-8 string), Array, Dict, Set, Func, Generator, Instance, Object, Special
+- - Types: Number (f64), Text (utf-8 string), Array, Dict, Set, Func, Generator, Instance, Object, Custom
 - Arrays, dictionaries (keys may only be numbers or strings), and sets are copied by value, not reference
 - Switch statement where case blocks have their own scope, with no fallthrough, not even explicit fallthrough
 - - Basically a glorified if-else chain where the switch value is only evaluated and stored once
@@ -30,7 +30,8 @@ Some random features:
 - - Separate initialization and invocation
 - - The generator state value returned by initialiation truth-tests as whether the generator has finalized
 - - Using the invoke statement on a generator state value resumes its execution until it yields or returns
-- Runtime metaprogramming - procedural code generation with text and/or ASTs, compiles into a bytecode function that you can call several times
+- Runtime metaprogramming
+- - Procedural code generation with text and/or ASTs, compiles into a bytecode function taking no arguments that you can call several times
 
 For example, the following code:
 
@@ -100,7 +101,7 @@ The following bindings are special "arrow" bindings, and are invoked as e.g. mya
 
 Some arrow bindings can mutate the variable they're called on, in addition to returning a value. insert() returns 0.0 (nothing), and remove() returns the element that was removed (except for sets, where it returns 0.0).
     
-    array/dict->insert(index/key, val)
+    string/array/dict->insert(index/key, val)
     set->insert(val)
     string/array/dict/set->remove(index/index/key/val) (returns removed element, except for sets, which return 0.0)
 
