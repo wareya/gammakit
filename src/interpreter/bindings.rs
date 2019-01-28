@@ -96,22 +96,28 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTN
 
 impl Interpreter
 {
+    /// Insert a normal binding that needs access to the interpreter.
+    ///
+    /// The reference-counter wrapping is required to pass functions.
+    ///
+    /// The reference cell wrapping is required to support lambdas that have closure over mutable references, because that closure may indirectly include the interpreter itself. See magmakit for examples.
     pub fn insert_binding(&mut self, funcname : String, func : Rc<RefCell<Binding>>)
     {
         self.simple_bindings.remove(&funcname);
         self.bindings.insert(funcname, func);
     }
+    /// Insert a normal binding that does not need access to the interpreter.
     pub fn insert_simple_binding(&mut self, funcname : String, func : Rc<RefCell<SimpleBinding>>)
     {
         self.bindings.remove(&funcname);
         self.simple_bindings.insert(funcname, func);
     }
-    
+    /// Insert an associated function ("arrow" function) binding.
     pub fn insert_arrow_binding(&mut self, funcname : String, func : Rc<RefCell<ArrowBinding>>)
     {
         self.arrow_bindings.insert(funcname, func);
     }
-    
+    /// Inserts or reinserts the default bindings. These SHOULD be safe, but if you're paranoid or you're making a very restrictive implementation of gammakit, you can feel free not to call this after initializing the interpreter.
     pub fn insert_default_bindings(&mut self)
     {
         macro_rules! insert { ( $x:expr, $y:ident ) => { self.insert_binding($x.to_string(), Rc::new(RefCell::new(Interpreter::$y))); } }

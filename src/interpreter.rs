@@ -20,8 +20,13 @@ pub type StepResult = Result<(), Option<String>>;
 type OpResult = Result<(), String>;
 /// Type signature of functions to be registered as bindings.
 pub type Binding = FnMut(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
+/// Type signature of functions to be registered as simple bindings.
 pub type SimpleBinding = FnMut(Vec<Value>) -> Result<Value, String>;
-
+/// Return value of associated function ("arrow" function) bindings.
+///
+/// An Immut() value returns a value and does not mutate what the function was invoked on.
+///
+/// A Mut{...} value returns a value, and if the binding was called on a variable, updates the variable with the value "var".
 pub enum ArrowRet {
     Immut(Value),
     Mut{var: Value, ret: Value},
@@ -36,6 +41,7 @@ impl ArrowRet {
         }
     }
 }
+/// Type signature of functions to be registered as arrow function bindings.
 pub type ArrowBinding = FnMut(Value, Vec<Value>) -> Result<ArrowRet, String>;
 
 fn minierr(mystr : &'static str) -> String

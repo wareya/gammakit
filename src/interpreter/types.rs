@@ -185,7 +185,7 @@ pub struct Custom {
 }
 
 #[derive(Debug, Clone)]
-/// Intentionally opaque.
+/// Intentionally opaque. Wrapped by Value.
 pub struct SubFuncVal {
     pub (super) source: StackValue,
     pub (super) name: String

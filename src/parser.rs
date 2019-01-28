@@ -121,12 +121,16 @@ impl Default for Parser {
     }
 }
 impl Parser {
+    /// Constructs a new parser with the default grammar.
     pub fn new_from_default() -> Result<Parser, String>
     {
         let mut parser = Parser::default();
         parser.init(super::grammar::default_grammar())?;
         Ok(parser)
     }
+    /// Constructs a new parser with a custom grammar.
+    ///
+    /// Only useful if you're eliminating parts of the grammar to restrict the language, or you're going to manually transform custom aspects of the AST into supported AST structures before compilation,
     pub fn new_from_grammar(grammar : &str) -> Result<Parser, String>
     {
         let mut parser = Parser::default();
@@ -626,6 +630,18 @@ impl Parser {
         Ok(())
     }
     
+    /// Parses a program. If "silent" is set to true, timing and error diagnostics will be printed to stdout.
+    ///
+    /// If an internal error is encountered during parsing, Err is returned.
+    ///
+    /// If the parse fails, Ok(None) is returned.
+    ///
+    /// Otherwise the root node of an AST is returned.
+    ///
+    /// The returned structure is an AST, not a parse tree.
+    /// - Arithmetic expressions have their associativity direction corrected (to be left-recursive; in the grammar, they're right-recursive, with LEFTBINEXPR tags)
+    /// - Value expressions with a single child are simplified to just their child
+    /// - Statements have their trailing semicolon stripped
     pub fn parse_program(&self, tokens : &VecDeque<LexToken>, lines : &[String], silent: bool) -> Result<Option<ASTNode>, String>
     {
         let start_time = Instant::now();
