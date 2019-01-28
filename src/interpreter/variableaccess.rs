@@ -27,6 +27,7 @@ fn assign_or_return(value : Option<Value>, var : &mut Value) -> Result<Option<Va
     match value
     {
         Some(Value::Special(_)) => plainerr("error: tried to assign a special value to a variable"),
+        Some(Value::SubFunc(_)) => plainerr("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)"),
         Some(value) =>
         {
             *var = value;

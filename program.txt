@@ -554,3 +554,5 @@ print("asdf"[0], "asdf"[3]);
 print("dismembering:");
 var badarray = [0, 1, 2, 3];
 print(badarray->len());
+print(badarray->len);
+

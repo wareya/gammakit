@@ -175,13 +175,17 @@ pub struct GeneratorState {
 pub enum Special {
     Global
 }
+/// For custom bindings dealing with manually-managed data that belongs to the application.
 #[derive(Debug, Clone)]
 pub struct Custom {
+    /// Typically for determining what kind of data is stored in this value.
     pub discrim: u64,
+    /// Typically for determining what identity of the given kind is stored in this value.
     pub storage: u64,
 }
 
 #[derive(Debug, Clone)]
+/// Intentionally opaque.
 pub struct SubFuncVal {
     pub (super) source: StackValue,
     pub (super) name: String
