@@ -6,7 +6,7 @@ Currently, *there are no API stability guarantees in this software at all.* Anyt
 
 # Features
 
-As of writing, Gammakit is approximately 5000 lines of code, not counting blank lines or lines with just comments. Gammakit aims to be
+As of writing, Gammakit is approximately 5000 lines of code, not counting blank lines or lines with just comments. Gammakit aims to be small and easy to embed.
 
 Some random features:
 
