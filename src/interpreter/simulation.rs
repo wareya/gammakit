@@ -56,6 +56,14 @@ impl Interpreter
             SCOPE => enbox!(sim_SCOPE),
             UNSCOPE => enbox!(sim_UNSCOPE),
             WITH => enbox!(sim_WITH),
+            
+            WHILETEST => enbox!(sim_WHILETEST),
+            WHILELOOP => enbox!(sim_WHILELOOP),
+            WITHLOOP => enbox!(sim_WITHLOOP),
+            FOREACHLOOP => enbox!(sim_FOREACHLOOP),
+            
+            JUMPRELATIVE => enbox!(sim_JUMPRELATIVE),
+            
             EXIT => enbox!(sim_EXIT),
             RETURN => enbox!(sim_RETURN),
             YIELD => enbox!(sim_YIELD),
@@ -320,19 +328,9 @@ impl Interpreter
         }
         let testval = self.stack_pop_val().ok_or_else(|| minierr("internal error: failed to find value on stack while handling IF controller"))?;
         let codelen1 = self.read_usize()?;
-        let codelen2 = self.read_usize()?;
-        let current_pc = self.get_pc();
         if !value_truthy(&testval)
         {
             self.add_pc(codelen1);
-        }
-        else
-        {
-            self.top_frame.controlstack.push(Controller::IfElse(IfElseData{
-                scopes : self.top_frame.scopes.len() as u16,
-                if_end : current_pc+codelen1,
-                else_end : current_pc+codelen1+codelen2
-            }));
         }
         Ok(())
     }
@@ -811,6 +809,93 @@ impl Interpreter
             _ =>
                 return plainerr("error: tried to use array indexing on a non-indexable value"),
         }
+        Ok(())
+    }
+    pub (crate) fn sim_WHILETEST(&mut self) -> OpResult
+    {
+        if let Some(Controller::While(ref data)) = self.top_frame.controlstack.last()
+        {
+            let dest = data.loop_end;
+            let todrain = data.scopes;
+            let testval = self.stack_pop_val().ok_or_else(|| minierr("internal error: failed to find value on stack while handling WHILE controller"))?;
+            if !value_truthy(&testval)
+            {
+                self.set_pc(dest);
+                self.drain_scopes(todrain);
+                self.top_frame.controlstack.pop();
+            }
+            return Ok(());
+        }
+        plainerr("internal error: WHILELOOP instruction when immediate controller is not a while controller")
+    }
+    pub (crate) fn sim_WHILELOOP(&mut self) -> OpResult
+    {
+        if let Some(Controller::While(ref data)) = self.top_frame.controlstack.last()
+        {
+            let dest = data.expr_start;
+            let todrain = data.scopes;
+            self.set_pc(dest);
+            self.drain_scopes(todrain);
+            return Ok(());
+        }
+        plainerr("internal error: WHILELOOP instruction when immediate controller is not a while controller")
+    }
+    pub (crate) fn sim_WITHLOOP(&mut self) -> OpResult
+    {
+        self.top_frame.instancestack.pop();
+        
+        if let Some(Controller::With(ref mut data)) = self.top_frame.controlstack.last_mut()
+        {
+            if let Some(next_instance) = data.instances.remove(0)
+            {
+                if let Value::Number(next_instance) = next_instance
+                {
+                    self.top_frame.instancestack.push(next_instance as usize);
+                    let dest = data.loop_start;
+                    self.set_pc(dest);
+                }
+                else
+                {
+                    return plainerr("internal error: values fed to with controller's 'other' data must be a list of only numbers");
+                }
+            }
+            else
+            {
+                self.top_frame.controlstack.pop();
+            }
+            return Ok(());
+        }
+        plainerr("internal error: WITHLOOP instruction when immediate controller is not a with controller")
+    }
+    pub (crate) fn sim_FOREACHLOOP(&mut self) -> OpResult
+    {
+        if let Some(Controller::ForEach(ref mut data)) = self.top_frame.controlstack.last_mut()
+        {
+            if let Some(value) = data.values.remove(0)
+            {
+                let todrain = data.scopes;
+                let name = data.name.clone();
+                let dest = data.loop_start;
+                
+                self.drain_scopes(todrain);
+                
+                let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
+                scope.insert(name, value);
+                
+                self.set_pc(dest);
+            }
+            else
+            {
+                self.top_frame.controlstack.pop();
+            }
+            return Ok(());
+        }
+        plainerr("internal error: FOREACHLOOP instruction when immediate controller is not a foreach controller")
+    }
+    pub (crate) fn sim_JUMPRELATIVE(&mut self) -> OpResult
+    {
+        let rel = self.read_usize()?;
+        self.add_pc(rel);
         Ok(())
     }
     pub (crate) fn sim_EXIT(&mut self) -> OpResult // an exit is a return with no value

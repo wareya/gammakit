@@ -60,7 +60,8 @@ fn compile_unstate(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> R
 fn compile_with(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     let expr = compile_astnode(ast.child(1)?, scopedepth)?;
-    let block = compile_astnode(ast.child(2)?, scopedepth)?;
+    let mut block = compile_astnode(ast.child(2)?, scopedepth)?;
+    block.push(WITHLOOP);
     
     code.extend(expr);
     code.push(WITH);
@@ -350,7 +351,7 @@ fn compile_ifcondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) 
 {
     code.extend(compile_astnode(ast.child(1)?, scopedepth)?);
     
-    let block = compile_astnode(ast.child(2)?, scopedepth)?;
+    let mut block = compile_astnode(ast.child(2)?, scopedepth)?;
     
     if ast.children.len() == 3
     {
@@ -361,9 +362,10 @@ fn compile_ifcondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) 
     else if ast.children.len() == 5 && ast.child(3)?.text == "else"
     {
         let block2 = compile_astnode(ast.child(4)?, scopedepth)?;
+        block.push(JUMPRELATIVE);
+        block.extend(pack_u64(block2.len() as u64));
         code.push(IFELSE);
         code.extend(pack_u64(block.len() as u64));
-        code.extend(pack_u64(block2.len() as u64));
         code.extend(block);
         code.extend(block2);
     }
@@ -455,8 +457,11 @@ fn compile_switch(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Re
 }
 fn compile_whilecondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
-    let expr = compile_astnode(ast.child(1)?, scopedepth)?;
-    let block = compile_astnode(ast.child(2)?, scopedepth)?;
+    let mut expr = compile_astnode(ast.child(1)?, scopedepth)?;
+    expr.push(WHILETEST);
+    let mut block = compile_astnode(ast.child(2)?, scopedepth)?;
+    block.push(WHILELOOP);
+    
     code.push(WHILE);
     code.extend(pack_u64(expr.len() as u64));
     code.extend(pack_u64(block.len() as u64));
@@ -473,7 +478,8 @@ fn compile_foreach(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> R
     
     code.push(SCOPE);
     
-    let block = compile_astnode(ast.child(6)?, scopedepth+1)?;
+    let mut block = compile_astnode(ast.child(6)?, scopedepth+1)?;
+    block.push(FOREACHLOOP);
     
     compile_string_with_prefix(code, PUSHNAME, &ast.child(2)?.child(0)?.text);
     code.extend(compile_astnode(ast.child(4)?, scopedepth+1)?);

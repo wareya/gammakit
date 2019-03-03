@@ -8,16 +8,8 @@ pub (crate) mod ops;
 
 pub (crate) use self::ops::*;
 
-// internal types
-
-#[derive(Debug, Clone)]
-pub (crate) struct IfElseData {
-    pub (super) scopes: u16,
-    pub (super) if_end: usize,
-    pub (super) else_end: usize,
-}
-
 // note: for loops are controlled the same way as while loops
+
 #[derive(Debug, Clone)]
 pub (crate) struct WhileData {
     pub (super) scopes: u16,
@@ -53,7 +45,6 @@ pub (crate) struct SwitchData {
 
 #[derive(Debug, Clone)]
 pub (crate) enum Controller {
-    IfElse(IfElseData),
     While(WhileData),
     With(WithData),
     ForEach(ForEachData),

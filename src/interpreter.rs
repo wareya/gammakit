@@ -11,7 +11,6 @@ mod manipulation;
 mod jumping;
 mod types;
 mod variableaccess;
-mod control;
 
 pub use self::types::*;
 
@@ -156,7 +155,6 @@ impl Interpreter {
         let opfunc = match_or_err!(self.get_opfunc(op), Some(opfunc) => opfunc, Some(format!("internal error: unknown operation 0x{:02X}", op)))?;
         
         opfunc(self).map_err(Some)?;
-        self.handle_flow_control()?;
         
         if self.doexit
         {

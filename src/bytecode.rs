@@ -113,6 +113,13 @@ pub (crate) const GLOBALFUNCDEF : u8 = 0xB3;
 pub (crate) const SUBFUNCDEF : u8 = 0xB4;
 pub (crate) const GENERATORDEF : u8 = 0xB5;
 
+pub (crate) const WHILETEST : u8 = 0xC0;
+pub (crate) const WHILELOOP : u8 = 0xC1;
+pub (crate) const WITHLOOP : u8 = 0xC2;
+pub (crate) const FOREACHLOOP : u8 = 0xC3;
+
+pub (crate) const JUMPRELATIVE : u8 = 0xD0;
+
 pub (crate) const EXIT : u8 = 0xF0;
 pub (crate) const RETURN : u8 = 0xF1;
 pub (crate) const YIELD : u8 = 0xF2;
