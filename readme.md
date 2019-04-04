@@ -145,7 +145,7 @@ MAYBE (metaprogramming):
 
 # Other
 
-As of writing, clippy processes gammakit with no complaints. Certain lints are disabled in certain files where they are inappropriate, unhelpful, or generate false positives.
+As of writing, clippy processes gammakit with no complaints, aside from suspicious_else_formatting, which is a false positive. Certain lints are disabled in certain files where they are inappropriate, unhelpful, or generate false positives.
 
 # License
 
