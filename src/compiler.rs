@@ -12,6 +12,21 @@ fn plainerr<T>(mystr : &str) -> Result<T, String>
     Err(mystr.to_string())
 }
 
+fn compile_push_float_one() -> Vec<u8>
+{
+    let mut code : Vec<u8> = Vec::new();
+    code.push(PUSHFLT);
+    code.extend(pack_f64(1.0));
+    code
+}
+fn compile_push_float_zero() -> Vec<u8>
+{
+    let mut code : Vec<u8> = Vec::new();
+    code.push(PUSHFLT);
+    code.extend(pack_f64(0.0));
+    code
+}
+
 fn compile_string_with_prefix(code : &mut Vec<u8>, prefix : u8, text : &str)
 {
     code.push(prefix);
@@ -102,11 +117,7 @@ fn compile_statement(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) ->
                         match ast.child(0)?.children.len()
                         {
                             2 => code.extend(compile_astnode(ast.child(0)?.child(1)?, scopedepth)?),
-                            1 => 
-                            {
-                                code.push(PUSHFLT);
-                                code.extend(pack_f64(0.0));
-                            }
+                            1 => code.extend(compile_push_float_zero()),
                             _ => return plainerr("internal error: broken return instruction")
                         }
                         match ast.child(0)?.child(0)?.text.as_str()
@@ -177,13 +188,8 @@ fn compile_arrayindex(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -
     
     Ok(())
 }
-fn compile_indirection(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize, left_is_var : bool) -> Result<(), String>
+fn compile_indirection(ast : &ASTNode, code : &mut Vec<u8>, _scopedepth : usize) -> Result<(), String>
 {
-    if left_is_var
-    {
-        code.push(EVALUATION);
-    }
-    
     compile_string_with_prefix(code, PUSHNAME, &ast.child(1)?.child(0)?.text); // FIXME make this use PUSHSTR
     code.push(INDIRECTION);
     
@@ -195,7 +201,6 @@ fn compile_funcargs(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize, lef
     {
         code.push(EVALUATION);
     }
-    
     let args = &ast.child(1)?.children;
     if args.len() > 0xFFFF
     {
@@ -264,7 +269,7 @@ fn compile_rhunexpr_inner(nodes : &[ASTNode], code : &mut Vec<u8>, scopedepth : 
                 "funcargs" => compile_funcargs(end, code, scopedepth, left_is_var)?,
                 "dismember" => compile_dismember(end, code, scopedepth)?,
                 "arrayindex" => compile_arrayindex(end, code, scopedepth)?,
-                "indirection" => compile_indirection(end, code, scopedepth, left_is_var)?,
+                "indirection" => compile_indirection(end, code, scopedepth)?,
                 _ => return plainerr("error: rhunexpr contains unknown final node")
             }
         }
@@ -525,7 +530,11 @@ fn compile_forcondition(ast : &ASTNode, code : &mut Vec<u8>, mut scopedepth : us
         return plainerr("internal error: wrong number of parts parts to for condition head");
     }
     
-    // FOR loops need an extra layer of scope around them if they have an init statement
+    // for loops act almost exactly like while loops,
+    // except that the "post" execution expression is a prefix to the loop test expression,
+    // but it is skipped over the first time the loop is entered
+    
+    // for loops need an extra layer of scope around them if they have an init statement
     if let Some(ref init) = header_init
     {
         code.push(SCOPE);
@@ -533,37 +542,19 @@ fn compile_forcondition(ast : &ASTNode, code : &mut Vec<u8>, mut scopedepth : us
         code.extend(compile_astnode(&init, scopedepth)?);
     }
     
-    // FOR loops act almost exactly like while loops,
-    // except that the "post" execution expression is a prefix to the loop test expression,
-    // but it is skipped over the first time the loop is entered
-    
-    let mut expr = if let Some(ref expr) = header_expr {compile_astnode(&expr, scopedepth)?} else {Vec::<u8>::new()};
-    
-    if expr.is_empty()
+    let mut expr = match header_expr
     {
-        expr.push(PUSHFLT);
-        expr.extend(pack_f64(1.0));
-    }
+        Some(ref expr) => compile_astnode(&expr, scopedepth)?,
+        _ => compile_push_float_one()
+    };
+    let post = match header_post
+    {
+        Some(ref body) => compile_astnode(&body, scopedepth)?,
+        _ => Vec::<u8>::new()
+    };
+    let mut block = compile_astnode(ast.last_child()?, scopedepth)?;
     
     expr.push(WHILETEST);
-    
-    let mut block : Vec<u8>;
-    let post = if let Some(ref body) = header_post {compile_astnode(&body, scopedepth)?} else {Vec::<u8>::new()};
-    
-    // custom block compiler
-    let sentinel = &ast.last_child()?.child(0)?.child(0)?;
-    if !sentinel.isparent && sentinel.text == "{"
-    {
-        block = compile_astnode(ast.last_child()?, scopedepth)?;
-    }
-    else
-    {
-        block = Vec::<u8>::new();
-        block.push(SCOPE);
-        block.extend(compile_astnode(ast.last_child()?, scopedepth+1)?);
-        compile_unscope(&mut block, scopedepth)?;
-    }
-    
     block.push(WHILELOOP);
     
     code.push(FOR);
@@ -574,7 +565,7 @@ fn compile_forcondition(ast : &ASTNode, code : &mut Vec<u8>, mut scopedepth : us
     code.extend(expr);
     code.extend(block);
     
-    // FOR loops need an extra layer of scope around them if they have an init statement
+    // for loops need an extra layer of scope around them if they have an init statement
     if header_init.is_some()
     {
         scopedepth -= 1;

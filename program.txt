@@ -556,3 +556,10 @@ var badarray = [0, 1, 2, 3];
 print(badarray->len());
 print(badarray->len);
 
+print(". for dictionary items:");
+
+var dumbdict = {"a" : 0, "b" : 1, "c" : "asdf"};
+
+print(dumbdict.c);
+dumbdict.c = dumbdict.a;
+print(dumbdict.c);

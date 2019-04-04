@@ -165,11 +165,11 @@ impl Interpreter
             return Err(format!("internal error: INDIRECTION instruction requires 2 values on the stack but only found {}", self.stack_len()));
         }
         let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to perform INDIRECTION operation with a right-hand side that wasn't a name"))?;
-        // FIXME support indirection into fake member functions
-        let source = self.stack_pop_val().ok_or_else(|| minierr("internal error: failed to get source from stack in INDIRECTION operation"))?;
+        
+        let source = self.stack_pop().ok_or_else(|| minierr("internal error: failed to get source from stack in INDIRECTION operation"))?;
         match source
         {
-            Value::Instance(ident) =>
+            StackValue::Val(Value::Instance(ident)) =>
             {
                 if !self.global.instances.contains_key(&ident)
                 {
@@ -177,10 +177,53 @@ impl Interpreter
                 }
                 self.stack_push_var(IndirectVar::from_ident(ident, name));
             }
-            Value::Special(Special::Global) =>
+            StackValue::Val(Value::Special(Special::Global)) =>
                 self.stack_push_var(IndirectVar::from_global(name)),
-            _ => return plainerr("error: tried to use indirection on a type that can't be an identifier (only instance IDs or the special name \"global\" can go on the left side of a . operator)")
+            StackValue::Val(Value::Dict(dict)) =>
+                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualDict(dict), indexes : vec!(Value::Text(name)) } )),
+            
+            StackValue::Var(Variable::Array(mut arrayvar)) =>
+            {
+                arrayvar.indexes.push(Value::Text(name));
+                self.stack_push_var(Variable::Array(arrayvar));
+            }
+            StackValue::Var(var) =>
+            {
+                let value = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just accessing a variable"))?;
+                match value
+                {
+                    Value::Instance(ident) =>
+                    {
+                        if !self.global.instances.contains_key(&ident)
+                        {
+                            return Err(format!("error: tried to perform indirection on instance {} that doesn't exist", ident));
+                        }
+                        self.stack_push_var(IndirectVar::from_ident(ident, name));
+                    }
+                    Value::Special(Special::Global) =>
+                        self.stack_push_var(IndirectVar::from_global(name)),
+                    _ =>
+                    {
+                        match var
+                        {
+                            Variable::Array(mut arrayvar) =>
+                            {
+                                arrayvar.indexes.push(Value::Text(name));
+                                self.stack_push_var(Variable::Array(arrayvar));
+                            }
+                            Variable::Direct(dirvar) =>
+                                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(Value::Text(name)) } )),
+                            Variable::Indirect(indirvar) =>
+                                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(Value::Text(name)) } )),
+                        }
+                    }
+                }
+                
+            }
+            
+            _ => return plainerr("error: tried to use indirection on a type that doesn't support it (only instances, dictionaries, and 'special' values are allowed)")
         }
+        
         Ok(())
     }
     pub (crate) fn sim_DISMEMBER(&mut self) -> OpResult

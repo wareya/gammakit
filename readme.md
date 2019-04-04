@@ -126,6 +126,7 @@ TODO:
 - inheritance? how would it work? like func_super()?
 - globalsubdef?
 - global constants?
+- foreach on generators
 
 TODO (sanitation/low-priority):
 - replace instances of "as" with instances of "from"
@@ -136,8 +137,6 @@ TODO (sanitation/low-priority):
 
 MAYBE:
 - "all"? (vs "other", "self")
-- real structs, copied by value like arrays/dicts are (if you don't want them copied by value just use objects/instances)
-  - maybe just give .attr access syntax to dictionaries? (like js) (maybe use another symbol like : or / so it doesn't have to decide?)
 - integer type?
 
 MAYBE (metaprogramming):
