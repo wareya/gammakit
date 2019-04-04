@@ -563,3 +563,9 @@ var dumbdict = {"a" : 0, "b" : 1, "c" : "asdf"};
 print(dumbdict.c);
 dumbdict.c = dumbdict.a;
 print(dumbdict.c);
+
+
+print("ternary:");
+print((0)?("true"):("false"));
+print((1)?("true"):("false"));
+

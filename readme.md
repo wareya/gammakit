@@ -119,7 +119,6 @@ If you use with() while inside of an instance scope, then "other" will dereferen
 # Roadmap
 
 TODO:
-- ternary operators
 - a destroy() event for instance_kill()
 - various helpful string and array functions
 - a "defer" statement?

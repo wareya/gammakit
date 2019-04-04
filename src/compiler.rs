@@ -352,6 +352,24 @@ fn compile_nakedblock(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -
     Ok(())
 }
 
+fn compile_ternary(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
+{
+    code.extend(compile_astnode(ast.child(0)?, scopedepth)?);
+    
+    let mut block = compile_astnode(ast.child(2)?, scopedepth)?;
+
+    let block2 = compile_astnode(ast.child(4)?, scopedepth)?;
+    block.push(JUMPRELATIVE);
+    block.extend(pack_u64(block2.len() as u64));
+    
+    code.push(IFELSE);
+    code.extend(pack_u64(block.len() as u64));
+    code.extend(block);
+    code.extend(block2);
+    
+    Ok(())
+}
+
 fn compile_ifcondition(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> Result<(), String>
 {
     code.extend(compile_astnode(ast.child(1)?, scopedepth)?);
@@ -897,6 +915,8 @@ fn compile_astnode(ast : &ASTNode, scopedepth : usize) -> Result<Vec<u8>, String
                 compile_rhunexpr(ast, &mut code, scopedepth)?,
             "funccall" =>
                 compile_funccall(ast, &mut code, scopedepth)?,
+            "ternary" =>
+                compile_ternary(ast, &mut code, scopedepth)?,
             "ifcondition" =>
                 compile_ifcondition(ast, &mut code, scopedepth)?,
             "whilecondition" =>

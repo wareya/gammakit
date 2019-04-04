@@ -59,6 +59,7 @@ parenexpr:
 ( $expr$ )
 
 supersimplexpr:
+$ternary$
 $parenexpr$
 $lambda$
 $arraybody$
@@ -70,7 +71,11 @@ $name$
 invocation_expr:
 invoke $lvar$
 
+ternary:
+$parenexpr$ ? $parenexpr$? : $parenexpr$
+
 simplexpr:
+$ternary$
 $parenexpr$
 $rvar$
 $invocation_expr$
