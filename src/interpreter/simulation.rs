@@ -182,11 +182,6 @@ impl Interpreter
             StackValue::Val(Value::Dict(dict)) =>
                 self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualDict(dict), indexes : vec!(Value::Text(name)) } )),
             
-            StackValue::Var(Variable::Array(mut arrayvar)) =>
-            {
-                arrayvar.indexes.push(Value::Text(name));
-                self.stack_push_var(Variable::Array(arrayvar));
-            }
             StackValue::Var(var) =>
             {
                 let value = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just accessing a variable"))?;
@@ -218,9 +213,7 @@ impl Interpreter
                         }
                     }
                 }
-                
             }
-            
             _ => return plainerr("error: tried to use indirection on a type that doesn't support it (only instances, dictionaries, and 'special' values are allowed)")
         }
         
