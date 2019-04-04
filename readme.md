@@ -125,7 +125,7 @@ TODO:
 - inheritance? how would it work? like func_super()?
 - globalsubdef?
 - global constants?
-- foreach on generators
+- "finalize" command for generators so that the next yield acts like a return instead of a yield
 
 TODO (sanitation/low-priority):
 - replace instances of "as" with instances of "from"

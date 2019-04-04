@@ -61,6 +61,7 @@ impl Interpreter
             WHILELOOP => enbox!(sim_WHILELOOP),
             WITHLOOP => enbox!(sim_WITHLOOP),
             FOREACHLOOP => enbox!(sim_FOREACHLOOP),
+            FOREACHHEAD => enbox!(sim_FOREACHHEAD),
             
             JUMPRELATIVE => enbox!(sim_JUMPRELATIVE),
             
@@ -253,7 +254,22 @@ impl Interpreter
     }
     pub (crate) fn sim_INVOKE(&mut self) -> OpResult
     {
-        self.handle_invocation()
+        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: not enough variables on stack to run instruction INVOKE"))?;
+        
+        let val = self.evaluate_or_store(&var, None)?;
+        
+        if let Some(Value::Generator(generator_state)) = val
+        {
+            let frame = generator_state.frame.ok_or_else(|| minierr("error: tried to invoke a dead generator"))?;
+            self.stack_push_var(var.clone());
+            self.push_new_frame(frame)?;
+        }
+        else
+        {
+            return Err(format!("error: tried to invoke a non-generator ({:?})", val));
+        }
+        
+        Ok(())
     }
     pub (crate) fn sim_INVOKECALL(&mut self) -> OpResult
     {
@@ -273,11 +289,11 @@ impl Interpreter
     {
         if self.stack_len() < 3
         {
-            return Err(format!("internal error: INVOKECALL instruction requires 3 values on the stack but found {}", self.stack_len()));
+            return Err(format!("internal error: INVOKEEXPR instruction requires 3 values on the stack but found {}", self.stack_len()));
         }
-        let generator = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 1 to INVOKECALL must be a value"))?;
-        let yielded = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 2 to INVOKECALL must be a value"))?;
-        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: stack argument 3 to INVOKECALL must be a variable"))?;
+        let generator = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 1 to INVOKEEXPR must be a value"))?;
+        let yielded = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 2 to INVOKEEXPR must be a value"))?;
+        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: stack argument 3 to INVOKEEXPR must be a variable"))?;
         
         self.evaluate_or_store(&var, Some(generator))?;
         
@@ -405,41 +421,38 @@ impl Interpreter
             return Err(format!("internal error: FOREACH instruction requires 2 values on the stack but found {}", self.stack_len()));
         }
         
-        let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: foreach loop was fed a variable of some sort, instead of a value, for what to loop over"))?;
+        let mut val = self.stack_pop_val().ok_or_else(|| minierr("internal error: foreach loop was fed a variable of some sort, instead of a value, for what to loop over"))?;
         let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: foreach loop was fed a non-name stack value"))?;
         
-        let mut list : VecDeque<Value> = match val
+        let list : ForEachValues = match val
         {
-            Value::Array(mut list) => list.drain(..).collect(),
-            Value::Dict(mut dict) => dict.drain().map(|(k, v)| Value::Array(vec!(hashval_to_val(k), v))).collect(),
-            Value::Set(mut set) => set.drain().map(hashval_to_val).collect(),
-            // TODO: support foreach over generators
-            _ => return plainerr("error: value fed to for-each loop must be an array or dictionary")
+            Value::Array(ref mut list) => ForEachValues::List(list.drain(..).collect()),
+            Value::Dict(ref mut dict)  => ForEachValues::List(dict.drain().map(|(k, v)| Value::Array(vec!(hashval_to_val(k), v))).collect()),
+            Value::Set(ref mut set)    => ForEachValues::List(set.drain().map(hashval_to_val).collect()),
+            Value::Generator(_) => ForEachValues::Gen(GeneratorState{frame : None}),
+            _ => return plainerr("error: value fed to for-each loop must be an array, dictionary, set, or generatorstate")
         };
         
         let codelen = self.read_usize()?;
+        let current_pc = self.get_pc();
+        self.top_frame.controlstack.push(Controller::ForEach(ForEachData{
+            scopes : self.top_frame.scopes.len() as u16,
+            loop_start : current_pc,
+            loop_end : current_pc+codelen,
+            name : name.clone(),
+            values : list
+        }));
         
-        if let Some(first_val) = list.pop_front()
+        let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
+        if scope.contains_key(&name)
         {
-            let current_pc = self.get_pc();
-            self.top_frame.controlstack.push(Controller::ForEach(ForEachData{
-                scopes : self.top_frame.scopes.len() as u16,
-                loop_start : current_pc,
-                loop_end : current_pc+codelen,
-                name : name.clone(),
-                values : list
-            }));
-            
-            let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
-            if scope.contains_key(&name)
-            {
-                return Err(format!("error: redeclared identifier {}", name))
-            }
-            scope.insert(name, first_val);
+            return Err(format!("error: redeclared identifier {}", name))
         }
-        else
+        
+        if let Value::Generator(genstate) = val
         {
-            self.add_pc(codelen);
+            let frame = genstate.frame.ok_or_else(|| minierr("error: tried to invoke a dead generator in a foreach loop"))?;
+            self.push_new_frame(frame)?;
         }
         
         Ok(())
@@ -450,7 +463,7 @@ impl Interpreter
         {
             return plainerr("internal error: WITH instruction requires 1 values on the stack but found 0");
         }
-        // NOTE: for with(), the self.top_frame.scopes.len() >= 0xFFFF error case is handled by SCOPE instruction
+        // NOTE: the self.top_frame.scopes.len() >= 0xFFFF error case is handled by SCOPE instruction
         let other_id = self.stack_pop_val().ok_or_else(|| minierr("internal error: tried to use with() on a non-value expression"))?;
         
         let codelen = self.read_usize()?;
@@ -907,26 +920,65 @@ impl Interpreter
     {
         if let Some(Controller::ForEach(ref mut data)) = self.top_frame.controlstack.last_mut()
         {
-            if let Some(value) = data.values.remove(0)
+            let todrain = data.scopes;
+            let dest = data.loop_start;
+            
+            if let ForEachValues::Gen(ref mut gen) = data.values
             {
-                let todrain = data.scopes;
-                let name = data.name.clone();
-                let dest = data.loop_start;
+                let mut holder = GeneratorState{frame : None};
+                std::mem::swap(&mut holder, gen);
+                let frame = holder.frame;
                 
-                self.drain_scopes(todrain);
-                
-                let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
-                scope.insert(name, value);
-                
-                self.set_pc(dest);
+                if let Some(frame) = frame
+                {
+                    self.set_pc(dest);
+                    self.push_new_frame(frame)?;
+                }
             }
             else
             {
+                self.set_pc(dest);
+            }
+            self.drain_scopes(todrain);
+            return Ok(());
+        }
+        plainerr("internal error: FOREACHLOOP instruction when immediate controller is not a foreach controller")
+    }
+    pub (crate) fn sim_FOREACHHEAD(&mut self) -> OpResult
+    {
+        if let Some(Controller::ForEach(ref mut data)) = self.top_frame.controlstack.last_mut()
+        {
+            let dest = data.loop_end;
+            let name = data.name.clone();
+            if let Some(value) = match data.values
+                {
+                    ForEachValues::List(ref mut values) => values.remove(0),
+                    ForEachValues::Gen(ref mut gen) =>
+                    {
+                        if let Some(StackValue::Val(Value::Generator(mut holder))) = self.top_frame.stack.pop()
+                        {
+                            std::mem::swap(&mut holder, gen);
+                        }
+                        else
+                        {
+                            return plainerr("internal error: failed to recover generator state in foreach loop over generator");
+                        }
+                        self.stack_pop_val()
+                    }
+                }
+            {
+                let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
+                scope.insert(name, value);
+            }
+            else
+            {
+                println!("---- leaving foreach loop");
+                self.set_pc(dest);
                 self.top_frame.controlstack.pop();
             }
             return Ok(());
         }
-        plainerr("internal error: FOREACHLOOP instruction when immediate controller is not a foreach controller")
+        plainerr("internal error: FOREACHHEAD instruction when immediate controller is not a foreach controller")
     }
     pub (crate) fn sim_JUMPRELATIVE(&mut self) -> OpResult
     {

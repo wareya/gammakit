@@ -306,7 +306,7 @@ print(getarray()[0]);
 
 print("generator tests:");
 
-generator test(i)
+generator gentest(i)
 {
     while(i > 0)
     {
@@ -316,10 +316,13 @@ generator test(i)
     return "generator has finalized";
 }
 
-var test_state = test(10);
+var test_state = gentest(10);
 
+// prints 10 through 1 then "generator has finalized"
 while(test_state)
     print(invoke test_state);
+
+// the generatorstate value inside of the variable "test_state" is now consumed
 
 // binary logical operator short-circuiting
 
@@ -568,4 +571,15 @@ print(dumbdict.c);
 print("ternary:");
 print((0)?("true"):("false"));
 print((1)?("true"):("false"));
+
+
+print("generator with for-each loops:");
+
+test_state = gentest(10);
+
+// this copies the generatorstate inside of test_state, then repeatedly invokes it
+for(output in test_state)
+    print(output);
+for(output in test_state)
+    print(output);
 

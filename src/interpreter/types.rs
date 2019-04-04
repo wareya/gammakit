@@ -27,12 +27,18 @@ pub (crate) struct WithData {
 }
 
 #[derive(Debug, Clone)]
+pub (crate) enum ForEachValues {
+    List(VecDeque<Value>),
+    Gen(GeneratorState),
+}
+
+#[derive(Debug, Clone)]
 pub (crate) struct ForEachData {
     pub (super) scopes: u16,
     pub (super) loop_start: usize,
     pub (super) loop_end: usize,
     pub (super) name: String,
-    pub (super) values: VecDeque<Value>,
+    pub (super) values: ForEachValues,
 }
 
 #[derive(Debug, Clone)]

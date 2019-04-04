@@ -117,6 +117,7 @@ pub (crate) const WHILETEST : u8 = 0xC0;
 pub (crate) const WHILELOOP : u8 = 0xC1;
 pub (crate) const WITHLOOP : u8 = 0xC2;
 pub (crate) const FOREACHLOOP : u8 = 0xC3;
+pub (crate) const FOREACHHEAD : u8 = 0xC4;
 
 pub (crate) const JUMPRELATIVE : u8 = 0xD0;
 

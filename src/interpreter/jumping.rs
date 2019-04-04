@@ -18,9 +18,7 @@ impl Interpreter
             return plainerr("error: provided too many arguments to function");
         }
         
-        let mut frameswapper = Frame::new_from_call(Rc::clone(&function.code), function.startaddr, function.endaddr, isexpr, if function.impassable {None} else {Some(&self.top_frame)}, false);
-        std::mem::swap(&mut frameswapper, &mut self.top_frame);
-        self.frames.push(frameswapper);
+        self.push_new_frame(Frame::new_from_call(Rc::clone(&function.code), function.startaddr, function.endaddr, isexpr, if function.impassable {None} else {Some(&self.top_frame)}, false))?;
         
         // copy lambda's universe, if there is one
         if let Some(ref universe) = funcdata.predefined
@@ -43,7 +41,7 @@ impl Interpreter
         
         Ok(())
     }
-    pub (crate) fn jump_to_generator_state(&mut self, mut new_frame : Frame) -> OpResult
+    pub (crate) fn push_new_frame(&mut self, mut new_frame : Frame) -> OpResult
     {
         std::mem::swap(&mut new_frame, &mut self.top_frame);
         self.frames.push(new_frame);

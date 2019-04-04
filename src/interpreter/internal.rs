@@ -101,24 +101,4 @@ impl Interpreter
         
         Ok(())
     }
-    
-    pub (super) fn handle_invocation(&mut self) -> OpResult
-    {
-        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: not enough variables on stack to run instruction INVOKE"))?;
-        
-        let val = self.evaluate_or_store(&var, None)?;
-        
-        if let Some(Value::Generator(generator_state)) = val
-        {
-            let frame = generator_state.frame.ok_or_else(|| minierr("error: tried to invoke a dead generator"))?;
-            self.stack_push_var(var.clone());
-            self.jump_to_generator_state(frame)?;
-        }
-        else
-        {
-            return Err(format!("error: tried to invoke a non-generator ({:?})", val));
-        }
-        
-        Ok(())
-    }
 }

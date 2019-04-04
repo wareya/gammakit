@@ -501,10 +501,13 @@ fn compile_foreach(ast : &ASTNode, code : &mut Vec<u8>, scopedepth : usize) -> R
     
     code.push(SCOPE);
     
-    let mut block = compile_astnode(ast.child(6)?, scopedepth+1)?;
+    let mut block = vec!(FOREACHHEAD);
+    block.extend(compile_astnode(ast.child(6)?, scopedepth+1)?);
     block.push(FOREACHLOOP);
     
+    // use expression
     compile_string_with_prefix(code, PUSHNAME, &ast.child(2)?.child(0)?.text);
+    
     code.extend(compile_astnode(ast.child(4)?, scopedepth+1)?);
     code.push(FOREACH);
     code.extend(pack_u64(block.len() as u64));
