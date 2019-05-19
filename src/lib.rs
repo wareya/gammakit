@@ -14,6 +14,9 @@
 //! 4) Optional: insert the default binding functions with interpreter.insert_default_bindings()
 //! 5) Run interpreter.step() until it returns Err. Err(None) indicates graceful exit, Err(Some(String))) indicates an error.
 
+#![allow(clippy::suspicious_else_formatting)]
+#![allow(clippy::redundant_closure)]
+
 #[macro_use]
 mod matches;
 mod strings;

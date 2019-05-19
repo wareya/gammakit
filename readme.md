@@ -126,6 +126,7 @@ TODO:
 - globalsubdef?
 - global constants?
 - "finalize" command for generators so that the next yield acts like a return instead of a yield
+- extend metaprogramming with argument lists, function types (subdef, generator, etc), etc
 
 TODO (sanitation/low-priority):
 - replace instances of "as" with instances of "from"
