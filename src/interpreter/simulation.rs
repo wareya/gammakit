@@ -45,7 +45,6 @@ impl Interpreter
             BREAK => enbox!(sim_BREAK),
             CONTINUE => enbox!(sim_CONTINUE),
             IF => enbox!(sim_IF),
-            IFELSE => enbox!(sim_IFELSE),
             WHILE => enbox!(sim_WHILE),
             FOR => enbox!(sim_FOR),
             FOREACH => enbox!(sim_FOREACH),
@@ -69,6 +68,7 @@ impl Interpreter
             RETURN => enbox!(sim_RETURN),
             YIELD => enbox!(sim_YIELD),
             LINENUM => enbox!(sim_LINENUM),
+            DEBUGINFO => enbox!(sim_DEBUGINFO),
             _ => None
         }
     }
@@ -168,6 +168,8 @@ impl Interpreter
         let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to perform INDIRECTION operation with a right-hand side that wasn't a name"))?;
         
         let source = self.stack_pop().ok_or_else(|| minierr("internal error: failed to get source from stack in INDIRECTION operation"))?;
+        
+        //eprintln!("performing indirection on {:?}", source);
         match source
         {
             StackValue::Val(Value::Instance(ident)) =>
@@ -229,6 +231,7 @@ impl Interpreter
         let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to perform DISMEMBER operation with a right-hand side that wasn't a name"))?;
         // FIXME support indirection into fake member functions
         let source = self.stack_pop().ok_or_else(|| minierr("internal error: failed to get source from stack in DISMEMBER operation"))?;
+        //eprintln!("dismembering into {:?}", source);
         
         self.stack_push_val(Value::SubFunc(Box::new(SubFuncVal{source, name})));
         Ok(())
@@ -372,20 +375,6 @@ impl Interpreter
         
         Ok(())
     }
-    pub (crate) fn sim_IFELSE(&mut self) -> OpResult
-    {
-        if self.stack_len() < 1
-        {
-            return plainerr("internal error: IFELSE instruction requires 1 values on the stack but found 0");
-        }
-        let testval = self.stack_pop_val().ok_or_else(|| minierr("internal error: failed to find value on stack while handling IF controller"))?;
-        let codelen1 = self.read_usize()?;
-        if !value_truthy(&testval)
-        {
-            self.add_pc(codelen1);
-        }
-        Ok(())
-    }
     pub (crate) fn sim_WHILE(&mut self) -> OpResult
     {
         let exprlen = self.read_usize()?;
@@ -510,6 +499,7 @@ impl Interpreter
     }
     pub (crate) fn sim_SWITCH(&mut self) -> OpResult
     {
+        //eprintln!("hit sim_switch");
         if self.stack_len() < 1
         {
             return plainerr("internal error: SWITCH instruction requires 1 values on the stack but found 0");
@@ -533,6 +523,9 @@ impl Interpreter
             value
         }));
         
+        //eprintln!("end of sim_switch");
+        //eprintln!("{:?}", self.top_frame.controlstack.last().unwrap());
+        
         Ok(())
     }
     pub (crate) fn sim_SWITCHCASE(&mut self) -> OpResult
@@ -546,10 +539,12 @@ impl Interpreter
         let which_case = self.read_u16()?;
         
         let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref x)) => x, minierr("internal error: SWITCHCASE instruction outside of switch statement"))?;
+        let dest = *switchdata.blocks.get(which_case as usize).ok_or_else(|| minierr("internal error: which_case in SWITCHCASE was too large"))?;
         
         if ops::value_equal(&value, &switchdata.value)?
         {
-            self.set_pc(*switchdata.blocks.get(which_case as usize).ok_or_else(|| minierr("internal error: which_case in SWITCHCASE was too large"))?);
+            //eprintln!("jumping to {} thanks to switch", dest);
+            self.set_pc(dest);
         }
         
         Ok(())
@@ -558,7 +553,8 @@ impl Interpreter
     {
         let which_case = self.read_u16()?;
         let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref x)) => x, minierr("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
-        self.set_pc(*switchdata.blocks.get(which_case as usize).ok_or_else(|| minierr("internal error: which_case in SWITCHDEFAULT was too large"))?);
+        let dest = *switchdata.blocks.get(which_case as usize).ok_or_else(|| minierr("internal error: which_case in SWITCHDEFAULT was too large"))?;
+        self.set_pc(dest);
         
         Ok(())
     }
@@ -694,7 +690,7 @@ impl Interpreter
         {
             return Err(format!("internal error: short circuit instruction requires 1 values on the stack but found {}", self.stack_len()))
         }
-        let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: left operand of binary logical operator was a value instead of a variable"))?;
+        let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: left operand of binary logical operator was a variable instead of a value"))?;
         
         let rel = self.read_usize()?;
         
@@ -972,7 +968,7 @@ impl Interpreter
             }
             else
             {
-                println!("---- leaving foreach loop");
+                //eprintln!("---- leaving foreach loop");
                 self.set_pc(dest);
                 self.top_frame.controlstack.pop();
             }
@@ -1066,6 +1062,15 @@ impl Interpreter
     pub (crate) fn sim_LINENUM(&mut self) -> OpResult
     {
         self.top_frame.currline = self.read_usize()? as usize;
+        Ok(())
+    }
+    pub (crate) fn sim_DEBUGINFO(&mut self) -> OpResult
+    {
+        let line = self.read_usize()? as usize;
+        let pos = self.read_usize()? as usize;
+        let name = self.read_string()?;
+        //eprintln!("at {}:{}, type {}, bytecode {}", line, pos, name, self.get_pc());
+        self.top_frame.currline = line;
         Ok(())
     }
 }

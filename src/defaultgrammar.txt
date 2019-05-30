@@ -35,7 +35,7 @@ rhunexpr:
 $supersimplexpr$ $rhunexpr_right$+
 
 funccall:
-$rhunexpr$
+$supersimplexpr$ $rhunexpr_right$+
 
 unusedcomma:
 ,
@@ -109,8 +109,11 @@ $binexpr_3$ >>? $binop_2$ $binexpr_2$
 binexpr_3: LEFTBINEXPR 3
 $lhunop$ >>? $binop_3$ $binexpr_3$
 
-lhunop:
+unary:
 $unop$ $lhunop$
+
+lhunop:
+$unary$
 $simplexpr$
 
 unop:
@@ -200,9 +203,19 @@ $declaration$
 $binstate$
 $unstate$
 $funccall$
+$invocation_call$
+
+forheaderstatement:
+$barestatement$?
+
+forheaderexpr:
+$expr$?
+
+forheader:
+$forheaderstatement$ ; $forheaderexpr$ ; $forheaderstatement$
 
 forcondition:
-for ( $barestatement$? ; $expr$? ; $barestatement$? ) $block$
+for ( $forheader$ ) $block$
 
 foreach:
 for ( $name$ in $expr$ ) $block$
@@ -227,9 +240,14 @@ subdef
 globaldef
 generator
 
+funcdefargs:
+>>? $name$...,
+
+funcdefstatements:
+$statement$*
+
 funcdef:
-$funcdeftoken$ $name$ ( ) { $statement$* }
-$funcdeftoken$ $name$ ( $name$..., ) { $statement$* }
+$funcdeftoken$ $name$ ( $funcdefargs$ ) { $funcdefstatements$ }
 
 binstateop:
 =
@@ -246,21 +264,19 @@ program:
 $statement$*
 
 lambda:
-$lambdacapture$ $lambdaargs$ $lambdabody$
+[ $lambdacapture$ ] ( $lambdaargs$ ) { $lambdabody$ }
 
 lambcapexpr:
 $name$ = $expr$
 
 lambdacapture:
-[ ]
-[ $lambcapexpr$..., ]
+>>? $lambcapexpr$...,
 
 lambdaargs:
-( )
-( $name$..., )
+>>? $name$...,
 
 lambdabody:
-{ $statement$* }
+$statement$*
 
 switch:
 switch ( $expr$ ) { $switchcases$ }

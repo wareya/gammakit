@@ -47,7 +47,8 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
             {
                 let indexnum = match_or_err!(index, Value::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an array index"))?;
                 
-                let mut newvar = var.get_mut(indexnum.round() as usize).ok_or_else(|| format!("error: tried to access non-extant index {} of an array", indexnum))?;
+                let cloned = var.clone();
+                let mut newvar = var.get_mut(indexnum.round() as usize).ok_or_else(|| format!("error: tried to access non-extant index {} of an array ({:?})", indexnum, cloned))?;
                 assign_or_return_indexed(value, &mut newvar, new_indexes)
             }
             Value::Dict(ref mut var) =>

@@ -605,8 +605,7 @@ impl Parser {
                     }
                     for child in ast.child_slice(3, -1)?
                     {
-                        if matches!(child.child(1)?.child(0)?.text.as_str(), "create" | "destroy")
-                           && (child.child(3)?.isparent || child.child(3)?.text != ")")
+                        if matches!(child.child(1)?.child(0)?.text.as_str(), "create" | "destroy") && !child.child(3)?.children.is_empty()
                         {
                             return plainerr(&format!("error: `{}` function of object must not have any arguments", child.child(1)?.child(0)?.text));
                         }
@@ -614,7 +613,7 @@ impl Parser {
                 }
                 "funccall" =>
                 {
-                    if ast.child(0)?.last_child()?.child(0)?.text != "funcargs"
+                    if ast.last_child()?.child(0)?.text != "funcargs"
                     {
                         return plainerr("error: tried to use non-function expression as a funccall statement");
                     }

@@ -24,7 +24,6 @@ impl ASTNode {
     }
     pub (crate) fn child(&'_ self, n : usize) -> Result<&'_ ASTNode, String>
     {
-        assert!(n < self.children.len());
         self.children.get(n).ok_or_else(|| format!("internal error: tried to access child {} (zero-indexed) of ast node that only has {} children", n, self.children.len()))
     }
     pub (crate) fn child_mut(&'_ mut self, n : usize) -> Result<&'_ mut ASTNode, String>

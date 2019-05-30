@@ -89,7 +89,6 @@ pub (crate) const COLLECTDICT : u8 = 0x71;
 pub (crate) const COLLECTSET : u8 = 0x72;
 
 pub (crate) const IF : u8 = 0x80;
-pub (crate) const IFELSE : u8 = 0x81;
 pub (crate) const WHILE : u8 = 0x82;
 pub (crate) const FOR : u8 = 0x83;
 pub (crate) const WITH : u8 = 0x84;
@@ -126,6 +125,7 @@ pub (crate) const RETURN : u8 = 0xF1;
 pub (crate) const YIELD : u8 = 0xF2;
 
 pub (crate) const LINENUM : u8 = 0xF8;
+pub (crate) const DEBUGINFO : u8 = 0xFF;
 
 
 pub (crate) fn get_assignment_type(optext : &str) -> Option<u8>

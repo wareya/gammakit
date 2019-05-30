@@ -205,6 +205,9 @@ pub enum Value {
     Special(Special),
     SubFunc(Box<SubFuncVal>),
 }
+
+type VarRef = Rc<RefCell<Value>>;
+
 #[derive(Debug, Clone)]
 pub (super) enum StackValue {
     Val(Value),

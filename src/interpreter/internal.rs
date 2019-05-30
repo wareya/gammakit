@@ -18,6 +18,15 @@ impl Interpreter
     {
         self.top_frame.pop()
     }
+    pub (super) fn stack_pop_as_val(&mut self) -> Option<Value>
+    {
+        match self.top_frame.pop()
+        {
+            Some(StackValue::Var(x)) => self.evaluate_or_store(&x, None).ok()?,
+            Some(StackValue::Val(x)) => Some(x),
+            _ => None
+        }
+    }
     pub (super) fn stack_push_val(&mut self, value : Value)
     {
         self.top_frame.push_val(value)
@@ -79,7 +88,9 @@ impl Interpreter
         let argcount = match_or_err!(argcount_val, Value::Number(argcount) => argcount, minierr("internal error: number on stack of arguments to function was not a number"))?;
         let argcount = argcount.round() as usize;
         
-        if argcount > self.stack_len()
+        //eprintln!("{} args", argcount);
+        
+        if argcount+1 > self.stack_len()
         {
             return plainerr("internal error: fewer values on stack than expected in FUNCEXPR/FUNCCALL");
         }
@@ -90,7 +101,7 @@ impl Interpreter
             args.insert(0, self.stack_pop_val().ok_or_else(|| minierr("internal error: expected values, got variable on stack in FUNCEXPR/FUNCCALL"))?);
         }
         
-        let funcdata = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR/FUNCCALL"))?;
+        let funcdata = self.stack_pop_as_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR/FUNCCALL (after args)"))?;
         
         match funcdata
         {

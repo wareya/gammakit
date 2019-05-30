@@ -127,6 +127,7 @@ TODO:
 - global constants?
 - "finalize" command for generators so that the next yield acts like a return instead of a yield
 - extend metaprogramming with argument lists, function types (subdef, generator, etc), etc
+- rewrite compiler so that it has a proper state object
 
 TODO (sanitation/low-priority):
 - replace instances of "as" with instances of "from"
@@ -134,15 +135,14 @@ TODO (sanitation/low-priority):
 - make sure format_val does the same as the above
 - replace parent/text AST node stuff with enum
 - forbid if-else inside an if condition's block with no enclosing braces
+- extend number type to "64-bit signed int or 64-bit float" rather than just "64-bit float"
 
 MAYBE:
 - "all"? (vs "other", "self")
-- integer type?
 
 MAYBE (metaprogramming):
 - give the runtime control over interpreters of its own; runtime panics will invalidate interpreters
-- investigate feasibility of grammar, parser, compiler, and interpreter hooks (limited to child interpreters)
-- allow interpreters to act like generators
+- investigate feasibility of grammar, parser, and compiler hooks
 
 # Other
 

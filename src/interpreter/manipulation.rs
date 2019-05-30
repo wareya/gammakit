@@ -96,15 +96,19 @@ impl Interpreter
     pub (crate) fn read_function(&mut self, subroutine : bool, generator : bool) -> Result<(String, FuncSpec), String>
     {
         let code = self.get_code();
+        //eprintln!("about to read function name; next byte is {:02X}", self.top_frame.code[self.get_pc()]);
         let name = self.read_string()?;
+        //eprintln!("read most of function");
         let argcount = self.read_u16()?;
         let bodylen = self.read_usize()?;
         
         let mut args = Vec::<String>::new();
         for _ in 0..argcount
         {
+            //eprintln!("about to read arg name; next byte is {:02X}", self.top_frame.code[self.get_pc()]);
             args.push(self.read_string()?);
         }
+        //eprintln!("read args");
         
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
@@ -116,7 +120,7 @@ impl Interpreter
     {
         let code = self.get_code();
         
-        let capturecount = self.read_u16()? as usize;
+        let capturecount = self.read_usize()?;
         
         if self.top_frame.stack.len() < capturecount*2
         {
