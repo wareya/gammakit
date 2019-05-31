@@ -7,7 +7,7 @@ fn get(vec : &[u8], n : usize) -> Result<u8, String>
 
 pub (crate) fn pack_u16(num : u16) -> Vec<u8>
 {
-    vec!(((num>>8)&0xFF) as u8, (num&0xFF) as u8)
+    num.to_le_bytes().to_vec()
 }
 pub (crate) fn unpack_u16(vec : &[u8]) -> Result<u16, String>
 {
@@ -15,13 +15,14 @@ pub (crate) fn unpack_u16(vec : &[u8]) -> Result<u16, String>
     {
         return Err("tried to unpack u16 from buffer of size other than 2 bytes".to_string());
     }
-    Ok((get(vec, 1)? as u16) | ((get(vec, 0)? as u16)<<8))
+    let mut ret = [0u8, 0u8];
+    ret.copy_from_slice(vec);
+    Ok(u16::from_le_bytes(ret))
 }
 
 pub (crate) fn pack_u64(num : u64) -> Vec<u8>
 {
-    vec!(((num>>56)&0xFF) as u8, ((num>>48)&0xFF) as u8, ((num>>40)&0xFF) as u8, ((num>>32)&0xFF) as u8,
-         ((num>>24)&0xFF) as u8, ((num>>16)&0xFF) as u8, ((num>> 8)&0xFF) as u8, ((num    )&0xFF) as u8)
+    num.to_le_bytes().to_vec()
 }
 pub (crate) fn unpack_u64(vec : &[u8]) ->  Result<u64, String>
 {
@@ -29,8 +30,9 @@ pub (crate) fn unpack_u64(vec : &[u8]) ->  Result<u64, String>
     {
         return Err("tried to unpack u64 from buffer of size other than 8 bytes".to_string());
     }
-    Ok ((   get(vec, 7)? as u64)      | ((get(vec, 6)? as u64)<< 8) | ((get(vec, 5)? as u64)<<16) | ((get(vec, 4)? as u64)<<24)
-         |((get(vec, 3)? as u64)<<32) | ((get(vec, 2)? as u64)<<40) | ((get(vec, 1)? as u64)<<48) | ((get(vec, 0)? as u64)<<56))
+    let mut ret = [0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8];
+    ret.copy_from_slice(vec);
+    Ok(u64::from_le_bytes(ret))
 }
 
 pub (crate) fn pun_f64_as_u64(num : f64) -> u64
