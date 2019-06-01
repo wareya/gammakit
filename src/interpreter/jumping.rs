@@ -118,7 +118,7 @@ impl Interpreter
                         scope.insert(varname.clone(), arg);
                     }
                     
-                    self.stack_push_val(Value::Generator(GeneratorState{frame: Some(new_frame)}));
+                    self.stack_push_val(Value::Generator(Box::new(GeneratorState{frame: Some(new_frame)})));
                 }
             }
             else if !defdata.fromobj

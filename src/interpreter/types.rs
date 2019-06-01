@@ -197,7 +197,7 @@ pub enum Value {
     Dict(HashMap<HashableValue, Value>),
     Set(HashSet<HashableValue>),
     Func(Box<FuncVal>),
-    Generator(GeneratorState),
+    Generator(Box<GeneratorState>),
     Instance(usize),
     Object(usize),
     Custom(Custom),
@@ -209,7 +209,7 @@ pub enum Value {
 type VarRef = Rc<RefCell<Value>>;
 
 #[derive(Debug, Clone)]
-pub (super) enum StackValue {
+pub (crate) enum StackValue {
     Val(Value),
     Var(Variable),
 }

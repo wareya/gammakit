@@ -57,51 +57,39 @@ bodies->push({
 
 var NUM_BODIES = bodies->len();
 
-var x = [];
-var y = [];
-var z = [];
-var xv = [];
-var yv = [];
-var zv = [];
-var mass = [];
-for(var i = 0; i < NUM_BODIES; i++)
-{
-    x->push(bodies[i].x);
-    y->push(bodies[i].y);
-    z->push(bodies[i].z);
-    xv->push(bodies[i].xv);
-    yv->push(bodies[i].yv);
-    zv->push(bodies[i].zv);
-    mass->push(bodies[i].mass);
-}
-
-bodies = [];
-
 subdef advance(delta)
 {
     for(var i = 0; i < NUM_BODIES; i++)
     {
+        var body_a = bodies[i];
         for(var j = i+1; j < NUM_BODIES; j++)
         {
-            var dx = x[i] - x[j];
-            var dy = y[i] - y[j];
-            var dz = z[i] - z[j];
+            var body_b = bodies[j];
+            var dx = body_a.x - body_b.x;
+            var dy = body_a.y - body_b.y;
+            var dz = body_a.z - body_b.z;
             var distance_sq = dx*dx + dy*dy + dz*dz;
             var distance = sqrt(distance_sq);
             var power = delta / distance_sq / distance;
-            xv[i] -= power * dx * mass[j];
-            yv[i] -= power * dy * mass[j];
-            zv[i] -= power * dz * mass[j];
-            xv[j] += power * dx * mass[i];
-            yv[j] += power * dy * mass[i];
-            zv[j] += power * dz * mass[i];
+            var mass_i = body_a.mass;
+            var mass_j = body_b.mass;
+            body_a.xv -= power * dx * mass_j;
+            body_a.yv -= power * dy * mass_j;
+            body_a.zv -= power * dz * mass_j;
+            body_b.xv += power * dx * mass_i;
+            body_b.yv += power * dy * mass_i;
+            body_b.zv += power * dz * mass_i;
+            bodies[j] = body_b;
         }
+        bodies[i] = body_a;
     }
     for(var i = 0; i < NUM_BODIES; i++)
     {
-        x[i] += xv[i] * delta;
-        y[i] += yv[i] * delta;
-        z[i] += zv[i] * delta;
+        var body_a = bodies[i];
+        body_a.x += body_a.xv * delta;
+        body_a.y += body_a.yv * delta;
+        body_a.z += body_a.zv * delta;
+        bodies[i] = body_a;
     }
 }
 subdef energy()
@@ -109,22 +97,24 @@ subdef energy()
     var e = 0;
     for(var i = 0; i < NUM_BODIES; i++)
     {
-        e += ( mass[i]
-             * ( xv[i]
-               * xv[i]
-               + yv[i]
-               * yv[i]
-               + zv[i]
-               * zv[i]
+        var body_a = bodies[i];
+        e += ( body_a.mass
+             * ( body_a.xv
+               * body_a.xv
+               + body_a.yv
+               * body_a.yv
+               + body_a.zv
+               * body_a.zv
                )
              ) / 2;
         for(var j = i+1; j < NUM_BODIES; j++)
         {
-            var dx = x[i] - x[j];
-            var dy = y[i] - y[j];
-            var dz = z[i] - z[j];
+            var body_b = bodies[j];
+            var dx = body_a.x - body_b.x;
+            var dy = body_a.y - body_b.y;
+            var dz = body_a.z - body_b.z;
             var distance = sqrt(dx*dx + dy*dy + dz*dz);
-            e -= (mass[i] * mass[j])/distance;
+            e -= (body_a.mass * body_b.mass)/distance;
         }
     }
     return e;
@@ -134,13 +124,14 @@ subdef offset_momentum()
     var px = 0, py = 0, pz = 0;
     for(var i = 0; i < NUM_BODIES; i++)
     {
-        px += xv[i] * mass[i];
-        py += yv[i] * mass[i];
-        pz += zv[i] * mass[i];
+        var body_a = bodies[i];
+        px += body_a.xv * body_a.mass;
+        py += body_a.yv * body_a.mass;
+        pz += body_a.zv * body_a.mass;
     }
-    xv[0] = -px/SOLAR_MASS;
-    yv[0] = -py/SOLAR_MASS;
-    zv[0] = -pz/SOLAR_MASS;
+    bodies[0].xv = -px/SOLAR_MASS;
+    bodies[0].yv = -py/SOLAR_MASS;
+    bodies[0].zv = -pz/SOLAR_MASS;
 }
 
 offset_momentum();

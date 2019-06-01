@@ -91,6 +91,9 @@ mod tests {
     #[test]
     fn test_nbodies() -> Result<(), String>
     {
+        eprintln!("`Value` has a size of {}", std::mem::size_of::<Value>());
+        eprintln!("`StackValue` has a size of {}", std::mem::size_of::<interpreter::StackValue>());
+        
         use std::time::Instant;
         let mut parser = Parser::new_from_default()?;
 

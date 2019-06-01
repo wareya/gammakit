@@ -953,7 +953,7 @@ impl Interpreter
                     {
                         if let Some(StackValue::Val(Value::Generator(mut holder))) = self.top_frame.stack.pop()
                         {
-                            std::mem::swap(&mut holder, gen);
+                            std::mem::swap(&mut *holder, gen);
                         }
                         else
                         {
@@ -996,7 +996,7 @@ impl Interpreter
             }
             if was_generator
             {
-                self.stack_push_val(Value::Generator(GeneratorState{frame : None}));
+                self.stack_push_val(Value::Generator(Box::new(GeneratorState{frame : None})));
                 if !frame_was_expr
                 {
                     return plainerr("internal error: generators must always return into an expression");
@@ -1025,7 +1025,7 @@ impl Interpreter
         }
         if was_generator
         {
-            self.stack_push_val(Value::Generator(GeneratorState{frame : None}));
+            self.stack_push_val(Value::Generator(Box::new(GeneratorState{frame : None})));
             if !frame_was_expr
             {
                 return plainerr("internal error: generators must always return into an expression");
@@ -1045,7 +1045,7 @@ impl Interpreter
         
         let inner_frame_stack_last = self.stack_pop();
         std::mem::swap(&mut self.top_frame, &mut old_frame);
-        let new_gen_state = GeneratorState{frame : Some(old_frame)};
+        let new_gen_state = Box::new(GeneratorState{frame : Some(old_frame)});
         
         if frame_was_expr
         {
