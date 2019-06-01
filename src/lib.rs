@@ -87,4 +87,32 @@ mod tests {
         
         Ok(())
     }
+    
+    #[test]
+    fn test_nbodies() -> Result<(), String>
+    {
+        use std::time::Instant;
+        let mut parser = Parser::new_from_default()?;
+
+        let mut program = String::new();
+        File::open("nbody.txt").or_else(|_| Err("failed to open program".to_string()))?.read_to_string(&mut program).or_else(|_| Err("failed to read program into memory".to_string()))?;
+        
+        let code = parser.give_me_bytecode(&program)?;
+        
+        let mut interpreter = Interpreter::new(&code, Some(parser));
+        interpreter.insert_default_bindings();
+        
+        let start_time = Instant::now();
+        
+        while interpreter.step().is_ok(){}
+        
+        println!("simulation took {:?}", Instant::now().duration_since(start_time));
+        
+        if let Some(err) = &interpreter.last_error
+        {
+            panic!("{}", err);
+        }
+        
+        Ok(())
+    }
 }

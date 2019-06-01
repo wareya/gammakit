@@ -101,6 +101,7 @@ impl Interpreter
             args.insert(0, self.stack_pop_val().ok_or_else(|| minierr("internal error: expected values, got variable on stack in FUNCEXPR/FUNCCALL"))?);
         }
         
+        // FIXME gives bad error message when can't access variable
         let funcdata = self.stack_pop_as_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR/FUNCCALL (after args)"))?;
         
         match funcdata

@@ -10,6 +10,8 @@ pub trait VecHelpers<Value> {
     /// If the given element exists, extracts it by value, replacing what was there with Value::Number(0.0)
     /// Otherwise returns None
     fn extract(&mut self, index : usize) -> Option<Value>;
+    /// For numbers.
+    fn extract_num(&mut self, index : usize) -> Result<f64, String>;
     /// Same as extract(), but returns Err(...message that the error should be unreachable...) on out-of-range.
     fn expect_extract(&mut self, index : usize) -> Result<Value, String>;
 }
@@ -31,6 +33,11 @@ impl VecHelpers<Value> for Vec<Value> {
         {
             None
         }
+    }
+    fn extract_num(&mut self, index : usize) -> Result<f64, String>
+    {
+        let val = self.extract(index).ok_or_else(|| format!("error: wrong number of arguments; expected at least {}", index+1))?;
+        match_or_err!(val, Value::Number(num) => num, minierr("error: expected a number, got something else"))
     }
     fn expect_extract(&mut self, index : usize) -> Result<Value, String>
     {
@@ -134,6 +141,11 @@ impl Interpreter
         insert!("floor"                 , sim_func_floor                );
         insert!("ceil"                  , sim_func_ceil                 );
         
+        insert!("sqrt"                  , sim_func_sqrt                 );
+        insert!("pow"                   , sim_func_pow                  );
+        insert!("log"                   , sim_func_log                  );
+        insert!("ln"                    , sim_func_log                  );
+        
         macro_rules! insert_arrow { ( $x:expr, $y:ident ) => { self.insert_arrow_binding($x.to_string(), Rc::new(RefCell::new(Interpreter::$y))); } }
         
         insert_arrow!("len"             , sim_subfunc_len               );
@@ -143,6 +155,9 @@ impl Interpreter
         
         insert_arrow!("insert"          , sim_subfunc_insert            );
         insert_arrow!("remove"          , sim_subfunc_remove            );
+        
+        insert_arrow!("push"            , sim_subfunc_push              );
+        insert_arrow!("pop"             , sim_subfunc_pop               );
     }
     pub (crate) fn get_binding(&self, name : &str) -> Option<Rc<RefCell<Binding>>>
     {
@@ -172,24 +187,42 @@ impl Interpreter
         }
         Ok(Value::Number(0.0))
     }
-    
     pub (crate) fn sim_func_round(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
-        let val = args.extract(0).ok_or_else(|| minierr("error: wrong number of arguments to round(); expected 1, got 0"))?;
-        let num = match_or_err!(val, Value::Number(num) => num, minierr("error: round() must be called with a number as its argument"))?;
+        let num = args.extract_num(0)?;
         Ok(Value::Number(num.round()))
     }
     pub (crate) fn sim_func_ceil(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
-        let val = args.extract(0).ok_or_else(|| minierr("error: wrong number of arguments to ceil(); expected 1, got 0"))?;
-        let num = match_or_err!(val, Value::Number(num) => num, minierr("error: ceil() must be called with a number as its argument"))?;
+        let num = args.extract_num(0)?;
         Ok(Value::Number(num.ceil()))
     }
     pub (crate) fn sim_func_floor(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
-        let val = args.extract(0).ok_or_else(|| minierr("error: wrong number of arguments to floor(); expected 1, got 0"))?;
-        let num = match_or_err!(val, Value::Number(num) => num, minierr("error: floor() must be called with a number as its argument"))?;
+        let num = args.extract_num(0)?;
         Ok(Value::Number(num.floor()))
+    }
+    pub (crate) fn sim_func_sqrt(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        let num = args.extract_num(0)?;
+        Ok(Value::Number(num.sqrt()))
+    }
+    pub (crate) fn sim_func_pow(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        let num1 = args.extract_num(0)?;
+        let num2 = args.extract_num(1)?;
+        Ok(Value::Number(num1.powf(num2)))
+    }
+    pub (crate) fn sim_func_log(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        let num1 = args.extract_num(0)?;
+        let num2 = args.extract_num(1)?;
+        Ok(Value::Number(num1.log(num2)))
+    }
+    pub (crate) fn sim_func_ln(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        let num = args.extract_num(0)?;
+        Ok(Value::Number(num.ln()))
     }
     pub (crate) fn sim_func_instance_create(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
@@ -478,7 +511,33 @@ impl Interpreter
                 set.insert(val_to_hashval(key)?);
                 Ok(ArrowRet::Mut{var: Value::Set(set), ret: Value::Number(0.0)})
             }
-            _ => plainerr("error: insert() must be called with an array, dictionary, or set as the first argument")
+            _ => plainerr("error: insert() must be called with an array, dictionary, set, or string as the first argument")
+        }
+    }
+    pub (crate) fn sim_subfunc_push(myself : Value, mut args : Vec<Value>) -> Result<ArrowRet, String>
+    {
+        if args.len() != 1
+        {
+            return Err(format!("error: wrong number of arguments to push(); expected 1, got {}", args.len()));
+        }
+        let value = args.expect_extract(0)?;
+        match myself
+        {
+            Value::Text(string) =>
+            {
+                if let Value::Text(value) = value
+                {
+                    let newstr = Value::Text(format!("{}{}", string, value));
+                    return Ok(ArrowRet::Mut{var: newstr, ret: Value::Number(0.0)});
+                }
+                plainerr("error: tried to concatenate a non-string to a string with push()")
+            }
+            Value::Array(mut array) =>
+            {
+                array.push(value);
+                Ok(ArrowRet::Mut{var: Value::Array(array), ret: Value::Number(0.0)})
+            }
+            _ => plainerr("error: push() must be called with an array or string as the first argument")
         }
     }
     pub (crate) fn sim_subfunc_remove(myself : Value, mut args : Vec<Value>) -> Result<ArrowRet, String>
@@ -539,6 +598,22 @@ impl Interpreter
                 }
             }
             _ => plainerr("error: remove() must be called with an array, dictionary, or set as its argument")
+        }
+    }
+    pub (crate) fn sim_subfunc_pop(myself : Value, args : Vec<Value>) -> Result<ArrowRet, String>
+    {
+        if args.len() != 0
+        {
+            return Err(format!("error: wrong number of arguments to pop(); expected 0, got {}", args.len()));
+        }
+        match myself
+        {
+            Value::Array(mut array) =>
+            {
+                let ret = array.pop().ok_or_else(|| minierr("error: tried to call pop() on an empty array"))?;
+                Ok(ArrowRet::Mut{var: Value::Array(array), ret})
+            }
+            _ => plainerr("error: pop() must be called with an array as the first argument")
         }
     }
 }
