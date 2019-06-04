@@ -57,39 +57,33 @@ bodies->push({
 
 var NUM_BODIES = bodies->len();
 
-subdef advance(delta)
+subdef advance()
 {
     for(var i = 0; i < NUM_BODIES; i++)
     {
-        var body_a = bodies[i];
         for(var j = i+1; j < NUM_BODIES; j++)
         {
-            var body_b = bodies[j];
-            var dx = body_a.x - body_b.x;
-            var dy = body_a.y - body_b.y;
-            var dz = body_a.z - body_b.z;
+            var dx = bodies[i].x - bodies[j].x;
+            var dy = bodies[i].y - bodies[j].y;
+            var dz = bodies[i].z - bodies[j].z;
             var distance_sq = dx*dx + dy*dy + dz*dz;
             var distance = sqrt(distance_sq);
-            var power = delta / distance_sq / distance;
-            var mass_i = body_a.mass;
-            var mass_j = body_b.mass;
-            body_a.xv -= power * dx * mass_j;
-            body_a.yv -= power * dy * mass_j;
-            body_a.zv -= power * dz * mass_j;
-            body_b.xv += power * dx * mass_i;
-            body_b.yv += power * dy * mass_i;
-            body_b.zv += power * dz * mass_i;
-            bodies[j] = body_b;
+            var power = 0.01 / distance_sq / distance;
+            var mass_i = bodies[i].mass;
+            var mass_j = bodies[j].mass;
+            bodies[i].xv -= power * dx * mass_j;
+            bodies[i].yv -= power * dy * mass_j;
+            bodies[i].zv -= power * dz * mass_j;
+            bodies[j].xv += power * dx * mass_i;
+            bodies[j].yv += power * dy * mass_i;
+            bodies[j].zv += power * dz * mass_i;
         }
-        bodies[i] = body_a;
     }
     for(var i = 0; i < NUM_BODIES; i++)
     {
-        var body_a = bodies[i];
-        body_a.x += body_a.xv * delta;
-        body_a.y += body_a.yv * delta;
-        body_a.z += body_a.zv * delta;
-        bodies[i] = body_a;
+        bodies[i].x += bodies[i].xv * 0.01;
+        bodies[i].y += bodies[i].yv * 0.01;
+        bodies[i].z += bodies[i].zv * 0.01;
     }
 }
 subdef energy()
@@ -134,5 +128,5 @@ subdef offset_momentum()
 offset_momentum();
 print(energy());
 for(var i = 0; i < 5000; i++)
-    advance(0.01);
+    advance();
 print(energy());

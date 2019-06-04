@@ -91,15 +91,11 @@ mod tests {
     #[test]
     fn test_nbodies() -> Result<(), String>
     {
-        eprintln!("`Value` has a size of {}", std::mem::size_of::<Value>());
-        eprintln!("`StackValue` has a size of {}", std::mem::size_of::<interpreter::StackValue>());
-        eprintln!("`HashableValue` has a size of {}", std::mem::size_of::<HashableValue>());
-        
         use std::time::Instant;
         let mut parser = Parser::new_from_default()?;
 
         let mut program = String::new();
-        File::open("nbody.txt").or_else(|_| Err("failed to open program".to_string()))?.read_to_string(&mut program).or_else(|_| Err("failed to read program into memory".to_string()))?;
+        File::open("nbody3.txt").or_else(|_| Err("failed to open program".to_string()))?.read_to_string(&mut program).or_else(|_| Err("failed to read program into memory".to_string()))?;
         
         let code = parser.give_me_bytecode(&program)?;
         

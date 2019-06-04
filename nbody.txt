@@ -110,12 +110,9 @@ subdef energy()
     for(var i = 0; i < NUM_BODIES; i++)
     {
         e += ( mass[i]
-             * ( xv[i]
-               * xv[i]
-               + yv[i]
-               * yv[i]
-               + zv[i]
-               * zv[i]
+             * ( xv[i] * xv[i]
+               + yv[i] * yv[i]
+               + zv[i] * zv[i]
                )
              ) / 2;
         for(var j = i+1; j < NUM_BODIES; j++)
