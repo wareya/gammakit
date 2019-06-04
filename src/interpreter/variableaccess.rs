@@ -22,7 +22,7 @@ fn plainerr(mystr : &'static str) -> Result<Option<Value>, String>
     Err(mystr.to_string())
 }
 
-fn assign_or_return(value : Option<Value>, var : &mut Value) -> Result<Option<Value>, String>
+fn assign_or_return_val(value : Option<Value>, var : &mut Value) -> Result<Option<Value>, String>
 {
     match value
     {
@@ -34,6 +34,22 @@ fn assign_or_return(value : Option<Value>, var : &mut Value) -> Result<Option<Va
             Ok(None)
         }
         _ => Ok(Some(var.clone()))
+    }
+}
+
+fn assign_or_return_valref(value : Option<Value>, var : ValRef) -> Result<Option<Value>, String>
+{
+    match value
+    {
+        Some(Value::Special(_)) => plainerr("error: tried to assign a special value to a variable"),
+        Some(Value::SubFunc(_)) => plainerr("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)"),
+        Some(value) =>
+        {
+            let mut var = var.borrow_mut();
+            *var = value;
+            Ok(None)
+        }
+        _ => Ok(Some(val_from_valref(var)))
     }
 }
 
@@ -103,7 +119,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
     }
     else
     {
-        assign_or_return(value, var)
+        assign_or_return_val(value, var)
     }
 }
 
@@ -134,19 +150,21 @@ fn access_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, di
 {
     for scope in frame.scopes.iter_mut().rev()
     {
-        if let Some(var) = scope.get_mut(&dirvar.name)
+        if let Some(var) = scope.get(&dirvar.name)
         {
-            return assign_or_return_indexed(value, var, indexes);
+            let mut var = var.borrow_mut();
+            return assign_or_return_indexed(value, &mut var, indexes);
         }
     }
     // FIXME: do I even want to search up instance stacks rather than just accessing the main one?
     for id in frame.instancestack.iter_mut().rev()
     {
-        if let Some(inst) = global.instances.get_mut(id)
+        if let Some(inst) = global.instances.get(id)
         {
-            if let Some(var) = inst.variables.get_mut(&dirvar.name)
+            if let Some(var) = inst.variables.get(&dirvar.name)
             {
-                return assign_or_return_indexed(value, var, indexes);
+                let mut var = var.borrow_mut();
+                return assign_or_return_indexed(value, &mut var, indexes);
             }
             // no need to check for instance function names because they can't be indexed - it will either skip them and look for something else, or fail with a generic error
             // FIXME is this good behavior?
@@ -187,19 +205,19 @@ fn access_frame_dirvar(global : &mut GlobalState, frame : &mut Frame, dirvar : &
 {
     for scope in frame.scopes.iter_mut().rev()
     {
-        if let Some(var) = scope.get_mut(&dirvar.name)
+        if let Some(var) = scope.get(&dirvar.name)
         {
-            return assign_or_return(value, var);
+            return assign_or_return_valref(value, Rc::clone(var));
         }
     }
     // FIXME: do I even want to search up instance stacks rather than just accessing the main one?
     for id in frame.instancestack.iter_mut().rev()
     {
-        if let Some(inst) = global.instances.get_mut(id)
+        if let Some(inst) = global.instances.get(id)
         {
-            if let Some(var) = inst.variables.get_mut(&dirvar.name)
+            if let Some(var) = inst.variables.get(&dirvar.name)
             {
-                return assign_or_return(value, var);
+                return assign_or_return_valref(value, Rc::clone(var));
             }
             else if let Some(objspec) = global.objects.get(&inst.objtype)
             {
@@ -234,12 +252,14 @@ impl Interpreter
                     {
                         let instance = self.global.instances.get_mut(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, ident))?;
                         let var = instance.variables.get_mut(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, ident))?;
-                        assign_or_return_indexed(value, var, &arrayvar.indexes)
+                        let mut var = var.borrow_mut();
+                        assign_or_return_indexed(value, &mut var, &arrayvar.indexes)
                     }
                     IndirectSource::Global =>
                     {
                         let var = self.global.variables.get_mut(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", indirvar.name))?;
-                        assign_or_return_indexed(value, var, &arrayvar.indexes)
+                        let mut var = var.borrow_mut();
+                        assign_or_return_indexed(value, &mut var, &arrayvar.indexes)
                     }
                 }
             }
@@ -306,11 +326,11 @@ impl Interpreter
         {
             IndirectSource::Ident(ident) =>
             {
-                let instance = self.global.instances.get_mut(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, ident))?;
+                let instance = self.global.instances.get(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, ident))?;
                 
-                if let Some(var) = instance.variables.get_mut(&indirvar.name)
+                if let Some(var) = instance.variables.get(&indirvar.name)
                 {
-                    assign_or_return(value, var)
+                    assign_or_return_valref(value, Rc::clone(var))
                 }
                 else
                 {
@@ -329,8 +349,8 @@ impl Interpreter
             }
             IndirectSource::Global =>
             {
-                let var = self.global.variables.get_mut(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", indirvar.name))?;
-                assign_or_return(value, var)
+                let var = self.global.variables.get(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", indirvar.name))?;
+                assign_or_return_valref(value, Rc::clone(var))
             }
         }
     }

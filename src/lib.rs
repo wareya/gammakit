@@ -93,6 +93,7 @@ mod tests {
     {
         eprintln!("`Value` has a size of {}", std::mem::size_of::<Value>());
         eprintln!("`StackValue` has a size of {}", std::mem::size_of::<interpreter::StackValue>());
+        eprintln!("`HashableValue` has a size of {}", std::mem::size_of::<HashableValue>());
         
         use std::time::Instant;
         let mut parser = Parser::new_from_default()?;

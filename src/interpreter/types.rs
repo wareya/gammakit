@@ -63,7 +63,7 @@ pub (crate) struct Frame {
     pub (super) startpc: usize,
     pub (super) pc: usize,
     pub (super) endpc: usize,
-    pub (super) scopes: Vec<HashMap<String, Value>>,
+    pub (super) scopes: Vec<HashMap<String, ValRef>>,
     pub (super) scopestarts: Vec<usize>,
     pub (super) instancestack: Vec<usize>,
     pub (super) controlstack: Vec<Controller>,
@@ -97,7 +97,7 @@ pub (crate) struct ObjSpec {
 pub (crate) struct Instance {
     pub (super) objtype: usize,
     pub (super) ident: usize,
-    pub (super) variables: HashMap<String, Value>
+    pub (super) variables: HashMap<String, ValRef>
 }
 
 // variable types (i.e. how to access a variable as an lvalue)
@@ -158,7 +158,7 @@ pub (crate) enum Variable {
 pub struct FuncVal {
     pub (super) internal: bool,
     pub (super) name: Option<String>,
-    pub (super) predefined: Option<HashMap<String, Value>>,
+    pub (super) predefined: Option<HashMap<String, ValRef>>,
     pub (super) userdefdata: Option<FuncSpec>
 }
 
@@ -206,6 +206,23 @@ pub enum Value {
     SubFunc(Box<SubFuncVal>),
 }
 
+pub (crate) type ValRef = Rc<RefCell<Value>>;
+
+pub (crate) fn valref_from_val(val : Value) -> ValRef
+{
+    Rc::new(RefCell::new(val))
+}
+/*
+pub (crate) fn valref_assign_inner(valref : ValRef, val : Value)
+{
+    let valref = valref.borrow_mut();
+    *valref = val;
+}*/
+pub (crate) fn val_from_valref(valref : ValRef) -> Value
+{
+    (*valref).clone().into_inner()
+}
+
 #[derive(Debug, Clone)]
 pub (crate) enum StackValue {
     Val(Value),
@@ -225,12 +242,12 @@ impl Frame {
     pub (super) fn new_root(code : Rc<Vec<u8>>) -> Frame
     {
         let codelen = code.len();
-        Frame { code, startpc : 0, pc : 0, endpc : codelen, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0, impassable: true, generator: false }
+        Frame { code, startpc : 0, pc : 0, endpc : codelen, scopes : vec!(HashMap::new()), scopestarts : Vec::new(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0, impassable: true, generator: false }
     }
     pub (super) fn new_from_call(code : Rc<Vec<u8>>, startpc : usize, endpc : usize, isexpr : bool, outer : Option<&Frame>, generator : bool) -> Frame
     {
         let instancestack = if let Some(outer) = outer { outer.instancestack.clone() } else { Vec::new() };
-        Frame { code, startpc, pc : startpc, endpc, scopes : vec!(HashMap::<String, Value>::new()), scopestarts : Vec::new(), instancestack, controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, impassable : outer.is_none(), generator }
+        Frame { code, startpc, pc : startpc, endpc, scopes : vec!(HashMap::new()), scopestarts : Vec::new(), instancestack, controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, impassable : outer.is_none(), generator }
     }
     pub (super) fn len(&mut self) -> usize
     {
@@ -264,7 +281,7 @@ impl Frame {
 
 impl Value
 {
-    pub (crate) fn new_funcval(internal : bool, name : Option<String>, predefined : Option<HashMap<String, Value>>, userdefdata : Option<FuncSpec>) -> Value
+    pub (crate) fn new_funcval(internal : bool, name : Option<String>, predefined : Option<HashMap<String, ValRef>>, userdefdata : Option<FuncSpec>) -> Value
     {
         Value::Func(Box::new(FuncVal{internal, name, predefined, userdefdata}))
     }

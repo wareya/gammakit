@@ -116,7 +116,7 @@ impl Interpreter
         Ok((name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : !subroutine, generator }))
     }
     
-    pub (crate) fn read_lambda(&mut self) -> Result<(HashMap<String, Value>, FuncSpec), String>
+    pub (crate) fn read_lambda(&mut self) -> Result<(HashMap<String, ValRef>, FuncSpec), String>
     {
         let code = self.get_code();
         
@@ -127,7 +127,7 @@ impl Interpreter
             return Err(format!("internal error: not enough values on stack to satisfy requirements of read_lambda (need {}, have {})", capturecount*2, self.top_frame.stack.len()));
         }
         
-        let mut captures = HashMap::<String, Value>::new();
+        let mut captures = HashMap::<String, ValRef>::new();
         for _i in 0..capturecount
         {
             let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: read_lambda failed to collect capture value from stack"))?;
@@ -137,7 +137,7 @@ impl Interpreter
             {
                 return Err(format!("error: duplicate capture variable name `{}` in lambda capture expression", name));
             }
-            captures.insert(name, val);
+            captures.insert(name, valref_from_val(val));
         }
         
         let argcount = self.read_u16()?;
