@@ -206,8 +206,6 @@ pub enum Value {
     SubFunc(Box<SubFuncVal>),
 }
 
-type VarRef = Rc<RefCell<Value>>;
-
 #[derive(Debug, Clone)]
 pub (crate) enum StackValue {
     Val(Value),

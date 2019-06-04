@@ -144,7 +144,7 @@ impl Interpreter
         insert!("sqrt"                  , sim_func_sqrt                 );
         insert!("pow"                   , sim_func_pow                  );
         insert!("log"                   , sim_func_log                  );
-        insert!("ln"                    , sim_func_log                  );
+        insert!("ln"                    , sim_func_ln                   );
         
         macro_rules! insert_arrow { ( $x:expr, $y:ident ) => { self.insert_arrow_binding($x.to_string(), Rc::new(RefCell::new(Interpreter::$y))); } }
         
@@ -602,7 +602,7 @@ impl Interpreter
     }
     pub (crate) fn sim_subfunc_pop(myself : Value, args : Vec<Value>) -> Result<ArrowRet, String>
     {
-        if args.len() != 0
+        if !args.is_empty()
         {
             return Err(format!("error: wrong number of arguments to pop(); expected 0, got {}", args.len()));
         }

@@ -1,10 +1,5 @@
 #![allow(clippy::cast_lossless)]
 
-fn get(vec : &[u8], n : usize) -> Result<u8, String>
-{
-    vec.get(n).cloned().ok_or_else(|| "tried to unpack past range of buffer".to_string())
-}
-
 pub (crate) fn pack_u16(num : u16) -> Vec<u8>
 {
     num.to_le_bytes().to_vec()

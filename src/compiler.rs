@@ -22,7 +22,6 @@ enum Context {
     Unknown,
     Statement,
     Expr,
-    Var,
     Objdef,
 }
 
@@ -257,7 +256,6 @@ impl CompilerState {
         {
             Context::Expr => self.code.push(FUNCEXPR),
             Context::Statement => self.code.push(FUNCCALL),
-            Context::Var => return plainerr("error: tried to assign to the result of a function call"),
             _ => return plainerr("internal error: function call encountered in unexpected context")
         }
         
