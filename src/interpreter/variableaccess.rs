@@ -37,7 +37,7 @@ fn assign_or_return(value : Option<Value>, var : &mut Value) -> Result<Option<Va
     }
 }
 
-fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &[Value]) -> Result<Option<Value>, String>
+fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &[HashableValue]) -> Result<Option<Value>, String>
 {
     if let (Some(index), Some(new_indexes)) = (indexes.get(0), indexes.get(1..))
     {
@@ -45,7 +45,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
         {
             Value::Array(ref mut var) =>
             {
-                let indexnum = match_or_err!(index, Value::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an array index"))?;
+                let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an array index"))?;
                 
                 let cloned = var.clone();
                 let mut newvar = var.get_mut(indexnum.round() as usize).ok_or_else(|| format!("error: tried to access non-extant index {} of an array ({:?})", indexnum, cloned))?;
@@ -53,20 +53,8 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
             }
             Value::Dict(ref mut var) =>
             {
-                if let Value::Number(indexnum) = index
-                {
-                    let mut newvar = var.get_mut(&HashableValue::Number(*indexnum)).ok_or_else(|| format!("error: tried to access non-extant index {} of a dict", indexnum))?;
-                    assign_or_return_indexed(value, &mut newvar, new_indexes)
-                }
-                else if let Value::Text(indexstr) = index
-                {
-                    let mut newvar = var.get_mut(&HashableValue::Text(indexstr.clone())).ok_or_else(|| format!("error: tried to access non-extant index {} of a dict", indexstr))?;
-                    assign_or_return_indexed(value, &mut newvar, new_indexes)
-                }
-                else
-                {
-                    plainerr("error: tried to use a non-number, non-string as a dict index")
-                }
+                let mut newvar = var.get_mut(index).ok_or_else(|| format!("error: tried to access non-extant index {:?} of a dict", index))?;
+                assign_or_return_indexed(value, &mut newvar, new_indexes)
             }
             Value::Text(ref mut text) =>
             {
@@ -75,7 +63,7 @@ fn assign_or_return_indexed(value : Option<Value>, var : &mut Value, indexes : &
                     return plainerr("error: tried to index into the value at another index in a string (i.e. tried to do something like \"asdf\"[0][0])");
                 }
                 
-                let indexnum = match_or_err!(index, Value::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an index into a string"))?;
+                let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an index into a string"))?;
                 
                 let realindex = ((indexnum.round() as i64) % text.len() as i64) as usize;
                 
@@ -142,7 +130,7 @@ fn check_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, dir
     }
     false
 }
-fn access_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, value : Option<Value>, indexes : &[Value]) -> Result<Option<Value>, String>
+fn access_frame_dirvar_indexed(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, value : Option<Value>, indexes : &[HashableValue]) -> Result<Option<Value>, String>
 {
     for scope in frame.scopes.iter_mut().rev()
     {

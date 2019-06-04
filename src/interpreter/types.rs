@@ -115,7 +115,7 @@ pub (super) enum NonArrayVariable {
 #[derive(Debug, Clone)]
 pub (crate) struct ArrayVar { // for x[y]
     pub (super) location: NonArrayVariable,
-    pub (super) indexes: Vec<Value>
+    pub (super) indexes: Vec<HashableValue>
 }
 
 #[derive(Debug, Clone)]

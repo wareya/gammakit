@@ -183,7 +183,7 @@ impl Interpreter
             StackValue::Val(Value::Special(Special::Global)) =>
                 self.stack_push_var(IndirectVar::from_global(name)),
             StackValue::Val(Value::Dict(dict)) =>
-                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualDict(dict), indexes : vec!(Value::Text(name)) } )),
+                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualDict(dict), indexes : vec!(HashableValue::Text(name)) } )),
             
             StackValue::Var(var) =>
             {
@@ -206,13 +206,13 @@ impl Interpreter
                         {
                             Variable::Array(mut arrayvar) =>
                             {
-                                arrayvar.indexes.push(Value::Text(name));
+                                arrayvar.indexes.push(HashableValue::Text(name));
                                 self.stack_push_var(Variable::Array(arrayvar));
                             }
                             Variable::Direct(dirvar) =>
-                                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(Value::Text(name)) } )),
+                                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(HashableValue::Text(name)) } )),
                             Variable::Indirect(indirvar) =>
-                                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(Value::Text(name)) } )),
+                                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(HashableValue::Text(name)) } )),
                         }
                     }
                 }
@@ -833,6 +833,7 @@ impl Interpreter
             return Err(format!("internal error: ARRAYEXPR instruction requires 2 values on the stack but found {}", self.stack_len()));
         }
         let index = self.stack_pop_val().ok_or_else(|| minierr("internal error: TODO write error askdgfauiowef"))?;
+        let index = val_to_hashval(index)?;
         let array = self.stack_pop().ok_or_else(|| minierr("internal error: TODO write error cvbhsrtgaerffd"))?;
         match array
         {
