@@ -50,6 +50,7 @@ impl CompilerState {
     fn insert_default_hooks(&mut self)
     {
         self.add_hook(&"program", &CompilerState::compile_program);
+        self.add_hook(&"blankstatement", &CompilerState::compile_nop);
         self.add_hook(&"statement", &CompilerState::compile_children);
         self.add_hook(&"funccall", &CompilerState::compile_funccall);
         self.add_hook(&"name", &CompilerState::compile_name);
@@ -159,6 +160,10 @@ impl CompilerState {
         let hook = Rc::clone(self.hooks.get(&ast.text).ok_or_else(|| minierr(&format!("internal error: no handler for AST node with name `{}`", ast.text)))?);
         let hook = hook.try_borrow().or_else(|_| Err(format!("internal error: hook for AST node type `{}` is already in use", ast.text)))?;
         hook(self, ast)
+    }
+    fn compile_nop(&mut self, _ast : &ASTNode) -> Result<(), String>
+    {
+        Ok(())
     }
     fn compile_program(&mut self, ast : &ASTNode) -> Result<(), String>
     {

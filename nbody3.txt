@@ -2,62 +2,82 @@ var PI = 3.141592653589793;
 var SOLAR_MASS = PI*PI*4;
 var DAYS_PER_YEAR = 365.24;
 
+obj Body {
+    def create()
+    {
+        far x, y, z, xv, yv, zv, mass;
+    }
+}
+
+def make_body(x, y, z, xv, yv, zv, mass)
+{
+    var body = instance_create(Body);
+    body.x = x;
+    body.y = y;
+    body.z = z;
+    body.xv = xv;
+    body.yv = yv;
+    body.zv = zv;
+    body.mass = mass;
+    return body;
+}
+
 var bodies = [];
 
 // sun
-bodies->push({
-    "x":  0,
-    "y":  0,
-    "z":  0,
-    "xv": 0,
-    "yv": 0,
-    "zv": 0,
-    "mass": SOLAR_MASS
-});
+bodies->push(make_body(
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    SOLAR_MASS
+));
 // jupiter
-bodies->push({
-    "x":  4.84143144246472090e+00,
-    "y": -1.16032004402742839e+00,
-    "z": -1.03622044471123109e-01,
-    "xv": 1.66007664274403694e-03 * DAYS_PER_YEAR,
-    "yv": 7.69901118419740425e-03 * DAYS_PER_YEAR,
-    "zv":-6.90460016972063023e-05 * DAYS_PER_YEAR,
-    "mass": 9.54791938424326609e-04 * SOLAR_MASS
-});
+bodies->push(make_body(
+     4.84143144246472090e+00,
+    -1.16032004402742839e+00,
+    -1.03622044471123109e-01,
+     1.66007664274403694e-03 * DAYS_PER_YEAR,
+     7.69901118419740425e-03 * DAYS_PER_YEAR,
+    -6.90460016972063023e-05 * DAYS_PER_YEAR,
+     9.54791938424326609e-04 * SOLAR_MASS
+));
 // saturn
-bodies->push({
-    "x":  8.34336671824457987e+00,
-    "y":  4.12479856412430479e+00,
-    "z": -4.03523417114321381e-01,
-    "xv":-2.76742510726862411e-03 * DAYS_PER_YEAR,
-    "yv": 4.99852801234917238e-03 * DAYS_PER_YEAR,
-    "zv": 2.30417297573763929e-05 * DAYS_PER_YEAR,
-    "mass": 2.85885980666130812e-04 * SOLAR_MASS
-});
+bodies->push(make_body(
+     8.34336671824457987e+00,
+     4.12479856412430479e+00,
+    -4.03523417114321381e-01,
+    -2.76742510726862411e-03 * DAYS_PER_YEAR,
+     4.99852801234917238e-03 * DAYS_PER_YEAR,
+     2.30417297573763929e-05 * DAYS_PER_YEAR,
+     2.85885980666130812e-04 * SOLAR_MASS
+));
 // uranus
-bodies->push({
-    "x":  1.28943695621391310e+01,
-    "y": -1.51111514016986312e+01,
-    "z": -2.23307578892655734e-01,
-    "xv": 2.96460137564761618e-03 * DAYS_PER_YEAR,
-    "yv": 2.37847173959480950e-03 * DAYS_PER_YEAR,
-    "zv":-2.96589568540237556e-05 * DAYS_PER_YEAR,
-    "mass": 4.36624404335156298e-05 * SOLAR_MASS
-});
+bodies->push(make_body(
+     1.28943695621391310e+01,
+    -1.51111514016986312e+01,
+    -2.23307578892655734e-01,
+     2.96460137564761618e-03 * DAYS_PER_YEAR,
+     2.37847173959480950e-03 * DAYS_PER_YEAR,
+    -2.96589568540237556e-05 * DAYS_PER_YEAR,
+     4.36624404335156298e-05 * SOLAR_MASS
+));
 // neptune
-bodies->push({
-    "x":  1.53796971148509165e+01,
-    "y": -2.59193146099879641e+01,
-    "z":  1.79258772950371181e-01,
-    "xv": 2.68067772490389322e-03 * DAYS_PER_YEAR,
-    "yv": 1.62824170038242295e-03 * DAYS_PER_YEAR,
-    "zv":-9.51592254519715870e-05 * DAYS_PER_YEAR,
-    "mass": 5.15138902046611451e-05 * SOLAR_MASS
-});
+bodies->push(make_body(
+     1.53796971148509165e+01,
+    -2.59193146099879641e+01,
+     1.79258772950371181e-01,
+     2.68067772490389322e-03 * DAYS_PER_YEAR,
+     1.62824170038242295e-03 * DAYS_PER_YEAR,
+    -9.51592254519715870e-05 * DAYS_PER_YEAR,
+     5.15138902046611451e-05 * SOLAR_MASS
+));
 
 var NUM_BODIES = bodies->len();
 
-subdef advance()
+subdef advance(delta)
 {
     for(var i = 0; i < NUM_BODIES; i++)
     {
@@ -68,7 +88,7 @@ subdef advance()
             var dz = bodies[i].z - bodies[j].z;
             var distance_sq = dx*dx + dy*dy + dz*dz;
             var distance = sqrt(distance_sq);
-            var power = 0.01 / distance_sq / distance;
+            var power = delta / distance_sq / distance;
             var mass_i = bodies[i].mass;
             var mass_j = bodies[j].mass;
             bodies[i].xv -= power * dx * mass_j;
@@ -81,9 +101,9 @@ subdef advance()
     }
     for(var i = 0; i < NUM_BODIES; i++)
     {
-        bodies[i].x += bodies[i].xv * 0.01;
-        bodies[i].y += bodies[i].yv * 0.01;
-        bodies[i].z += bodies[i].zv * 0.01;
+        bodies[i].x += bodies[i].xv * delta;
+        bodies[i].y += bodies[i].yv * delta;
+        bodies[i].z += bodies[i].zv * delta;
     }
 }
 subdef energy()
@@ -128,5 +148,5 @@ subdef offset_momentum()
 offset_momentum();
 print(energy());
 for(var i = 0; i < 5000; i++)
-    advance();
+    advance(0.01);
 print(energy());
