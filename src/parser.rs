@@ -328,7 +328,7 @@ impl Parser {
     }
 
     // attempts to parse a token list as a particular form of a grammar point
-    fn parse_form(&self, tokens : &Vec<LexToken>, index : usize, form : &GrammarForm, formname : Option<&str>) -> Result<ParseVecInfo, String>
+    fn parse_form(&self, tokens : &[LexToken], index : usize, form : &GrammarForm, formname : Option<&str>) -> Result<ParseVecInfo, String>
     {
         if tokens.len() == 0
         {
@@ -494,7 +494,7 @@ impl Parser {
     }
 
     // attempts to parse a token list as each form of a grammar point in order and uses the first valid one
-    fn parse(&self, tokens : &Vec<LexToken>, index : usize, nodetype : &GrammarPoint) -> Result<ParseInfo, String>
+    fn parse(&self, tokens : &[LexToken], index : usize, nodetype : &GrammarPoint) -> Result<ParseInfo, String>
     {
         if tokens.len() == 0
         {
@@ -640,7 +640,7 @@ impl Parser {
     /// - Arithmetic expressions have their associativity direction corrected (to be left-recursive; in the grammar, they're right-recursive, with LEFTBINEXPR tags)
     /// - Value expressions with a single child are simplified to just their child
     /// - Statements have their trailing semicolon stripped
-    pub fn parse_program(&self, tokens : &Vec<LexToken>, lines : &[String], silent: bool) -> Result<Option<ASTNode>, String>
+    pub fn parse_program(&self, tokens : &[LexToken], lines : &[String], silent: bool) -> Result<Option<ASTNode>, String>
     {
         let start_time = Instant::now();
         
