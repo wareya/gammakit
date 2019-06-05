@@ -415,7 +415,7 @@ impl Interpreter
         
         let list : ForEachValues = match val
         {
-            Value::Array(ref mut list) => ForEachValues::List(list.drain(..).collect()),
+            Value::Array(ref mut list) => ForEachValues::List(list.drain(..).rev().collect()),
             Value::Dict(ref mut dict)  => ForEachValues::List(dict.drain().map(|(k, v)| Value::Array(vec!(hashval_to_val(k), v))).collect()),
             Value::Set(ref mut set)    => ForEachValues::List(set.drain().map(hashval_to_val).collect()),
             Value::Generator(_) => ForEachValues::Gen(GeneratorState{frame : None}),
@@ -469,7 +469,7 @@ impl Interpreter
                     scopes : self.top_frame.scopes.len() as u16,
                     loop_start : current_pc,
                     loop_end : current_pc + codelen,
-                    instances : instance_id_list.get(1..).ok_or_else(|| minierr("internal error: inaccessible error in sim_WITH"))?.iter().map(|id| Value::Number(*id as f64)).collect()
+                    instances : instance_id_list.get(1..).ok_or_else(|| minierr("internal error: inaccessible error in sim_WITH"))?.iter().rev().map(|id| Value::Number(*id as f64)).collect()
                 }));
             }
             else
@@ -492,7 +492,7 @@ impl Interpreter
                 scopes : self.top_frame.scopes.len() as u16,
                 loop_start : current_pc,
                 loop_end : current_pc + codelen,
-                instances : VecDeque::new()
+                instances : Vec::new()
             }));
         }
         Ok(())
@@ -892,7 +892,7 @@ impl Interpreter
         
         if let Some(Controller::With(ref mut data)) = self.top_frame.controlstack.last_mut()
         {
-            if let Some(next_instance) = data.instances.remove(0)
+            if let Some(next_instance) = data.instances.pop()
             {
                 if let Value::Number(next_instance) = next_instance
                 {
@@ -949,7 +949,7 @@ impl Interpreter
             let name = data.name.clone();
             if let Some(value) = match data.values
                 {
-                    ForEachValues::List(ref mut values) => values.remove(0),
+                    ForEachValues::List(ref mut values) => values.pop(),
                     ForEachValues::Gen(ref mut gen) =>
                     {
                         if let Some(StackValue::Val(Value::Generator(mut holder))) = self.top_frame.stack.pop()

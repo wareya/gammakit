@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 pub (crate) fn slice_any<T>(collection : &[T], start : i64, end : i64) -> Option<&[T]>
 {
     let u_start = if start < 0 {collection.len() - (-start as usize)} else {start as usize};
@@ -26,14 +24,14 @@ pub (crate) fn slice_to_end(text : &str, start : i64) -> String
 pub (crate) fn unescape(text: &str) -> String
 {
     let mut ret = String::with_capacity(text.len());
-    let mut chars : VecDeque<char> = text.chars().collect();
-    while let Some(c) = chars.pop_front()
+    let mut chars : Vec<_> = text.chars().rev().collect();
+    while let Some(c) = chars.pop()
     {
         if c != '\\'
         {
             ret.push(c);
         }
-        else if let Some(c2) = chars.pop_front()
+        else if let Some(c2) = chars.pop()
         {
             match c2
             {
@@ -52,8 +50,8 @@ pub (crate) fn unescape(text: &str) -> String
 pub (crate) fn escape(text: &str) -> String
 {
     let mut ret = String::with_capacity(text.len());
-    let mut chars : VecDeque<char> = text.chars().collect();
-    while let Some(c) = chars.pop_front()
+    let mut chars : Vec<_> = text.chars().rev().collect();
+    while let Some(c) = chars.pop()
     {
         match c
         {

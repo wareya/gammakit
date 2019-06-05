@@ -1,6 +1,6 @@
 #![allow(clippy::len_zero)]
 
-use std::collections::{HashMap, HashSet, BTreeSet, VecDeque};
+use std::collections::{HashMap, HashSet, BTreeSet};
 use std::time::Instant;
 
 use crate::{ast::*, grammar::*, strings::*};
@@ -141,13 +141,12 @@ impl Parser {
     {
         let start_time = Instant::now();
         
-        let mut lines : VecDeque<String> = text.lines().map(|x| x.to_string()).collect();
-        // guarantee the last line is ""
-        lines.push_back("".to_string());
+        let mut lines : Vec<_> = vec!("".to_string());
+        lines.extend(text.lines().rev().map(|x| x.to_string()));
     
         while lines.len() > 0
         {
-            macro_rules! pop { () => { lines.pop_front().ok_or_else(|| "tried to access past end of program text".to_string()) }; }
+            macro_rules! pop { () => { lines.pop().ok_or_else(|| "tried to access past end of program text".to_string()) }; }
             
             let mut line : String = pop!()?;
             if line == ""
@@ -223,11 +222,11 @@ impl Parser {
     }
     
     // FIXME: change it to not be line-based; seek to the next newline instead. necessary for things like strings containing newline literals, which should definitely be supported.
-    pub (crate) fn tokenize(&mut self, lines : &[String], silent: bool) -> Result<VecDeque<LexToken>, String>
+    pub (crate) fn tokenize(&mut self, lines : &[String], silent: bool) -> Result<Vec<LexToken>, String>
     {
         let start_time = Instant::now();
         
-        let mut ret : VecDeque<LexToken> = VecDeque::new();
+        let mut ret : Vec<_> = Vec::new();
         let mut linecount = 1;
         
         let mut in_multiline_comment = false;
@@ -275,7 +274,7 @@ impl Parser {
                     if let Some(text) = self.internal_regexes.match_at(&rule, &line, offset)
                     {
                         // TODO: fix position everywhere to be codepoints instead of bytes
-                        ret.push_back(LexToken{text : text.clone(), line : linecount, position : offset});
+                        ret.push(LexToken{text : text.clone(), line : linecount, position : offset});
                         offset += text.len();
                         continue_the_while = true;
                         break;
@@ -288,7 +287,7 @@ impl Parser {
                     {
                         if segment == text.as_str()
                         {
-                            ret.push_back(LexToken{text : text.clone(), line : linecount, position : offset});
+                            ret.push(LexToken{text : text.clone(), line : linecount, position : offset});
                             offset += text.len();
                             continue_the_while = true;
                             break;
@@ -307,7 +306,7 @@ impl Parser {
                             {
                                 continue;
                             }
-                            ret.push_back(LexToken{text : text.clone(), line : linecount, position : offset});
+                            ret.push(LexToken{text : text.clone(), line : linecount, position : offset});
                             offset += text.len();
                             continue_the_while = true;
                             break;
@@ -329,7 +328,7 @@ impl Parser {
     }
 
     // attempts to parse a token list as a particular form of a grammar point
-    fn parse_form(&self, tokens : &VecDeque<LexToken>, index : usize, form : &GrammarForm, formname : Option<&str>) -> Result<ParseVecInfo, String>
+    fn parse_form(&self, tokens : &Vec<LexToken>, index : usize, form : &GrammarForm, formname : Option<&str>) -> Result<ParseVecInfo, String>
     {
         if tokens.len() == 0
         {
@@ -495,7 +494,7 @@ impl Parser {
     }
 
     // attempts to parse a token list as each form of a grammar point in order and uses the first valid one
-    fn parse(&self, tokens : &VecDeque<LexToken>, index : usize, nodetype : &GrammarPoint) -> Result<ParseInfo, String>
+    fn parse(&self, tokens : &Vec<LexToken>, index : usize, nodetype : &GrammarPoint) -> Result<ParseInfo, String>
     {
         if tokens.len() == 0
         {
@@ -641,7 +640,7 @@ impl Parser {
     /// - Arithmetic expressions have their associativity direction corrected (to be left-recursive; in the grammar, they're right-recursive, with LEFTBINEXPR tags)
     /// - Value expressions with a single child are simplified to just their child
     /// - Statements have their trailing semicolon stripped
-    pub fn parse_program(&self, tokens : &VecDeque<LexToken>, lines : &[String], silent: bool) -> Result<Option<ASTNode>, String>
+    pub fn parse_program(&self, tokens : &Vec<LexToken>, lines : &[String], silent: bool) -> Result<Option<ASTNode>, String>
     {
         let start_time = Instant::now();
         
