@@ -95,7 +95,7 @@ mod tests {
         let mut parser = Parser::new_from_default()?;
 
         let mut program = String::new();
-        File::open("nbody3.txt").or_else(|_| Err("failed to open program".to_string()))?.read_to_string(&mut program).or_else(|_| Err("failed to read program into memory".to_string()))?;
+        File::open("nbody.txt").or_else(|_| Err("failed to open program".to_string()))?.read_to_string(&mut program).or_else(|_| Err("failed to read program into memory".to_string()))?;
         
         let code = parser.give_me_bytecode(&program)?;
         
@@ -104,9 +104,22 @@ mod tests {
         
         let start_time = Instant::now();
         
-        while interpreter.step().is_ok(){}
+        let mut steps = 0;
+        while interpreter.step().is_ok()
+        {
+            steps += 1;
+        }
         
         println!("simulation took {:?}", Instant::now().duration_since(start_time));
+        println!("steps {:?}", steps);
+        //println!("op map {:?}", interpreter.op_map);
+        let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>();
+        op_map.sort_by(|a, b| a.1.cmp(&b.1));
+        for (op, time) in op_map
+        {
+            let time = (time/1000000) as f64 / 1000.0;
+            println!("{:02X}:{}", op, time);
+        }
         
         if let Some(err) = &interpreter.last_error
         {

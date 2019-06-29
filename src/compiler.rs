@@ -51,7 +51,7 @@ impl CompilerState {
     {
         self.add_hook(&"program", &CompilerState::compile_program);
         self.add_hook(&"blankstatement", &CompilerState::compile_nop);
-        self.add_hook(&"statement", &CompilerState::compile_children);
+        self.add_hook(&"statement", &CompilerState::compile_statement);
         self.add_hook(&"funccall", &CompilerState::compile_funccall);
         self.add_hook(&"name", &CompilerState::compile_name);
         self.add_hook(&"rhunexpr_right", &CompilerState::compile_children);
@@ -146,9 +146,9 @@ impl CompilerState {
     }
     fn compile_any(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.last_line = ast.line;
-        self.last_index = ast.position;
-        self.last_type = ast.text.clone();
+        //self.last_line = ast.line;
+        //self.last_index = ast.position;
+        //self.last_type = ast.text.clone();
         //if !matches!(self.last_type.as_str(), "funcdef")
         //{
         //    self.code.push(DEBUGINFO);
@@ -187,38 +187,19 @@ impl CompilerState {
     {
         self.compile_any(ast.last_child()?)
     }
-    
-    fn compile_funccall(&mut self, ast : &ASTNode) -> Result<(), String>
+    fn compile_statement(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        if ast.last_child()?.child(0)?.text.as_str() != "funcargs"
-        {
-            return match ast.last_child()?.child(0)?.text.as_str()
-            {
-                "dismember" => plainerr("error: tried to use a -> expression as a statement"),
-                "arrayindex" => plainerr("error: tried to use a [] expression as a statement"),
-                "indirection" => plainerr("error: tried to use a . expression as a statement"),
-                _ => plainerr("error: tried to use an unknown form of expression as a statement")
-            };
-        }
-        
-        self.compile_context_wrapped(Context::Expr, &|x|
-        {
-            for child in ast.child_slice(0, -1)?
-            {
-                //eprintln!("{:?}", child);
-                if child.text == "name"
-                {
-                    x.compile_string_with_prefix(PUSHNAME, &child.child(0)?.text);
-                }
-                else
-                {
-                    x.compile_any(child)?;
-                }
-            }
-            Ok(())
-        })?;
-        self.compile_context_wrapped(Context::Statement, &|x| x.compile_last_child(ast))
+        self.last_line = ast.line;
+        self.last_index = ast.position;
+        self.last_type = ast.text.clone();
+        self.code.push(DEBUGINFO);
+        self.code.extend(pack_u64(self.last_line as u64));
+        self.code.extend(pack_u64(self.last_index as u64));
+        self.code.extend(self.last_type.bytes());
+        self.code.push(0x00);
+        self.compile_nth_child(ast, 0)
     }
+    
     fn compile_rhunexpr(&mut self, ast : &ASTNode) -> Result<(), String>
     {
         for child in ast.child_slice(0, -1)?
@@ -234,6 +215,32 @@ impl CompilerState {
             }
         }
         self.compile_last_child(ast)
+    }
+    fn compile_funccall(&mut self, ast : &ASTNode) -> Result<(), String>
+    {
+        if ast.last_child()?.child(0)?.text.as_str() != "funcargs"
+        {
+            return match ast.last_child()?.child(0)?.text.as_str()
+            {
+                "dismember" => plainerr("error: tried to use a -> expression as a statement"),
+                "arrayindex" => plainerr("error: tried to use a [] expression as a statement"),
+                "indirection" => plainerr("error: tried to use a . expression as a statement"),
+                _ => plainerr("error: tried to use an unknown form of expression as a statement")
+            };
+        }
+        
+        for child in ast.child_slice(0, -1)?
+        {
+            if child.text == "name"
+            {
+                self.compile_string_with_prefix(PUSHNAME, &child.child(0)?.text);
+            }
+            else
+            {
+                self.compile_any(child)?;
+            }
+        }
+        self.compile_context_wrapped(Context::Statement, &|x| x.compile_last_child(ast))
     }
     fn compile_name(&mut self, ast : &ASTNode) -> Result<(), String>
     {
@@ -259,9 +266,8 @@ impl CompilerState {
         })?;
         match self.context
         {
-            Context::Expr => self.code.push(FUNCEXPR),
             Context::Statement => self.code.push(FUNCCALL),
-            _ => return plainerr("internal error: function call encountered in unexpected context")
+            _ => self.code.push(FUNCEXPR)
         }
         
         Ok(())

@@ -22,10 +22,10 @@ def make_body(x, y, z, xv, yv, zv, mass)
     return body;
 }
 
-var bodies = [];
+globalvar bodies = [];
 
 // sun
-bodies->push(make_body(
+global.bodies->push(make_body(
     0,
     0,
     0,
@@ -35,7 +35,7 @@ bodies->push(make_body(
     SOLAR_MASS
 ));
 // jupiter
-bodies->push(make_body(
+global.bodies->push(make_body(
      4.84143144246472090e+00,
     -1.16032004402742839e+00,
     -1.03622044471123109e-01,
@@ -45,7 +45,7 @@ bodies->push(make_body(
      9.54791938424326609e-04 * SOLAR_MASS
 ));
 // saturn
-bodies->push(make_body(
+global.bodies->push(make_body(
      8.34336671824457987e+00,
      4.12479856412430479e+00,
     -4.03523417114321381e-01,
@@ -55,7 +55,7 @@ bodies->push(make_body(
      2.85885980666130812e-04 * SOLAR_MASS
 ));
 // uranus
-bodies->push(make_body(
+global.bodies->push(make_body(
      1.28943695621391310e+01,
     -1.51111514016986312e+01,
     -2.23307578892655734e-01,
@@ -65,7 +65,7 @@ bodies->push(make_body(
      4.36624404335156298e-05 * SOLAR_MASS
 ));
 // neptune
-bodies->push(make_body(
+global.bodies->push(make_body(
      1.53796971148509165e+01,
     -2.59193146099879641e+01,
      1.79258772950371181e-01,
@@ -75,52 +75,52 @@ bodies->push(make_body(
      5.15138902046611451e-05 * SOLAR_MASS
 ));
 
-var NUM_BODIES = bodies->len();
+globalvar num_bodies = global.bodies->len();
 
 subdef advance(delta)
 {
-    for(var i = 0; i < NUM_BODIES; i++)
+    for(var i = 0; i < global.num_bodies; i++)
     {
-        for(var j = i+1; j < NUM_BODIES; j++)
+        for(var j = i+1; j < global.num_bodies; j++)
         {
-            var dx = bodies[i].x - bodies[j].x;
-            var dy = bodies[i].y - bodies[j].y;
-            var dz = bodies[i].z - bodies[j].z;
+            var dx = global.bodies[i].x - global.bodies[j].x;
+            var dy = global.bodies[i].y - global.bodies[j].y;
+            var dz = global.bodies[i].z - global.bodies[j].z;
             var distance_sq = dx*dx + dy*dy + dz*dz;
             var distance = sqrt(distance_sq);
             var power = delta / distance_sq / distance;
-            var mass_i = bodies[i].mass;
-            var mass_j = bodies[j].mass;
-            bodies[i].xv -= power * dx * mass_j;
-            bodies[i].yv -= power * dy * mass_j;
-            bodies[i].zv -= power * dz * mass_j;
-            bodies[j].xv += power * dx * mass_i;
-            bodies[j].yv += power * dy * mass_i;
-            bodies[j].zv += power * dz * mass_i;
+            var mass_i = global.bodies[i].mass;
+            var mass_j = global.bodies[j].mass;
+            global.bodies[i].xv -= power * dx * mass_j;
+            global.bodies[i].yv -= power * dy * mass_j;
+            global.bodies[i].zv -= power * dz * mass_j;
+            global.bodies[j].xv += power * dx * mass_i;
+            global.bodies[j].yv += power * dy * mass_i;
+            global.bodies[j].zv += power * dz * mass_i;
         }
     }
-    for(var i = 0; i < NUM_BODIES; i++)
+    for(var i = 0; i < global.num_bodies; i++)
     {
-        bodies[i].x += bodies[i].xv * delta;
-        bodies[i].y += bodies[i].yv * delta;
-        bodies[i].z += bodies[i].zv * delta;
+        global.bodies[i].x += global.bodies[i].xv * delta;
+        global.bodies[i].y += global.bodies[i].yv * delta;
+        global.bodies[i].z += global.bodies[i].zv * delta;
     }
 }
 subdef energy()
 {
     var e = 0;
-    for(var i = 0; i < NUM_BODIES; i++)
+    for(var i = 0; i < global.num_bodies; i++)
     {
-        var body_a = bodies[i];
+        var body_a = global.bodies[i];
         e += ( body_a.mass
              * ( body_a.xv * body_a.xv
                + body_a.yv * body_a.yv
                + body_a.zv * body_a.zv
                )
              ) / 2;
-        for(var j = i+1; j < NUM_BODIES; j++)
+        for(var j = i+1; j < global.num_bodies; j++)
         {
-            var body_b = bodies[j];
+            var body_b = global.bodies[j];
             var dx = body_a.x - body_b.x;
             var dy = body_a.y - body_b.y;
             var dz = body_a.z - body_b.z;
@@ -133,18 +133,19 @@ subdef energy()
 subdef offset_momentum()
 {
     var px = 0, py = 0, pz = 0;
-    for(var i = 0; i < NUM_BODIES; i++)
+    for(var i = 0; i < global.num_bodies; i++)
     {
-        var body_a = bodies[i];
+        var body_a = global.bodies[i];
         px += body_a.xv * body_a.mass;
         py += body_a.yv * body_a.mass;
         pz += body_a.zv * body_a.mass;
     }
-    bodies[0].xv = -px/SOLAR_MASS;
-    bodies[0].yv = -py/SOLAR_MASS;
-    bodies[0].zv = -pz/SOLAR_MASS;
+    global.bodies[0].xv = -px/SOLAR_MASS;
+    global.bodies[0].yv = -py/SOLAR_MASS;
+    global.bodies[0].zv = -pz/SOLAR_MASS;
 }
 
+print(global.bodies);
 offset_momentum();
 print(energy());
 for(var i = 0; i < 5000; i++)

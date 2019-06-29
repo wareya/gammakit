@@ -1068,9 +1068,12 @@ impl Interpreter
     pub (crate) fn sim_DEBUGINFO(&mut self) -> OpResult
     {
         let line = self.read_usize()? as usize;
-        //let pos = self.read_usize()? as usize;
-        //let name = self.read_string()?;
-        //eprintln!("at {}:{}, type {}, bytecode {}", line, pos, name, self.get_pc());
+        let pos = self.read_usize()? as usize;
+        let name = self.read_string()?;
+        if false
+        {
+            eprintln!("at {}:{}, type {}, bytecode {}", line, pos, name, self.get_pc());
+        }
         self.top_frame.currline = line;
         Ok(())
     }

@@ -76,22 +76,21 @@ impl Interpreter
     pub (crate) fn read_string(&mut self) -> Result<String, String>
     {
         let code = self.get_code();
-        if self.get_pc() >= code.len()
+        let start = self.get_pc();
+        if start >= code.len()
         {
             return Err("error: tried to decode a string past the end of code".to_string());
         }
         
-        let mut bytes = Vec::<u8>::new();
-        
-        let mut c = self.pull_single_from_code()?;
-        while c != 0 && self.get_pc() < code.len()
+        let mut end = start+1;
+        while end < code.len() && code[end] != 0
         {
-            bytes.push(c);
-            c = self.pull_single_from_code()?;
+            end += 1;
         }
         
-        let res = std::str::from_utf8(&bytes).or_else(|_| plainerr("error: tried to decode a string that was not utf-8"))?;
-        Ok(res.to_string())
+        let res = String::from_utf8_lossy(&code[start..end]).to_string();
+        self.set_pc(end+1);
+        Ok(res)
     }
     pub (crate) fn read_function(&mut self, subroutine : bool, generator : bool) -> Result<(String, FuncSpec), String>
     {
@@ -102,7 +101,7 @@ impl Interpreter
         let argcount = self.read_u16()?;
         let bodylen = self.read_usize()?;
         
-        let mut args = Vec::<String>::new();
+        let mut args = Vec::<_>::new();
         for _ in 0..argcount
         {
             //eprintln!("about to read arg name; next byte is {:02X}", self.top_frame.code[self.get_pc()]);

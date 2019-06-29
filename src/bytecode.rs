@@ -30,14 +30,9 @@ pub (crate) fn unpack_u64(vec : &[u8]) ->  Result<u64, String>
     Ok(u64::from_le_bytes(ret))
 }
 
-pub (crate) fn pun_f64_as_u64(num : f64) -> u64
-{
-    num.to_bits()
-}
-
 pub (crate) fn pack_f64(num : f64) -> Vec<u8>
 {
-    pack_u64(pun_f64_as_u64(num))
+    pack_u64(num.to_bits())
 }
 
 pub (crate) fn unpack_f64(vec : &[u8]) ->  Result<f64, String>
@@ -46,10 +41,11 @@ pub (crate) fn unpack_f64(vec : &[u8]) ->  Result<f64, String>
     {
         return Err("tried to unpack f64 from buffer of size other than 8 bytes".to_string());
     }
-    let num = unpack_u64(vec)?;
-    Ok(f64::from_bits(num))
+    let mut ret = [0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8];
+    ret.copy_from_slice(vec);
+    let ret = u64::from_le_bytes(ret);
+    Ok(f64::from_bits(ret))
 }
-
 
 pub (crate) const NOP : u8 = 0x00;
 
