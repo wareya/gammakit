@@ -17,10 +17,7 @@ use crate::interpreter::*;
 
 // Before you ask: Things like x += y work by evaluating x and storing the evaluation temporarily, so variableaccess.rs only handles evaluation and storage.
 
-macro_rules! plainerr { ( $x:expr ) =>
-{
-    Err($x.to_string())
-} }
+macro_rules! plainerr { ( $x:expr ) => { Err($x.to_string()) } }
 
 fn assign_val(value : Value, var : &mut Value) -> Result<(), String>
 {
@@ -40,12 +37,9 @@ fn assign_or_return_valref(value : Option<Value>, var : ValRef) -> Result<Option
 {
     match value
     {
-        Some(Value::Special(_)) => plainerr!("error: tried to assign a special value to a variable"),
-        Some(Value::SubFunc(_)) => plainerr!("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)"),
         Some(value) =>
         {
-            let mut var = var.borrow_mut();
-            *var = value;
+            var.assign(value)?;
             Ok(None)
         }
         _ => var.to_val().map(|x| Some(x))
