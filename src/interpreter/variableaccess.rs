@@ -48,11 +48,11 @@ fn assign_or_return_valref(value : Option<Value>, var : ValRef) -> Result<Option
             *var = value;
             Ok(None)
         }
-        _ => Ok(Some(val_from_valref(var)))
+        _ => var.to_val().map(|x| Some(x))
     }
 }
 
-fn assign_indexed(value : Value, var : &mut Value, indexes : &[HashableValue]) -> Result<(), String>
+pub (crate) fn assign_indexed(value : Value, var : &mut Value, indexes : &[HashableValue]) -> Result<(), String>
 {
     if let (Some(index), Some(new_indexes)) = (indexes.get(0), indexes.get(1..))
     {
@@ -108,7 +108,7 @@ fn assign_indexed(value : Value, var : &mut Value, indexes : &[HashableValue]) -
         assign_val(value, var)
     }
 }
-fn return_indexed(var : &Value, indexes : &[HashableValue]) -> Result<Value, String>
+pub (crate) fn return_indexed(var : &Value, indexes : &[HashableValue]) -> Result<Value, String>
 {
     if let (Some(index), Some(new_indexes)) = (indexes.get(0), indexes.get(1..))
     {
@@ -159,7 +159,7 @@ fn access_frame(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectV
     {
         if let Some(var) = scope.get(&dirvar.name)
         {
-            return Some(Rc::clone(var));
+            return Some(var.refclone());
         }
     }
     if !*seen_instance
@@ -171,7 +171,7 @@ fn access_frame(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectV
             {
                 if let Some(var) = inst.variables.get(&dirvar.name)
                 {
-                    return Some(Rc::clone(var));
+                    return Some(var.refclone());
                 }
                 else if let Some(objspec) = global.objects.get(&inst.objtype)
                 {
@@ -179,7 +179,7 @@ fn access_frame(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectV
                     {
                         let mut mydata = funcdat.clone();
                         mydata.forcecontext = inst.ident;
-                        return Some(valref_from_val(Value::new_funcval(false, Some(dirvar.name.clone()), None, Some(mydata))));
+                        return Some(ValRef::from_val(Value::new_funcval(false, Some(dirvar.name.clone()), None, Some(mydata))));
                     }
                 }
             }
@@ -310,7 +310,7 @@ impl Interpreter
                 
                 if let Some(var) = instance.variables.get(&indirvar.name)
                 {
-                    assign_or_return_valref(value, Rc::clone(var))
+                    assign_or_return_valref(value, var.refclone())
                 }
                 else
                 {
@@ -330,7 +330,7 @@ impl Interpreter
             IndirectSource::Global =>
             {
                 let var = self.global.variables.get(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", indirvar.name))?;
-                assign_or_return_valref(value, Rc::clone(var))
+                assign_or_return_valref(value, var.refclone())
             }
         }
     }

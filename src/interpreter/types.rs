@@ -215,21 +215,55 @@ pub enum Value {
     SubFunc(Box<SubFuncVal>),
 }
 
-pub (crate) type ValRef = Rc<RefCell<Value>>;
-
-pub (crate) fn valref_from_val(val : Value) -> ValRef
-{
-    Rc::new(RefCell::new(val))
+#[derive(Debug, Clone)]
+pub (crate) struct ValRef {
+    reference : Rc<RefCell<Value>>,
+    indexes : Option<Vec<HashableValue>>
 }
-/*
-pub (crate) fn valref_assign_inner(valref : ValRef, val : Value)
-{
-    let valref = valref.borrow_mut();
-    *valref = val;
-}*/
-pub (crate) fn val_from_valref(valref : ValRef) -> Value
-{
-    (*valref).clone().into_inner()
+
+impl ValRef {
+    pub (crate) fn from_val(val : Value) -> ValRef
+    {
+        ValRef{reference : Rc::new(RefCell::new(val)), indexes : None}
+    }
+    pub (crate) fn refclone(&self) -> ValRef
+    {
+        ValRef{reference : Rc::clone(&self.reference), indexes : self.indexes.clone()}
+    }
+    pub (crate) fn borrow(&self) -> std::cell::Ref<Value>
+    {
+        self.reference.borrow()
+    }
+    pub (crate) fn borrow_mut(&self) -> std::cell::RefMut<Value>
+    {
+        self.reference.borrow_mut()
+    }
+    pub (crate) fn to_val(&self) -> Result<Value, String>
+    {
+        if let Some(indexes) = &self.indexes
+        {
+            use super::variableaccess::return_indexed;
+            return_indexed(&self.reference.borrow(), &indexes)
+        }
+        else
+        {
+            Ok((*self.reference).clone().into_inner())
+        }
+    }
+    pub (crate) fn assign(&self, val : Value) -> Result<(), String>
+    {
+        if let Some(indexes) = &self.indexes
+        {
+            use super::variableaccess::assign_indexed;
+            assign_indexed(val, &mut self.reference.borrow_mut(), &indexes)
+        }
+        else
+        {
+            let mut var = self.reference.borrow_mut();
+            *var = val;
+            Ok(())
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

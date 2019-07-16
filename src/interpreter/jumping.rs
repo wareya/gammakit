@@ -31,12 +31,12 @@ impl Interpreter
         
         if let Some(ref name) = funcdata.name
         {
-            scope.insert(name.clone(), valref_from_val(Value::Func(Box::new(funcdata.clone()))));
+            scope.insert(name.clone(), ValRef::from_val(Value::Func(Box::new(funcdata.clone()))));
         }
         for (i, varname) in function.varnames.iter().enumerate()
         {
             let arg = args.extract(i).ok_or_else(|| minierr("internal error: list of arguments to provide to function was shorter than list of argument names (this error should be unreachable!)"))?;
-            scope.insert(varname.clone(), valref_from_val(arg));
+            scope.insert(varname.clone(), ValRef::from_val(arg));
         }
         
         Ok(())
@@ -109,13 +109,13 @@ impl Interpreter
                     let scope = new_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: no scope in top frame despite just making it in jump_to_function (this error should be unreachable!)"))?;
                     if let Some(ref name) = funcdata.name
                     {
-                        scope.insert(name.clone(), valref_from_val(Value::Func(Box::new(funcdata.clone()))));
+                        scope.insert(name.clone(), ValRef::from_val(Value::Func(Box::new(funcdata.clone()))));
                     }
                     
                     for (i, varname) in defdata.varnames.iter().enumerate()
                     {
                         let arg = args.get(i).cloned().ok_or_else(|| minierr("internal error: list of arguments to provide to function was shorter than list of argument names (this error should be unreachable!)"))?;
-                        scope.insert(varname.clone(), valref_from_val(arg));
+                        scope.insert(varname.clone(), ValRef::from_val(arg));
                     }
                     
                     self.stack_push_val(Value::Generator(Box::new(GeneratorState{frame: Some(new_frame)})));

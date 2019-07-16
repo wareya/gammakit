@@ -136,7 +136,7 @@ impl Interpreter
             {
                 return Err(format!("error: duplicate capture variable name `{}` in lambda capture expression", name));
             }
-            captures.insert(name, valref_from_val(val));
+            captures.insert(name, ValRef::from_val(val));
         }
         
         let argcount = self.read_u16()?;
