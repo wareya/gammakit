@@ -252,16 +252,24 @@ impl ValRef {
     }
     pub (crate) fn assign(&self, val : Value) -> Result<(), String>
     {
-        if let Some(indexes) = &self.indexes
+        match val
         {
-            use super::variableaccess::assign_indexed;
-            assign_indexed(val, &mut self.reference.borrow_mut(), &indexes)
-        }
-        else
-        {
-            let mut var = self.reference.borrow_mut();
-            *var = val;
-            Ok(())
+            Value::Special(_) => Err("error: tried to assign a special value to a variable".to_string()),
+            Value::SubFunc(_) => Err("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)".to_string()),
+            val =>
+            {
+                if let Some(indexes) = &self.indexes
+                {
+                    use super::variableaccess::assign_indexed;
+                    assign_indexed(val, &mut self.reference.borrow_mut(), &indexes)
+                }
+                else
+                {
+                    let mut var = self.reference.borrow_mut();
+                    *var = val;
+                    Ok(())
+                }
+            }
         }
     }
 }
