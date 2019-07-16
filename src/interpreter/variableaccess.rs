@@ -153,7 +153,7 @@ fn return_indexed(var : &Value, indexes : &[HashableValue]) -> Result<Value, Str
     }
 }
 
-fn access_frame(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar) -> Option<ValRef>
+fn access_frame(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, seen_instance : &mut bool) -> Option<ValRef>
 {
     for scope in frame.scopes.iter_mut().rev()
     {
@@ -162,21 +162,25 @@ fn access_frame(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectV
             return Some(Rc::clone(var));
         }
     }
-    if let Some(id) = frame.instancestack.last()
+    if !*seen_instance
     {
-        if let Some(inst) = global.instances.get(id)
+        if let Some(id) = frame.instancestack.last()
         {
-            if let Some(var) = inst.variables.get(&dirvar.name)
+            *seen_instance = true;
+            if let Some(inst) = global.instances.get(id)
             {
-                return Some(Rc::clone(var));
-            }
-            else if let Some(objspec) = global.objects.get(&inst.objtype)
-            {
-                if let Some(funcdat) = objspec.functions.get(&dirvar.name)
+                if let Some(var) = inst.variables.get(&dirvar.name)
                 {
-                    let mut mydata = funcdat.clone();
-                    mydata.forcecontext = inst.ident;
-                    return Some(valref_from_val(Value::new_funcval(false, Some(dirvar.name.clone()), None, Some(mydata))));
+                    return Some(Rc::clone(var));
+                }
+                else if let Some(objspec) = global.objects.get(&inst.objtype)
+                {
+                    if let Some(funcdat) = objspec.functions.get(&dirvar.name)
+                    {
+                        let mut mydata = funcdat.clone();
+                        mydata.forcecontext = inst.ident;
+                        return Some(valref_from_val(Value::new_funcval(false, Some(dirvar.name.clone()), None, Some(mydata))));
+                    }
                 }
             }
         }
@@ -228,12 +232,13 @@ impl Interpreter
             }
             NonArrayVariable::Direct(ref dirvar) =>
             {
-                let mut my_ref = access_frame(&mut self.global, &mut self.top_frame, dirvar);
+                let mut seen_instance = false;
+                let mut my_ref = access_frame(&mut self.global, &mut self.top_frame, dirvar, &mut seen_instance);
                 if my_ref.is_none() && !self.top_frame.impassable
                 {
                     for mut frame in self.frames.iter_mut().rev()
                     {
-                        my_ref = access_frame(&mut self.global, &mut frame, dirvar);
+                        my_ref = access_frame(&mut self.global, &mut frame, dirvar, &mut seen_instance);
                         if frame.impassable || my_ref.is_some()
                         {
                             break;
@@ -331,7 +336,8 @@ impl Interpreter
     }
     fn evaluate_or_store_of_direct(&mut self, dirvar : &DirectVar, value : Option<Value>) -> Result<Option<Value>, String>
     {
-        if let Some(my_ref) = access_frame(&mut self.global, &mut self.top_frame, dirvar)
+        let mut seen_instance = false;
+        if let Some(my_ref) = access_frame(&mut self.global, &mut self.top_frame, dirvar, &mut seen_instance)
         {
             return assign_or_return_valref(value, my_ref);
         }
@@ -339,7 +345,7 @@ impl Interpreter
         {
             for mut frame in self.frames.iter_mut().rev()
             {
-                if let Some(my_ref) = access_frame(&mut self.global, &mut frame, dirvar)
+                if let Some(my_ref) = access_frame(&mut self.global, &mut frame, dirvar, &mut seen_instance)
                 {
                     return assign_or_return_valref(value, my_ref);
                 }
