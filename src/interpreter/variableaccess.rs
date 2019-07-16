@@ -33,7 +33,7 @@ fn assign_val(value : Value, var : &mut Value) -> Result<(), String>
     }
 }
 
-fn assign_or_return_valref(value : Option<Value>, var : ValRef) -> Result<Option<Value>, String>
+fn assign_or_return_valref(value : Option<Value>, var : Box<dyn ValRef>) -> Result<Option<Value>, String>
 {
     match value
     {
@@ -147,7 +147,7 @@ pub (crate) fn return_indexed(var : &Value, indexes : &[HashableValue]) -> Resul
     }
 }
 
-fn access_frame(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, seen_instance : &mut bool) -> Option<ValRef>
+fn access_frame(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, seen_instance : &mut bool) -> Option<Box<dyn ValRef>>
 {
     for scope in frame.scopes.iter_mut().rev()
     {
@@ -173,7 +173,7 @@ fn access_frame(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectV
                     {
                         let mut mydata = funcdat.clone();
                         mydata.forcecontext = inst.ident;
-                        return Some(ValRef::from_val(Value::new_funcval(false, Some(dirvar.name.clone()), None, Some(mydata))));
+                        return Some(ValRefSimple::from_val(Value::new_funcval(false, Some(dirvar.name.clone()), None, Some(mydata))));
                     }
                 }
             }
@@ -196,30 +196,30 @@ impl Interpreter
                     {
                         if let Some(value) = value
                         {
-                            let instance = self.global.instances.get_mut(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, ident))?;
-                            let var = instance.variables.get_mut(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, ident))?;
-                            assign_indexed(value, &mut var.borrow_mut(), &arrayvar.indexes)?;
+                            let instance = self.global.instances.get(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, ident))?;
+                            let var = instance.variables.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, ident))?;
+                            assign_indexed(value, &mut *var.borrow_mut()?, &arrayvar.indexes)?;
                             Ok(None)
                         }
                         else
                         {
                             let instance = self.global.instances.get(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, ident))?;
                             let var = instance.variables.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, ident))?;
-                            Ok(Some(return_indexed(&var.borrow(), &arrayvar.indexes)?))
+                            Ok(Some(return_indexed(&*var.borrow()?, &arrayvar.indexes)?))
                         }
                     }
                     IndirectSource::Global =>
                     {
                         if let Some(value) = value
                         {
-                            let var = self.global.variables.get_mut(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", indirvar.name))?;
-                            assign_indexed(value, &mut var.borrow_mut(), &arrayvar.indexes)?;
+                            let var = self.global.variables.get(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", indirvar.name))?;
+                            assign_indexed(value, &mut *var.borrow_mut()?, &arrayvar.indexes)?;
                             Ok(None)
                         }
                         else
                         {
                             let var = self.global.variables.get(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", indirvar.name))?;
-                            Ok(Some(return_indexed(&var.borrow(), &arrayvar.indexes)?))
+                            Ok(Some(return_indexed(&*var.borrow()?, &arrayvar.indexes)?))
                         }
                     }
                 }
@@ -257,12 +257,12 @@ impl Interpreter
                     {
                         if let Some(value) = value
                         {
-                            assign_indexed(value, &mut my_ref.borrow_mut(), &arrayvar.indexes)?;
+                            assign_indexed(value, &mut *my_ref.borrow_mut()?, &arrayvar.indexes)?;
                             Ok(None)
                         }
                         else
                         {
-                            Ok(Some(return_indexed(&my_ref.borrow(), &arrayvar.indexes)?))
+                            Ok(Some(return_indexed(&*my_ref.borrow()?, &arrayvar.indexes)?))
                         }
                     }
                     None => Err(format!("error: unknown variable `{}`", dirvar.name))

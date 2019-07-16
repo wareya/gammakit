@@ -241,7 +241,7 @@ impl Interpreter
         let object = self.global.objects.get(&object_id).ok_or_else(|| format!("error: tried to create instance of non-extant object type {}", object_id))?;
         
         let mut variables = HashMap::new();
-        variables.insert("id".to_string(), ValRef::from_val(Value::Instance(instance_id)));
+        variables.insert("id".to_string(), ValRefSimple::from_val(Value::Instance(instance_id)));
         self.global.instances.insert(instance_id, Instance { objtype : object_id, ident : instance_id, variables });
         
         if let Some(ref mut instance_list) = self.global.instances_by_type.get_mut(&object_id)

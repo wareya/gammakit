@@ -61,7 +61,7 @@ struct GlobalState {
     objectnames: HashMap<String, usize>,
     objects: HashMap<usize, ObjSpec>,
     parser: Option<Parser>,
-    variables: HashMap<String, ValRef>, // accessed as global.varname
+    variables: HashMap<String, Box<dyn ValRef>>, // accessed as global.varname
     functions: HashMap<String, Value>, // accessed as funcname
 }
 

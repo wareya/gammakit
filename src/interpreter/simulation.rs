@@ -136,7 +136,7 @@ impl Interpreter
         {
             return Err(format!("error: redeclared identifier {}", name))
         }
-        scope.insert(name, ValRef::from_val(Value::Number(0.0)));
+        scope.insert(name, ValRefSimple::from_val(Value::Number(0.0)));
         
         Ok(())
     }
@@ -153,7 +153,7 @@ impl Interpreter
         {
             return Err(format!("error: redeclared identifier {}", name));
         }
-        instance.variables.insert(name, ValRef::from_val(Value::Number(0.0)));
+        instance.variables.insert(name, ValRefSimple::from_val(Value::Number(0.0)));
         Ok(())
     }
     pub (crate) fn sim_DECLGLOBALVAR(&mut self) -> OpResult
@@ -168,7 +168,7 @@ impl Interpreter
         {
             return Err(format!("error: redeclared global variable identifier {}", name))
         }
-        self.global.variables.insert(name, ValRef::from_val(Value::Number(0.0)));
+        self.global.variables.insert(name, ValRefSimple::from_val(Value::Number(0.0)));
         
         Ok(())
     }
@@ -587,7 +587,7 @@ impl Interpreter
         {
             return Err(format!("error: redeclared identifier {}", funcname));
         }
-        scope.insert(funcname.clone(), ValRef::from_val(Value::new_funcval(false, Some(funcname), None, Some(myfuncspec))));
+        scope.insert(funcname.clone(), ValRefSimple::from_val(Value::new_funcval(false, Some(funcname), None, Some(myfuncspec))));
         Ok(())
     }
     pub (crate) fn sim_GLOBALFUNCDEF(&mut self) -> OpResult
@@ -610,7 +610,7 @@ impl Interpreter
         {
             return Err(format!("error: redeclared identifier {}", funcname));
         }
-        scope.insert(funcname.clone(), ValRef::from_val(Value::new_funcval(false, Some(funcname), None, Some(myfuncspec))));
+        scope.insert(funcname.clone(), ValRefSimple::from_val(Value::new_funcval(false, Some(funcname), None, Some(myfuncspec))));
         Ok(())
     }
     pub (crate) fn sim_GENERATORDEF(&mut self) -> OpResult
@@ -622,7 +622,7 @@ impl Interpreter
         {
             return Err(format!("error: redeclared identifier {}", funcname));
         }
-        scope.insert(funcname.clone(), ValRef::from_val(Value::new_funcval(false, Some(funcname), None, Some(myfuncspec))));
+        scope.insert(funcname.clone(), ValRefSimple::from_val(Value::new_funcval(false, Some(funcname), None, Some(myfuncspec))));
         Ok(())
     }
     
@@ -978,7 +978,7 @@ impl Interpreter
                 }
             {
                 let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
-                scope.insert(name, ValRef::from_val(value));
+                scope.insert(name, ValRefSimple::from_val(value));
             }
             else
             {

@@ -231,8 +231,8 @@ pub (crate) fn value_equal(left : &Value, right : &Value) -> Result<bool, String
                 {
                     if let Some(right_val) = right.get(left_key)
                     {
-                        let left_val = left_val.borrow();
-                        let right_val = right_val.borrow();
+                        let left_val = left_val.borrow()?;
+                        let right_val = right_val.borrow()?;
                         if_then_return_false!(!value_equal(&left_val, &right_val)?);
                     }
                     else
