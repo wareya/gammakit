@@ -366,7 +366,12 @@ impl CompilerState {
             return plainerr("internal error: unhandled form of number");
         }
         self.code.push(PUSHFLT);
-        let float = ast.child(0)?.text.parse::<f64>().or_else(|_| Err(format!("internal error: text `{}` cannot be converted to a floating point number by rust", ast.child(0)?.text)))?;
+        let float = match ast.child(0)?.text.as_str()
+        {
+            "true" => 1.0,
+            "false" => 0.0,
+            _ => ast.child(0)?.text.parse::<f64>().or_else(|_| Err(format!("internal error: text `{}` cannot be converted to a floating point number by rust", ast.child(0)?.text)))?
+        };
         self.code.extend(pack_f64(float));
         Ok(())
     }

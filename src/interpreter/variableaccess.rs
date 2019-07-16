@@ -332,50 +332,6 @@ impl Interpreter
     }
     fn evaluate_or_store_of_direct(&mut self, dirvar : &DirectVar, value : Option<Value>) -> Result<Option<Value>, String>
     {
-        if matches!(dirvar.name.as_str(), "global" | "true" | "false")
-        {
-            if value.is_some()
-            {
-                return Err(format!("error: cannot assign to variable called \"{}\" (special read-only name)", dirvar.name));
-            }
-            match dirvar.name.as_str()
-            {
-                "global" => return Ok(Some(Value::Special(Special::Global))),
-                "true" => return Ok(Some(Value::Number(1.0))),
-                "false" => return Ok(Some(Value::Number(0.0))),
-                _ => return Err(minierr("unreachable internal error about special read-only names"))
-            }
-        }
-        
-        match dirvar.name.as_str()
-        {
-            "self" =>
-            {
-                if value.is_some()
-                {
-                    return Err(format!("error: cannot assign to variable called \"{}\" (special read-only name)", dirvar.name));
-                }
-                if let Some(id) = self.top_frame.instancestack.last()
-                {
-                    return Ok(Some(Value::Instance(*id)));
-                }
-                return plainerr!("error: tried to access `self` while not inside of instance scope");
-            },
-            "other" =>
-            {
-                if value.is_some()
-                {
-                    return Err(format!("error: cannot assign to variable called \"{}\" (special read-only name)", dirvar.name));
-                }
-                if let Some(id) = self.top_frame.instancestack.get(self.top_frame.instancestack.len()-2)
-                {
-                    return Ok(Some(Value::Instance(*id)));
-                }
-                return plainerr!("error: tried to access `other` while not inside of at least two instance scopes");
-            },
-            _ => ()
-        }
-        
         if let Some(my_ref) = access_frame(&mut self.global, &mut self.top_frame, dirvar)
         {
             return assign_or_return_valref(value, my_ref);
@@ -419,6 +375,38 @@ impl Interpreter
         
         Err(format!("error: unknown identifier `{}`", dirvar.name))
     }
+    pub (crate) fn evaluate_self(&mut self, value : Option<Value>) -> Result<Option<Value>, String>
+    {
+        if value.is_some()
+        {
+            return plainerr!("error: cannot assign to variable called \"self\" (special read-only name)");
+        }
+        if let Some(id) = self.top_frame.instancestack.last()
+        {
+            return Ok(Some(Value::Instance(*id)));
+        }
+        return plainerr!("error: tried to access `self` while not inside of instance scope");
+    }
+    pub (crate) fn evaluate_global(&mut self, value : Option<Value>) -> Result<Option<Value>, String>
+    {
+        if value.is_some()
+        {
+            return plainerr!("error: cannot assign to variable called \"global\" (special read-only name)");
+        }
+        return Ok(Some(Value::Special(Special::Global)));
+    }
+    pub (crate) fn evaluate_other(&mut self, value : Option<Value>) -> Result<Option<Value>, String>
+    {
+        if value.is_some()
+        {
+            return plainerr!("error: cannot assign to variable called \"other\" (special read-only name)");
+        }
+        if let Some(id) = self.top_frame.instancestack.get(self.top_frame.instancestack.len()-2)
+        {
+            return Ok(Some(Value::Instance(*id)));
+        }
+        return plainerr!("error: tried to access `other` while not inside of at least two instance scopes");
+    }
     // if value is None, finds and returns appropriate value; otherwise, stores value and returns None
     pub (crate) fn evaluate_or_store(&mut self, variable : &Variable, value : Option<Value>) -> Result<Option<Value>, String>
     {
@@ -427,6 +415,9 @@ impl Interpreter
             Variable::Array(ref arrayvar) => self.evaluate_or_store_of_array(arrayvar, value),
             Variable::Indirect(ref indirvar) => self.evaluate_or_store_of_indirect(indirvar, value),
             Variable::Direct(ref dirvar) => self.evaluate_or_store_of_direct(dirvar, value),
+            Variable::Selfref => self.evaluate_self(value),
+            Variable::Global => self.evaluate_global(value),
+            Variable::Other => self.evaluate_other(value),
         };
         return ret;
     }

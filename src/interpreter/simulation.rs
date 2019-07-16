@@ -97,14 +97,28 @@ impl Interpreter
     }
     pub (crate) fn sim_PUSHNAME(&mut self) -> OpResult
     {
-        let text = self.read_string()?;
-        self.stack_push_var(Variable::Direct(DirectVar{name:text}));
+        let name = self.read_string()?;
+        let var = match name.as_str()
+        {
+            "self" => Variable::Selfref,
+            "global" => Variable::Global,
+            "other" => Variable::Other,
+            _ => Variable::Direct(DirectVar{name})
+        };
+        self.stack_push_var(var);
         Ok(())
     }
     pub (crate) fn sim_PUSHVAR(&mut self) -> OpResult
     {
         let name = self.read_string()?;
-        let val = self.evaluate_or_store(&Variable::Direct(DirectVar{name}), None)?.ok_or_else(|| minierr("error: tried to evaluate non-extant variable"))?;
+        let var = match name.as_str()
+        {
+            "self" => Variable::Selfref,
+            "global" => Variable::Global,
+            "other" => Variable::Other,
+            _ => Variable::Direct(DirectVar{name})
+        };
+        let val = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("error: tried to evaluate non-extant variable"))?;
         self.stack_push_val(val);
         Ok(())
     }
@@ -213,6 +227,7 @@ impl Interpreter
                                 self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(HashableValue::Text(name)) } )),
                             Variable::Indirect(indirvar) =>
                                 self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(HashableValue::Text(name)) } )),
+                            _ => return plainerr("internal error: tried to treat a special read-only variable as the left hand of a . operation instead of using its value")
                         }
                     }
                 }

@@ -148,7 +148,10 @@ pub (crate) struct DirectVar { // for x
 pub (crate) enum Variable {
     Array(ArrayVar),
     Indirect(IndirectVar),
-    Direct(DirectVar)
+    Direct(DirectVar),
+    Selfref,
+    Global,
+    Other,
 }
 
 // value types
