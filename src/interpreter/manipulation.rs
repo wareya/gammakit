@@ -175,7 +175,6 @@ impl Interpreter
         while self.top_frame.scopes.len() > desired_depth as usize
         {
             self.top_frame.scopes.pop();
-            self.top_frame.scopestarts.pop();
         }
     }
     pub (crate) fn pop_controlstack_until_loop(&mut self)

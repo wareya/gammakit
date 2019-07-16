@@ -162,8 +162,7 @@ fn access_frame(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectV
             return Some(Rc::clone(var));
         }
     }
-    // FIXME: do I even want to search up instance stacks rather than just accessing the main one?
-    for id in frame.instancestack.iter_mut().rev()
+    if let Some(id) = frame.instancestack.last()
     {
         if let Some(inst) = global.instances.get(id)
         {

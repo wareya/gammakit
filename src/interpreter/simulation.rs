@@ -323,8 +323,6 @@ impl Interpreter
     pub (crate) fn sim_SCOPE(&mut self) -> OpResult
     {
         self.top_frame.scopes.push(HashMap::new());
-        let here = self.get_pc();
-        self.top_frame.scopestarts.push(here);
         if self.top_frame.scopes.len() >= 0x10000
         {
             return Err(format!("error: scope recursion limit of 0x10000 reached at line {}\n(note: use more functions!)", self.top_frame.currline));
