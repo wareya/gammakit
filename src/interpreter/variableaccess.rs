@@ -134,7 +134,7 @@ pub (crate) fn return_indexed(var : &Value, indexes : &[HashableValue]) -> Resul
     }
 }
 
-fn access_frame(global : &GlobalState, frame : &Frame, dirvar : &DirectVar, seen_instance : &mut bool) -> Option<Box<dyn ValRef>>
+fn access_frame(global : &GlobalState, frame : &Frame, dirvar : &DirectVar, seen_instance : &mut bool) -> Option<ValRef>
 {
     for scope in frame.scopes.iter().rev()
     {
@@ -160,7 +160,7 @@ fn access_frame(global : &GlobalState, frame : &Frame, dirvar : &DirectVar, seen
                     {
                         let mut mydata = funcdat.clone();
                         mydata.forcecontext = inst.ident;
-                        return Some(ValRefSimple::from_val(Value::new_funcval(false, Some(dirvar.name.clone()), None, Some(mydata))));
+                        return Some(ValRef::from_val(Value::new_funcval(false, Some(dirvar.name.clone()), None, Some(mydata))));
                     }
                 }
             }
@@ -171,18 +171,18 @@ fn access_frame(global : &GlobalState, frame : &Frame, dirvar : &DirectVar, seen
 
 impl Interpreter
 {
-    fn evaluate_of_array(&self, arrayvar : &ArrayVar) -> Result<Box<dyn ValRef>, String>
+    fn evaluate_of_array(&self, arrayvar : &ArrayVar) -> Result<ValRef, String>
     {
         match &arrayvar.location
         {
-            NonArrayVariable::Indirect(ref indirvar) => Ok(ValRefArray::from_ref(self.evaluate_of_indirect(indirvar)?.extract_ref()?, arrayvar.indexes.clone())),
-            NonArrayVariable::Direct(ref dirvar) => Ok(ValRefArray::from_ref(self.evaluate_of_direct(dirvar)?.extract_ref()?, arrayvar.indexes.clone())),
-            NonArrayVariable::ActualArray(array) => Ok(ValRefArrayReadOnly::from_val(Value::Array(array.clone()), arrayvar.indexes.clone())),
-            NonArrayVariable::ActualDict(dict) => Ok(ValRefArrayReadOnly::from_val(Value::Dict(dict.clone()), arrayvar.indexes.clone())),
-            NonArrayVariable::ActualText(string) => Ok(ValRefArrayReadOnly::from_val(Value::Text(string.clone()), arrayvar.indexes.clone())),
+            NonArrayVariable::Indirect(ref indirvar) => Ok(ValRef::from_ref(self.evaluate_of_indirect(indirvar)?.extract_ref()?, arrayvar.indexes.clone(), false)),
+            NonArrayVariable::Direct(ref dirvar) => Ok(ValRef::from_ref(self.evaluate_of_direct(dirvar)?.extract_ref()?, arrayvar.indexes.clone(), false)),
+            NonArrayVariable::ActualArray(array) => Ok(ValRef::from_val_indexed_readonly(Value::Array(array.clone()), arrayvar.indexes.clone())),
+            NonArrayVariable::ActualDict(dict) => Ok(ValRef::from_val_indexed_readonly(Value::Dict(dict.clone()), arrayvar.indexes.clone())),
+            NonArrayVariable::ActualText(string) => Ok(ValRef::from_val_indexed_readonly(Value::Text(string.clone()), arrayvar.indexes.clone())),
         }
     }
-    fn evaluate_of_indirect(&self, indirvar : &IndirectVar,) -> Result<Box<dyn ValRef>, String>
+    fn evaluate_of_indirect(&self, indirvar : &IndirectVar,) -> Result<ValRef, String>
     {
         match indirvar.source
         {
@@ -202,7 +202,7 @@ impl Interpreter
                     
                     let mut mydata = funcdat.clone();
                     mydata.forcecontext = ident;
-                    return Ok(ValRefReadOnly::from_val(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata))));
+                    return Ok(ValRef::from_val_readonly(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata))));
                 }
             }
             IndirectSource::Global =>
@@ -212,7 +212,7 @@ impl Interpreter
             }
         }
     }
-    fn evaluate_of_direct(&self, dirvar : &DirectVar) -> Result<Box<dyn ValRef>, String>
+    fn evaluate_of_direct(&self, dirvar : &DirectVar) -> Result<ValRef, String>
     {
         let mut seen_instance = false;
         if let Some(my_ref) = access_frame(&self.global, &self.top_frame, dirvar, &mut seen_instance)
@@ -233,34 +233,34 @@ impl Interpreter
         
         if let Some(var) = self.global.objectnames.get(&dirvar.name)
         {
-            return Ok(ValRefSimple::from_val(Value::Object(*var)));
+            return Ok(ValRef::from_val(Value::Object(*var)));
         }
         if let Some(var) = self.global.functions.get(&dirvar.name)
         {
-            return Ok(ValRefSimple::from_val(var.clone()));
+            return Ok(ValRef::from_val(var.clone()));
         }
         if self.get_binding(&dirvar.name).is_some() || self.get_simple_binding(&dirvar.name).is_some()
         {
-            return Ok(ValRefSimple::from_val(Value::new_funcval(true, Some(dirvar.name.clone()), None, None)));
+            return Ok(ValRef::from_val(Value::new_funcval(true, Some(dirvar.name.clone()), None, None)));
         }
         
         Err(format!("error: unknown identifier `{}`", dirvar.name))
     }
-    pub (crate) fn evaluate_self(&self) -> Result<Box<dyn ValRef>, String>
+    pub (crate) fn evaluate_self(&self) -> Result<ValRef, String>
     {
         let id = self.top_frame.instancestack.last().ok_or_else(|| "error: tried to access `self` while not inside of instance scope".to_string())?;
-        Ok(ValRefSimple::from_val(Value::Instance(*id)))
+        Ok(ValRef::from_val(Value::Instance(*id)))
     }
-    pub (crate) fn evaluate_global(&self) -> Result<Box<dyn ValRef>, String>
+    pub (crate) fn evaluate_global(&self) -> Result<ValRef, String>
     {
-        Ok(ValRefSimple::from_val(Value::Special(Special::Global)))
+        Ok(ValRef::from_val(Value::Special(Special::Global)))
     }
-    pub (crate) fn evaluate_other(&self) -> Result<Box<dyn ValRef>, String>
+    pub (crate) fn evaluate_other(&self) -> Result<ValRef, String>
     {
         let id = self.top_frame.instancestack.get(self.top_frame.instancestack.len()-2).ok_or_else(|| "error: tried to access `other` while not inside of at least two instance scopes".to_string())?;
-        Ok(ValRefSimple::from_val(Value::Instance(*id)))
+        Ok(ValRef::from_val(Value::Instance(*id)))
     }
-    pub (crate) fn evaluate(&self, variable : &Variable) -> Result<Box<dyn ValRef>, String>
+    pub (crate) fn evaluate(&self, variable : &Variable) -> Result<ValRef, String>
     {
         let ret = match &variable
         {

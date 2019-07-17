@@ -50,7 +50,7 @@ impl Interpreter
             {
                 StackValue::Val(val) =>
                 {
-                    let ret = binding(ValRefReadOnly::from_val(val), args)?;
+                    let ret = binding(ValRef::from_val_readonly(val), args)?;
                     if isexpr
                     {
                         self.stack_push_val(ret);

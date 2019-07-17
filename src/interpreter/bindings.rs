@@ -241,7 +241,7 @@ impl Interpreter
         let object = self.global.objects.get(&object_id).ok_or_else(|| format!("error: tried to create instance of non-extant object type {}", object_id))?;
         
         let mut variables = HashMap::new();
-        variables.insert("id".to_string(), ValRefSimple::from_val(Value::Instance(instance_id)));
+        variables.insert("id".to_string(), ValRef::from_val(Value::Instance(instance_id)));
         self.global.instances.insert(instance_id, Instance { objtype : object_id, ident : instance_id, variables });
         
         if let Some(ref mut instance_list) = self.global.instances_by_type.get_mut(&object_id)
@@ -385,7 +385,7 @@ impl Interpreter
         ) )
     }
     
-    pub (crate) fn sim_subfunc_len(myself : Box<ValRef>, args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_len(myself : ValRef, args : Vec<Value>) -> Result<Value, String>
     {
         if !args.is_empty()
         {
@@ -401,7 +401,7 @@ impl Interpreter
             _ => return plainerr("error: tried to take length of lengthless type")
         })
     }
-    pub (crate) fn sim_subfunc_keys(myself : Box<ValRef>, args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_keys(myself : ValRef, args : Vec<Value>) -> Result<Value, String>
     {
         if !args.is_empty()
         {
@@ -415,7 +415,7 @@ impl Interpreter
             _ => return plainerr("error: tried to take length of lengthless type")
         })
     }
-    pub (crate) fn sim_subfunc_slice(myself : Box<ValRef>, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_slice(myself : ValRef, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 2
         {
@@ -433,7 +433,7 @@ impl Interpreter
             _ => return plainerr("error: tried to slice lengthless type")
         })
     }
-    pub (crate) fn sim_subfunc_contains(myself : Box<ValRef>, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_contains(myself : ValRef, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
@@ -447,7 +447,7 @@ impl Interpreter
             _ => return plainerr("error: remove() must be called with an array, dictionary, or set as its argument")
         })
     }
-    pub (crate) fn sim_subfunc_insert(myself : Box<ValRef>, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_insert(myself : ValRef, mut args : Vec<Value>) -> Result<Value, String>
     {
         match *myself.borrow_mut()?
         {
@@ -516,7 +516,7 @@ impl Interpreter
             _ => plainerr("error: insert() must be called with an array, dictionary, set, or string as the first argument")
         }
     }
-    pub (crate) fn sim_subfunc_push(myself : Box<ValRef>, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_push(myself : ValRef, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
@@ -542,7 +542,7 @@ impl Interpreter
             _ => plainerr("error: push() must be called with an array or string as the first argument")
         }
     }
-    pub (crate) fn sim_subfunc_remove(myself : Box<ValRef>, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_remove(myself : ValRef, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
@@ -598,7 +598,7 @@ impl Interpreter
             _ => plainerr("error: remove() must be called with an array, dictionary, or set as its argument")
         }
     }
-    pub (crate) fn sim_subfunc_pop(myself : Box<ValRef>, args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_pop(myself : ValRef, args : Vec<Value>) -> Result<Value, String>
     {
         if !args.is_empty()
         {

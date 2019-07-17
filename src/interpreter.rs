@@ -22,7 +22,7 @@ pub type Binding = FnMut(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
 /// Type signature of functions to be registered as simple bindings.
 pub type SimpleBinding = FnMut(Vec<Value>) -> Result<Value, String>;
 /// Type signature of functions to be registered as arrow function bindings.
-pub type ArrowBinding = FnMut(Box<ValRef>, Vec<Value>) -> Result<Value, String>;
+pub type ArrowBinding = FnMut(ValRef, Vec<Value>) -> Result<Value, String>;
 
 fn minierr(mystr : &'static str) -> String
 {
@@ -42,7 +42,7 @@ struct GlobalState {
     objectnames: HashMap<String, usize>,
     objects: HashMap<usize, ObjSpec>,
     parser: Option<Parser>,
-    variables: HashMap<String, Box<dyn ValRef>>, // accessed as global.varname
+    variables: HashMap<String, ValRef>, // accessed as global.varname
     functions: HashMap<String, Value>, // accessed as funcname
 }
 

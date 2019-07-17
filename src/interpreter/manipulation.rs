@@ -115,7 +115,7 @@ impl Interpreter
         Ok((name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : !subroutine, generator }))
     }
     
-    pub (crate) fn read_lambda(&mut self) -> Result<(HashMap<String, Box<dyn ValRef>>, FuncSpec), String>
+    pub (crate) fn read_lambda(&mut self) -> Result<(HashMap<String, ValRef>, FuncSpec), String>
     {
         let code = self.get_code();
         
@@ -136,7 +136,7 @@ impl Interpreter
             {
                 return Err(format!("error: duplicate capture variable name `{}` in lambda capture expression", name));
             }
-            captures.insert(name, ValRefSimple::from_val(val));
+            captures.insert(name, ValRef::from_val(val));
         }
         
         let argcount = self.read_u16()?;

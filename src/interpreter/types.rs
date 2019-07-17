@@ -63,7 +63,7 @@ pub (crate) struct Frame {
     pub (super) startpc: usize,
     pub (super) pc: usize,
     pub (super) endpc: usize,
-    pub (super) scopes: Vec<HashMap<String, Box<dyn ValRef>>>,
+    pub (super) scopes: Vec<HashMap<String, ValRef>>,
     pub (super) instancestack: Vec<usize>,
     pub (super) controlstack: Vec<Controller>,
     pub (super) stack: Vec<StackValue>,
@@ -97,7 +97,7 @@ pub (crate) struct ObjSpec {
 pub (crate) struct Instance {
     pub (super) objtype: usize,
     pub (super) ident: usize,
-    pub (super) variables: HashMap<String, Box<dyn ValRef>>
+    pub (super) variables: HashMap<String, ValRef>
 }
 
 // variable types (i.e. how to access a variable as an lvalue)
@@ -161,7 +161,7 @@ pub (crate) enum Variable {
 pub struct FuncVal {
     pub (super) internal: bool,
     pub (super) name: Option<String>,
-    pub (super) predefined: Option<HashMap<String, Box<dyn ValRef>>>,
+    pub (super) predefined: Option<HashMap<String, ValRef>>,
     pub (super) userdefdata: Option<FuncSpec>
 }
 
@@ -216,198 +216,101 @@ pub enum Value {
     SubFunc(Box<SubFuncVal>),
 }
 
-pub trait ValRef: core::fmt::Debug {
-    fn refclone(&self) -> Box<dyn ValRef>;
-    fn borrow(&self) -> Result<std::cell::Ref<Value>, String>;
-    fn borrow_mut(&self) -> Result<std::cell::RefMut<Value>, String>;
-    fn extract_ref(&self) -> Result<Rc<RefCell<Value>>, String>;
-    fn to_val(&self) -> Result<Value, String>;
-    fn assign(&self, val : Value) -> Result<(), String>;
+#[derive(Debug)]
+pub struct ValRef {
+    reference: Rc<RefCell<Value>>,
+    indexes: Option<Vec<HashableValue>>,
+    readonly: bool,
 }
-
-impl Clone for Box<ValRef> {
-    fn clone(&self) -> Box<ValRef>
+impl ValRef {
+    pub fn from_val(val : Value) -> ValRef
     {
-        Box::new(ValRefSimple{reference: Rc::new(RefCell::new(self.to_val().unwrap()))})
+        ValRef{reference : Rc::new(RefCell::new(val)), indexes : None, readonly : false}
     }
-}
-
-#[derive(Debug, Clone)]
-pub (crate) struct ValRefReadOnly {
-    value : Rc<RefCell<Value>>
-}
-impl ValRefReadOnly {
-    pub (crate) fn from_val(val : Value) -> Box<dyn ValRef>
+    pub fn from_val_readonly(val : Value) -> ValRef
     {
-        Box::new(ValRefReadOnly{value : Rc::new(RefCell::new(val))})
+        ValRef{reference : Rc::new(RefCell::new(val)), indexes : None, readonly : true}
     }
-}
-
-#[derive(Debug, Clone)]
-pub (crate) struct ValRefSimple {
-    reference : Rc<RefCell<Value>>
-}
-impl ValRefSimple {
-    pub (crate) fn from_val(val : Value) -> Box<dyn ValRef>
+    pub fn from_val_indexed(val : Value, indexes : Vec<HashableValue>) -> ValRef
     {
-        Box::new(ValRefSimple{reference : Rc::new(RefCell::new(val))})
+        ValRef{reference : Rc::new(RefCell::new(val)), indexes : Some(indexes), readonly : false}
     }
-}
-
-#[derive(Debug, Clone)]
-pub (crate) struct ValRefArrayReadOnly {
-    value : Rc<RefCell<Value>>,
-    indexes : Vec<HashableValue>
-}
-impl ValRefArrayReadOnly {
-    pub (crate) fn from_val(val : Value, indexes : Vec<HashableValue>) -> Box<dyn ValRef>
+    pub fn from_val_indexed_readonly(val : Value, indexes : Vec<HashableValue>) -> ValRef
     {
-        Box::new(ValRefArrayReadOnly{value : Rc::new(RefCell::new(val)), indexes})
+        ValRef{reference : Rc::new(RefCell::new(val)), indexes : Some(indexes), readonly : true}
     }
-}
-
-#[derive(Debug, Clone)]
-pub (crate) struct ValRefArray {
-    reference : Rc<RefCell<Value>>,
-    indexes : Vec<HashableValue>
-}
-impl ValRefArray {
-    //pub (crate) fn from_val(val : Value, indexes : Vec<HashableValue>) -> Box<dyn ValRef>
-    //{
-    //    Box::new(ValRefArray{reference : Rc::new(RefCell::new(val)), indexes})
-    //}
-    pub (crate) fn from_ref(reference : Rc<RefCell<Value>>, indexes : Vec<HashableValue>) -> Box<dyn ValRef>
+    pub (crate) fn from_ref(reference : Rc<RefCell<Value>>, indexes : Vec<HashableValue>, readonly : bool) -> ValRef
     {
-        Box::new(ValRefArray{reference, indexes})
+        ValRef{reference, indexes : Some(indexes), readonly}
     }
-}
-
-impl ValRef for ValRefReadOnly {
-    fn refclone(&self) -> Box<dyn ValRef>
+    pub fn refclone(&self) -> ValRef
     {
-        Box::new(ValRefReadOnly{value : Rc::clone(&self.value)})
+        ValRef{reference : Rc::clone(&self.reference), indexes : self.indexes.clone(), readonly : self.readonly}
     }
-    fn borrow(&self) -> Result<std::cell::Ref<Value>, String>
-    {
-        Ok(self.value.borrow())
-    }
-    fn borrow_mut(&self) -> Result<std::cell::RefMut<Value>, String>
-    {
-        Err("error: tried to borrow a read-only value".to_string())
-    }
-    fn extract_ref(&self) -> Result<Rc<RefCell<Value>>, String>
-    {
-        Err("error: tried to borrow a read-only value".to_string())
-    }
-    fn to_val(&self) -> Result<Value, String>
-    {
-        Ok((*self.value).clone().into_inner())
-    }
-    fn assign(&self, _val : Value) -> Result<(), String>
-    {
-        Err("error: tried to assign to a read-only value".to_string())
-    }
-}
-
-impl ValRef for ValRefSimple {
-    fn refclone(&self) -> Box<dyn ValRef>
-    {
-        Box::new(ValRefSimple{reference : Rc::clone(&self.reference)})
-    }
-    fn borrow(&self) -> Result<std::cell::Ref<Value>, String>
+    pub fn borrow(&self) -> Result<std::cell::Ref<Value>, String>
     {
         Ok(self.reference.borrow())
     }
-    fn borrow_mut(&self) -> Result<std::cell::RefMut<Value>, String>
+    pub fn borrow_mut(&self) -> Result<std::cell::RefMut<Value>, String>
     {
+        if self.readonly
+        {
+            return Err("error: tried to borrow to a read-only value".to_string());
+        }
         Ok(self.reference.borrow_mut())
     }
-    fn extract_ref(&self) -> Result<Rc<RefCell<Value>>, String>
+    pub fn extract_ref(&self) -> Result<Rc<RefCell<Value>>, String>
     {
+        if self.readonly
+        {
+            return Err("error: tried to borrow to a read-only value".to_string());
+        }
         Ok(Rc::clone(&self.reference))
     }
-    fn to_val(&self) -> Result<Value, String>
+    pub fn to_val(&self) -> Result<Value, String>
     {
-        Ok((*self.reference).clone().into_inner())
+        if let Some(indexes) = &self.indexes
+        {
+            use super::variableaccess::return_indexed;
+            return_indexed(&*self.borrow()?, indexes)
+        }
+        else
+        {
+            Ok((*self.reference).clone().into_inner())
+        }
     }
-    fn assign(&self, val : Value) -> Result<(), String>
+    pub fn assign(&self, val : Value) -> Result<(), String>
     {
+        if self.readonly
+        {
+            return Err("error: tried to assign to a read-only value".to_string());
+        }
         match val
         {
             Value::Special(_) => Err("error: tried to assign a special value to a variable".to_string()),
             Value::SubFunc(_) => Err("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)".to_string()),
             val =>
             {
-                let mut var = self.reference.borrow_mut();
-                *var = val;
-                Ok(())
+                if let Some(indexes) = &self.indexes
+                {
+                    use super::variableaccess::assign_indexed;
+                    assign_indexed(val, &mut self.reference.borrow_mut(), indexes)
+                }
+                else
+                {
+                    let mut var = self.reference.borrow_mut();
+                    *var = val;
+                    Ok(())
+                }
             }
         }
     }
 }
 
-impl ValRef for ValRefArrayReadOnly {
-    fn refclone(&self) -> Box<dyn ValRef>
+impl Clone for ValRef {
+    fn clone(&self) -> ValRef
     {
-        Box::new(ValRefArrayReadOnly{value : Rc::clone(&self.value), indexes : self.indexes.clone()})
-    }
-    fn borrow(&self) -> Result<std::cell::Ref<Value>, String>
-    {
-        Ok(self.value.borrow())
-    }
-    fn borrow_mut(&self) -> Result<std::cell::RefMut<Value>, String>
-    {
-        Err("error: tried to borrow a read-only indexed value".to_string())
-    }
-    fn extract_ref(&self) -> Result<Rc<RefCell<Value>>, String>
-    {
-        Err("error: tried to borrow a read-only indexed value".to_string())
-    }
-    fn to_val(&self) -> Result<Value, String>
-    {
-        use super::variableaccess::return_indexed;
-        return_indexed(&*self.borrow()?, &self.indexes)
-    }
-    fn assign(&self, _val : Value) -> Result<(), String>
-    {
-        Err("error: tried to assign to a read-only indexed value".to_string())
-    }
-}
-
-impl ValRef for ValRefArray {
-    fn refclone(&self) -> Box<dyn ValRef>
-    {
-        Box::new(ValRefArray{reference : Rc::clone(&self.reference), indexes : self.indexes.clone()})
-    }
-    fn borrow(&self) -> Result<std::cell::Ref<Value>, String>
-    {
-        Ok(self.reference.borrow())
-    }
-    fn borrow_mut(&self) -> Result<std::cell::RefMut<Value>, String>
-    {
-        Ok(self.reference.borrow_mut())
-    }
-    fn extract_ref(&self) -> Result<Rc<RefCell<Value>>, String>
-    {
-        Ok(Rc::clone(&self.reference))
-    }
-    fn to_val(&self) -> Result<Value, String>
-    {
-        use super::variableaccess::return_indexed;
-        return_indexed(&*self.borrow()?, &self.indexes)
-    }
-    fn assign(&self, val : Value) -> Result<(), String>
-    {
-        match val
-        {
-            Value::Special(_) => Err("error: tried to assign a special value to a variable".to_string()),
-            Value::SubFunc(_) => Err("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)".to_string()),
-            val =>
-            {
-                use super::variableaccess::assign_indexed;
-                assign_indexed(val, &mut self.reference.borrow_mut(), &self.indexes)
-            }
-        }
+        ValRef{reference: Rc::new(RefCell::new(self.to_val().unwrap())), indexes: self.indexes.clone(), readonly: self.readonly}
     }
 }
 
@@ -469,7 +372,7 @@ impl Frame {
 
 impl Value
 {
-    pub (crate) fn new_funcval(internal : bool, name : Option<String>, predefined : Option<HashMap<String, Box<dyn ValRef>>>, userdefdata : Option<FuncSpec>) -> Value
+    pub (crate) fn new_funcval(internal : bool, name : Option<String>, predefined : Option<HashMap<String, ValRef>>, userdefdata : Option<FuncSpec>) -> Value
     {
         Value::Func(Box::new(FuncVal{internal, name, predefined, userdefdata}))
     }
