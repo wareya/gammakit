@@ -166,7 +166,7 @@ impl Interpreter
     }
     pub (crate) fn stack_pop_name(&mut self) -> Option<String>
     {
-        match_or_none!(self.stack_pop_var(), Some(Variable::Direct(DirectVar{name:text})) => text)
+        match_or_none!(self.stack_pop_var(), Some(Variable::Direct(text)) => text)
     }
     
     pub (crate) fn drain_scopes(&mut self, desired_depth : u16)

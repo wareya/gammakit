@@ -56,6 +56,8 @@ bodies->push({
 });
 
 var NUM_BODIES = bodies->len();
+print("num bodies:");
+print(NUM_BODIES);
 
 var x = [];
 var y = [];
@@ -89,12 +91,14 @@ subdef advance(delta)
             var distance_sq = dx*dx + dy*dy + dz*dz;
             var distance = sqrt(distance_sq);
             var power = delta / distance_sq / distance;
-            xv[i] -= power * dx * mass[j];
-            yv[i] -= power * dy * mass[j];
-            zv[i] -= power * dz * mass[j];
-            xv[j] += power * dx * mass[i];
-            yv[j] += power * dy * mass[i];
-            zv[j] += power * dz * mass[i];
+            var pj = mass[j] * power;
+            var pi = mass[i] * power;
+            xv[i] -= pj * dx;
+            yv[i] -= pj * dy;
+            zv[i] -= pj * dz;
+            xv[j] += pi * dx;
+            yv[j] += pi * dy;
+            zv[j] += pi * dz;
         }
     }
     for(var i = 0; i < NUM_BODIES; i++)
@@ -143,5 +147,7 @@ subdef offset_momentum()
 offset_momentum();
 print(energy());
 for(var i = 0; i < 5000; i++)
+{
     advance(0.01);
+}
 print(energy());

@@ -103,7 +103,7 @@ impl Interpreter
             "self" => Variable::Selfref,
             "global" => Variable::Global,
             "other" => Variable::Other,
-            _ => Variable::Direct(DirectVar{name})
+            _ => Variable::Direct(name)
         };
         self.stack_push_var(var);
         Ok(())
@@ -111,15 +111,14 @@ impl Interpreter
     pub (crate) fn sim_PUSHVAR(&mut self) -> OpResult
     {
         let name = self.read_string()?;
-        let var = match name.as_str()
+        let val = match name.as_str()
         {
-            "self" => Variable::Selfref,
-            "global" => Variable::Global,
-            "other" => Variable::Other,
-            _ => Variable::Direct(DirectVar{name})
+            "self" => self.evaluate_self()?,
+            "global" => self.evaluate_global()?,
+            "other" => self.evaluate_other()?,
+            _ => self.evaluate_of_direct(&name)?
         };
-        let val = self.evaluate(&var)?.to_val()?;
-        self.stack_push_val(val);
+        self.stack_push_val(val.to_val()?);
         Ok(())
     }
     
@@ -134,7 +133,8 @@ impl Interpreter
         
         if scope.contains_key(&name)
         {
-            return Err(format!("error: redeclared identifier {}", name))
+            //return Ok(());
+            return Err(format!("error: redeclared lexical variable {}", name))
         }
         scope.insert(name, ValRef::from_val(Value::Number(0.0)));
         
@@ -151,7 +151,7 @@ impl Interpreter
         let instance = self.global.instances.get_mut(instance_id).ok_or_else(|| format!("error: tried to declare instance variable but instance of current scope ({}) no longer exists", instance_id))?;
         if instance.variables.contains_key(&name)
         {
-            return Err(format!("error: redeclared identifier {}", name));
+            return Err(format!("error: redeclared instance variable {}", name));
         }
         instance.variables.insert(name, ValRef::from_val(Value::Number(0.0)));
         Ok(())

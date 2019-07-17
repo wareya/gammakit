@@ -134,11 +134,11 @@ pub (crate) fn return_indexed(var : &Value, indexes : &[HashableValue]) -> Resul
     }
 }
 
-fn access_frame(global : &GlobalState, frame : &Frame, dirvar : &DirectVar, seen_instance : &mut bool) -> Option<ValRef>
+fn access_frame(global : &GlobalState, frame : &Frame, name : &String, seen_instance : &mut bool) -> Option<ValRef>
 {
     for scope in frame.scopes.iter().rev()
     {
-        if let Some(var) = scope.get(&dirvar.name)
+        if let Some(var) = scope.get(name)
         {
             return Some(var.refclone());
         }
@@ -150,17 +150,17 @@ fn access_frame(global : &GlobalState, frame : &Frame, dirvar : &DirectVar, seen
             *seen_instance = true;
             if let Some(inst) = global.instances.get(id)
             {
-                if let Some(var) = inst.variables.get(&dirvar.name)
+                if let Some(var) = inst.variables.get(name)
                 {
                     return Some(var.refclone());
                 }
                 else if let Some(objspec) = global.objects.get(&inst.objtype)
                 {
-                    if let Some(funcdat) = objspec.functions.get(&dirvar.name)
+                    if let Some(funcdat) = objspec.functions.get(name)
                     {
                         let mut mydata = funcdat.clone();
                         mydata.forcecontext = inst.ident;
-                        return Some(ValRef::from_val(Value::new_funcval(false, Some(dirvar.name.clone()), None, Some(mydata))));
+                        return Some(ValRef::from_val(Value::new_funcval(false, Some(name.clone()), None, Some(mydata))));
                     }
                 }
             }
@@ -212,10 +212,10 @@ impl Interpreter
             }
         }
     }
-    fn evaluate_of_direct(&self, dirvar : &DirectVar) -> Result<ValRef, String>
+    pub(crate) fn evaluate_of_direct(&self, name : &String) -> Result<ValRef, String>
     {
         let mut seen_instance = false;
-        if let Some(my_ref) = access_frame(&self.global, &self.top_frame, dirvar, &mut seen_instance)
+        if let Some(my_ref) = access_frame(&self.global, &self.top_frame, name, &mut seen_instance)
         {
             return Ok(my_ref.refclone());
         }
@@ -223,7 +223,7 @@ impl Interpreter
         {
             for frame in self.frames.iter().rev()
             {
-                if let Some(my_ref) = access_frame(&self.global, &frame, dirvar, &mut seen_instance)
+                if let Some(my_ref) = access_frame(&self.global, &frame, name, &mut seen_instance)
                 {
                     return Ok(my_ref.refclone());
                 }
@@ -231,20 +231,20 @@ impl Interpreter
             }
         }
         
-        if let Some(var) = self.global.objectnames.get(&dirvar.name)
+        if let Some(var) = self.global.objectnames.get(name)
         {
             return Ok(ValRef::from_val(Value::Object(*var)));
         }
-        if let Some(var) = self.global.functions.get(&dirvar.name)
+        if let Some(var) = self.global.functions.get(name)
         {
             return Ok(ValRef::from_val(var.clone()));
         }
-        if self.get_binding(&dirvar.name).is_some() || self.get_simple_binding(&dirvar.name).is_some()
+        if self.get_binding(name).is_some() || self.get_simple_binding(name).is_some()
         {
-            return Ok(ValRef::from_val(Value::new_funcval(true, Some(dirvar.name.clone()), None, None)));
+            return Ok(ValRef::from_val(Value::new_funcval(true, Some(name.clone()), None, None)));
         }
         
-        Err(format!("error: unknown identifier `{}`", dirvar.name))
+        Err(format!("error: unknown identifier `{}`", name))
     }
     pub (crate) fn evaluate_self(&self) -> Result<ValRef, String>
     {
@@ -266,7 +266,7 @@ impl Interpreter
         {
             Variable::Array(ref arrayvar) => self.evaluate_of_array(arrayvar),
             Variable::Indirect(ref indirvar) => self.evaluate_of_indirect(indirvar),
-            Variable::Direct(ref dirvar) => self.evaluate_of_direct(dirvar),
+            Variable::Direct(ref name) => self.evaluate_of_direct(name),
             Variable::Selfref => self.evaluate_self(),
             Variable::Global => self.evaluate_global(),
             Variable::Other => self.evaluate_other(),

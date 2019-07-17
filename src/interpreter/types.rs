@@ -106,7 +106,7 @@ pub (crate) struct Instance {
 #[derive(Debug, Clone)]
 pub (super) enum NonArrayVariable {
     Indirect(IndirectVar), // x.y.z evaluates x.y before storing it as the instance identity under which to find y
-    Direct(DirectVar),
+    Direct(String),
     ActualArray(Vec<Value>),
     ActualDict(HashMap<HashableValue, Value>),
     ActualText(String)
@@ -148,14 +148,10 @@ impl IndirectVar {
 }
 
 #[derive(Debug, Clone)]
-pub (crate) struct DirectVar { // for x
-    pub (super) name: String
-}
-#[derive(Debug, Clone)]
 pub (crate) enum Variable {
     Array(ArrayVar),
     Indirect(IndirectVar),
-    Direct(DirectVar),
+    Direct(String),
     Selfref,
     Global,
     Other,
