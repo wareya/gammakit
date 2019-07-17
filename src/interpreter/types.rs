@@ -90,6 +90,7 @@ pub (crate) struct FuncSpec {
 pub (crate) struct ObjSpec {
     #[allow(unused)]
     pub (super) ident: usize,
+    #[allow(unused)]
     pub (super) name: String,
     pub (super) functions: HashMap<String, FuncSpec>
 }
@@ -215,10 +216,11 @@ pub enum Value {
     SubFunc(Box<SubFuncVal>),
 }
 
-pub (crate) trait ValRef: core::fmt::Debug {
+pub trait ValRef: core::fmt::Debug {
     fn refclone(&self) -> Box<dyn ValRef>;
     fn borrow(&self) -> Result<std::cell::Ref<Value>, String>;
     fn borrow_mut(&self) -> Result<std::cell::RefMut<Value>, String>;
+    fn extract_ref(&self) -> Result<Rc<RefCell<Value>>, String>;
     fn to_val(&self) -> Result<Value, String>;
     fn assign(&self, val : Value) -> Result<(), String>;
 }
@@ -232,12 +234,12 @@ impl Clone for Box<ValRef> {
 
 #[derive(Debug, Clone)]
 pub (crate) struct ValRefReadOnly {
-    value : Rc<Value>
+    value : Rc<RefCell<Value>>
 }
 impl ValRefReadOnly {
     pub (crate) fn from_val(val : Value) -> Box<dyn ValRef>
     {
-        Box::new(ValRefReadOnly{value : Rc::new(val)})
+        Box::new(ValRefReadOnly{value : Rc::new(RefCell::new(val))})
     }
 }
 
@@ -253,14 +255,30 @@ impl ValRefSimple {
 }
 
 #[derive(Debug, Clone)]
+pub (crate) struct ValRefArrayReadOnly {
+    value : Rc<RefCell<Value>>,
+    indexes : Vec<HashableValue>
+}
+impl ValRefArrayReadOnly {
+    pub (crate) fn from_val(val : Value, indexes : Vec<HashableValue>) -> Box<dyn ValRef>
+    {
+        Box::new(ValRefArrayReadOnly{value : Rc::new(RefCell::new(val)), indexes})
+    }
+}
+
+#[derive(Debug, Clone)]
 pub (crate) struct ValRefArray {
     reference : Rc<RefCell<Value>>,
     indexes : Vec<HashableValue>
 }
 impl ValRefArray {
-    pub (crate) fn from_val(val : Value) -> Box<dyn ValRef>
+    //pub (crate) fn from_val(val : Value, indexes : Vec<HashableValue>) -> Box<dyn ValRef>
+    //{
+    //    Box::new(ValRefArray{reference : Rc::new(RefCell::new(val)), indexes})
+    //}
+    pub (crate) fn from_ref(reference : Rc<RefCell<Value>>, indexes : Vec<HashableValue>) -> Box<dyn ValRef>
     {
-        Box::new(ValRefArray{reference : Rc::new(RefCell::new(val)), indexes : vec!()})
+        Box::new(ValRefArray{reference, indexes})
     }
 }
 
@@ -271,17 +289,21 @@ impl ValRef for ValRefReadOnly {
     }
     fn borrow(&self) -> Result<std::cell::Ref<Value>, String>
     {
-        Err("error: tried to borrow a read-only value".to_string())
+        Ok(self.value.borrow())
     }
     fn borrow_mut(&self) -> Result<std::cell::RefMut<Value>, String>
     {
         Err("error: tried to borrow a read-only value".to_string())
     }
+    fn extract_ref(&self) -> Result<Rc<RefCell<Value>>, String>
+    {
+        Err("error: tried to borrow a read-only value".to_string())
+    }
     fn to_val(&self) -> Result<Value, String>
     {
-        Ok((*self.value).clone())
+        Ok((*self.value).clone().into_inner())
     }
-    fn assign(&self, val : Value) -> Result<(), String>
+    fn assign(&self, _val : Value) -> Result<(), String>
     {
         Err("error: tried to assign to a read-only value".to_string())
     }
@@ -299,6 +321,10 @@ impl ValRef for ValRefSimple {
     fn borrow_mut(&self) -> Result<std::cell::RefMut<Value>, String>
     {
         Ok(self.reference.borrow_mut())
+    }
+    fn extract_ref(&self) -> Result<Rc<RefCell<Value>>, String>
+    {
+        Ok(Rc::clone(&self.reference))
     }
     fn to_val(&self) -> Result<Value, String>
     {
@@ -320,6 +346,34 @@ impl ValRef for ValRefSimple {
     }
 }
 
+impl ValRef for ValRefArrayReadOnly {
+    fn refclone(&self) -> Box<dyn ValRef>
+    {
+        Box::new(ValRefArrayReadOnly{value : Rc::clone(&self.value), indexes : self.indexes.clone()})
+    }
+    fn borrow(&self) -> Result<std::cell::Ref<Value>, String>
+    {
+        Ok(self.value.borrow())
+    }
+    fn borrow_mut(&self) -> Result<std::cell::RefMut<Value>, String>
+    {
+        Err("error: tried to borrow a read-only indexed value".to_string())
+    }
+    fn extract_ref(&self) -> Result<Rc<RefCell<Value>>, String>
+    {
+        Err("error: tried to borrow a read-only indexed value".to_string())
+    }
+    fn to_val(&self) -> Result<Value, String>
+    {
+        use super::variableaccess::return_indexed;
+        return_indexed(&*self.borrow()?, &self.indexes)
+    }
+    fn assign(&self, _val : Value) -> Result<(), String>
+    {
+        Err("error: tried to assign to a read-only indexed value".to_string())
+    }
+}
+
 impl ValRef for ValRefArray {
     fn refclone(&self) -> Box<dyn ValRef>
     {
@@ -333,10 +387,14 @@ impl ValRef for ValRefArray {
     {
         Ok(self.reference.borrow_mut())
     }
+    fn extract_ref(&self) -> Result<Rc<RefCell<Value>>, String>
+    {
+        Ok(Rc::clone(&self.reference))
+    }
     fn to_val(&self) -> Result<Value, String>
     {
         use super::variableaccess::return_indexed;
-        return_indexed(&self.reference.borrow(), &self.indexes)
+        return_indexed(&*self.borrow()?, &self.indexes)
     }
     fn assign(&self, val : Value) -> Result<(), String>
     {

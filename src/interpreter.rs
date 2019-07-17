@@ -21,27 +21,8 @@ type OpResult = Result<(), String>;
 pub type Binding = FnMut(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
 /// Type signature of functions to be registered as simple bindings.
 pub type SimpleBinding = FnMut(Vec<Value>) -> Result<Value, String>;
-/// Return value of associated function ("arrow" function) bindings.
-///
-/// An Immut() value returns a value and does not mutate what the function was invoked on.
-///
-/// A Mut{...} value returns a value, and if the binding was called on a variable, updates the variable with the value "var".
-pub enum ArrowRet {
-    Immut(Value),
-    Mut{var: Value, ret: Value},
-}
-impl ArrowRet {
-    pub (super) fn into_parts(self) -> (Option<Value>, Value)
-    {
-        match self
-        {
-            ArrowRet::Immut(ret) => (None, ret),
-            ArrowRet::Mut{var, ret} => (Some(var), ret)
-        }
-    }
-}
 /// Type signature of functions to be registered as arrow function bindings.
-pub type ArrowBinding = FnMut(Value, Vec<Value>) -> Result<ArrowRet, String>;
+pub type ArrowBinding = FnMut(Box<ValRef>, Vec<Value>) -> Result<Value, String>;
 
 fn minierr(mystr : &'static str) -> String
 {

@@ -385,37 +385,37 @@ impl Interpreter
         ) )
     }
     
-    pub (crate) fn sim_subfunc_len(myself : Value, args : Vec<Value>) -> Result<ArrowRet, String>
+    pub (crate) fn sim_subfunc_len(myself : Box<ValRef>, args : Vec<Value>) -> Result<Value, String>
     {
         if !args.is_empty()
         {
             return Err(format!("error: wrong number of arguments to len(); expected 0, got {}", args.len()));
         }
         
-        Ok(ArrowRet::Immut(match myself
+        Ok(match *myself.borrow()?
         {
-            Value::Text(string) => Value::Number(string.chars().count() as f64),
-            Value::Array(array) => Value::Number(array.len() as f64),
-            Value::Dict(dict) => Value::Number(dict.keys().len() as f64),
-            Value::Set(set) => Value::Number(set.len() as f64),
+            Value::Text(ref string) => Value::Number(string.chars().count() as f64),
+            Value::Array(ref array) => Value::Number(array.len() as f64),
+            Value::Dict(ref dict) => Value::Number(dict.keys().len() as f64),
+            Value::Set(ref set) => Value::Number(set.len() as f64),
             _ => return plainerr("error: tried to take length of lengthless type")
-        }))
+        })
     }
-    pub (crate) fn sim_subfunc_keys(myself : Value, args : Vec<Value>) -> Result<ArrowRet, String>
+    pub (crate) fn sim_subfunc_keys(myself : Box<ValRef>, args : Vec<Value>) -> Result<Value, String>
     {
         if !args.is_empty()
         {
             return Err(format!("error: wrong number of arguments to keys(); expected 0, got {}", args.len()));
         }
         
-        Ok(ArrowRet::Immut(match myself
+        Ok(match *myself.borrow()?
         {
-            Value::Array(array) => Value::Array((0..array.len()).map(|i| Value::Number(i as f64)).collect()),
-            Value::Dict(mut dict) => Value::Array(dict.drain().map(|(key, _)| hashval_to_val(key)).collect()),
+            Value::Array(ref array) => Value::Array((0..array.len()).map(|i| Value::Number(i as f64)).collect()),
+            Value::Dict(ref dict) => Value::Array(dict.iter().map(|(key, _)| hashval_to_val(key.clone())).collect()),
             _ => return plainerr("error: tried to take length of lengthless type")
-        }))
+        })
     }
-    pub (crate) fn sim_subfunc_slice(myself : Value, mut args : Vec<Value>) -> Result<ArrowRet, String>
+    pub (crate) fn sim_subfunc_slice(myself : Box<ValRef>, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 2
         {
@@ -426,32 +426,32 @@ impl Interpreter
         let start = match_or_err!(start, Value::Number(start) => start.round() as i64, minierr("error: start and end indexes passed to slice() must be numbers"))?;
         let end = match_or_err!(end, Value::Number(end) => end.round() as i64, minierr("error: start and end indexes passed to slice() must be numbers"))?;
         
-        Ok(ArrowRet::Immut(match myself
+        Ok(match *myself.borrow()?
         {
-            Value::Text(string) => slice_any(&string.chars().collect::<Vec<char>>(), start, end).map(|array| Value::Text(array.iter().cloned().collect())).ok_or_else(|| minierr("error: slice() on string went out of range"))?,
-            Value::Array(array) => slice_any(&array, start, end).map(|array| Value::Array(array.to_vec())).ok_or_else(|| minierr("error: slice() on array went out of range"))?,
+            Value::Text(ref string) => slice_any(&string.chars().collect::<Vec<char>>(), start, end).map(|array| Value::Text(array.iter().cloned().collect())).ok_or_else(|| minierr("error: slice() on string went out of range"))?,
+            Value::Array(ref array) => slice_any(&array, start, end).map(|array| Value::Array(array.to_vec())).ok_or_else(|| minierr("error: slice() on array went out of range"))?,
             _ => return plainerr("error: tried to slice lengthless type")
-        }))
+        })
     }
-    pub (crate) fn sim_subfunc_contains(myself : Value, mut args : Vec<Value>) -> Result<ArrowRet, String>
+    pub (crate) fn sim_subfunc_contains(myself : Box<ValRef>, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
             return Err(format!("error: wrong number of arguments to contains(); expected 1, got {}", args.len()));
         }
         let key = args.expect_extract(0)?;
-        Ok(ArrowRet::Immut(match myself
+        Ok(match *myself.borrow()?
         {
-            Value::Dict(dict) => Value::Number(bool_floaty(dict.contains_key(&val_to_hashval(key)?))),
-            Value::Set (set ) => Value::Number(bool_floaty(set .contains    (&val_to_hashval(key)?))),
+            Value::Dict(ref dict) => Value::Number(bool_floaty(dict.contains_key(&val_to_hashval(key)?))),
+            Value::Set (ref set ) => Value::Number(bool_floaty(set .contains    (&val_to_hashval(key)?))),
             _ => return plainerr("error: remove() must be called with an array, dictionary, or set as its argument")
-        }))
+        })
     }
-    pub (crate) fn sim_subfunc_insert(myself : Value, mut args : Vec<Value>) -> Result<ArrowRet, String>
+    pub (crate) fn sim_subfunc_insert(myself : Box<ValRef>, mut args : Vec<Value>) -> Result<Value, String>
     {
-        match myself
+        match *myself.borrow_mut()?
         {
-            Value::Text(string) =>
+            Value::Text(ref mut string) =>
             {
                 if args.len() != 2
                 {
@@ -460,6 +460,7 @@ impl Interpreter
                 let key = args.expect_extract(0)?;
                 if let Value::Text(value) = args.expect_extract(1)?
                 {
+                    // FIXME use codepoint indexes for this
                     let chars : Vec<char> = string.chars().collect();
                     
                     let index = match_or_err!(key, Value::Number(index) => index.round() as isize, minierr("error: tried to insert into a string with a non-number index"))?;
@@ -468,13 +469,14 @@ impl Interpreter
                     let left = chars.get(0..index).ok_or_else(|| minierr("error: tried to insert into a string at an out-of-range index"))?.iter().collect::<String>();
                     let right = chars.get(index..chars.len()).ok_or_else(|| minierr("error: tried to insert into a string at an out-of-range index"))?.iter().collect::<String>();
                     
-                    let newstr = Value::Text(format!("{}{}{}", left, value, right));
+                    let newstr = format!("{}{}{}", left, value, right);
+                    *string = newstr;
                     
-                    return Ok(ArrowRet::Mut{var: newstr, ret: Value::Number(0.0)});
+                    return Ok(Value::Number(0.0));
                 }
                 plainerr("error: tried to insert a non-string into a string with insert()")
             }
-            Value::Array(mut array) =>
+            Value::Array(ref mut array) =>
             {
                 if args.len() != 2
                 {
@@ -488,9 +490,9 @@ impl Interpreter
                     return plainerr("error: tried to insert into an array at an out-of-range index");
                 }
                 array.insert(index as usize, value);
-                Ok(ArrowRet::Mut{var: Value::Array(array), ret: Value::Number(0.0)})
+                Ok(Value::Number(0.0))
             }
-            Value::Dict(mut dict) =>
+            Value::Dict(ref mut dict) =>
             {
                 if args.len() != 2
                 {
@@ -499,9 +501,9 @@ impl Interpreter
                 let key = args.expect_extract(0)?;
                 let value = args.expect_extract(1)?;
                 dict.insert(val_to_hashval(key)?, value);
-                Ok(ArrowRet::Mut{var: Value::Dict(dict), ret: Value::Number(0.0)})
+                Ok(Value::Number(0.0))
             }
-            Value::Set(mut set) =>
+            Value::Set(ref mut set) =>
             {
                 if args.len() != 1
                 {
@@ -509,63 +511,59 @@ impl Interpreter
                 }
                 let key = args.expect_extract(0)?;
                 set.insert(val_to_hashval(key)?);
-                Ok(ArrowRet::Mut{var: Value::Set(set), ret: Value::Number(0.0)})
+                Ok(Value::Number(0.0))
             }
             _ => plainerr("error: insert() must be called with an array, dictionary, set, or string as the first argument")
         }
     }
-    pub (crate) fn sim_subfunc_push(myself : Value, mut args : Vec<Value>) -> Result<ArrowRet, String>
+    pub (crate) fn sim_subfunc_push(myself : Box<ValRef>, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
             return Err(format!("error: wrong number of arguments to push(); expected 1, got {}", args.len()));
         }
         let value = args.expect_extract(0)?;
-        match myself
+        match *myself.borrow_mut()?
         {
-            Value::Text(string) =>
+            Value::Text(ref mut string) =>
             {
                 if let Value::Text(value) = value
                 {
-                    let newstr = Value::Text(format!("{}{}", string, value));
-                    return Ok(ArrowRet::Mut{var: newstr, ret: Value::Number(0.0)});
+                    *string = format!("{}{}", string, value);
+                    return Ok(Value::Number(0.0));
                 }
                 plainerr("error: tried to concatenate a non-string to a string with push()")
             }
-            Value::Array(mut array) =>
+            Value::Array(ref mut array) =>
             {
                 array.push(value);
-                Ok(ArrowRet::Mut{var: Value::Array(array), ret: Value::Number(0.0)})
+                Ok(Value::Number(0.0))
             }
             _ => plainerr("error: push() must be called with an array or string as the first argument")
         }
     }
-    pub (crate) fn sim_subfunc_remove(myself : Value, mut args : Vec<Value>) -> Result<ArrowRet, String>
+    pub (crate) fn sim_subfunc_remove(myself : Box<ValRef>, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
             return Err(format!("error: wrong number of arguments to remove(); expected 1, got {}", args.len()));
         }
         let key = args.expect_extract(0)?;
-        match myself
+        match *myself.borrow_mut()?
         {
-            Value::Text(string) =>
+            Value::Text(ref mut string) =>
             {
-                let chars : Vec<char> = string.chars().collect();
+                let mut chars : Vec<char> = string.chars().collect();
                 
                 let index = match_or_err!(key, Value::Number(index) => index.round() as isize, minierr("error: tried to remove from a string with a non-number index"))?;
                 let index = if index < 0 {chars.len() - (-index as usize)} else {index as usize} as usize;
                 
-                let left = chars.get(0..index).ok_or_else(|| minierr("error: tried to remove from a string at an out-of-range index"))?.iter().collect::<String>();
                 let mid = chars.get(index..=index).ok_or_else(|| minierr("error: tried to remove from a string at an out-of-range index"))?.iter().collect::<String>();
-                let right = chars.get(index+1..chars.len()).ok_or_else(|| minierr("error: tried to remove from a string at an out-of-range index"))?.iter().collect::<String>();
-                
-                let newstr = Value::Text(format!("{}{}", left, right));
-                let extracted = Value::Text(mid);
-                
-                Ok(ArrowRet::Mut{var: newstr, ret: extracted})
+                chars.drain(index..=index);
+                *string = chars.iter().collect();
+                Ok(Value::Text(mid))
             }
-            Value::Array(mut array) =>
+            Value::Array(ref mut array) =>
             {
                 let index = match_or_err!(key, Value::Number(index) => index.round() as isize, minierr("error: tried to remove from an array with a non-number index"))?;
                 if index < 0 || index as usize > array.len()
@@ -573,24 +571,24 @@ impl Interpreter
                     return plainerr("error: tried to remove from an array at an out-of-range index");
                 }
                 let removed = array.remove(index as usize);
-                Ok(ArrowRet::Mut{var: Value::Array(array), ret: removed})
+                Ok(removed)
             }
-            Value::Dict(mut dict) =>
+            Value::Dict(ref mut dict) =>
             {
                 if let Some(removed) = dict.remove(&val_to_hashval(key)?)
                 {
-                    Ok(ArrowRet::Mut{var: Value::Dict(dict), ret: removed})
+                    Ok(removed)
                 }
                 else
                 {
                     plainerr("error: tried to remove non-extant key from dict")
                 }
             }
-            Value::Set(mut set) =>
+            Value::Set(ref mut set) =>
             {
                 if set.remove(&val_to_hashval(key.clone())?)
                 {
-                    Ok(ArrowRet::Mut{var: Value::Set(set), ret: Value::Number(0.0)})
+                    Ok(Value::Number(0.0))
                 }
                 else
                 {
@@ -600,18 +598,18 @@ impl Interpreter
             _ => plainerr("error: remove() must be called with an array, dictionary, or set as its argument")
         }
     }
-    pub (crate) fn sim_subfunc_pop(myself : Value, args : Vec<Value>) -> Result<ArrowRet, String>
+    pub (crate) fn sim_subfunc_pop(myself : Box<ValRef>, args : Vec<Value>) -> Result<Value, String>
     {
         if !args.is_empty()
         {
             return Err(format!("error: wrong number of arguments to pop(); expected 0, got {}", args.len()));
         }
-        match myself
+        match *myself.borrow_mut()?
         {
-            Value::Array(mut array) =>
+            Value::Array(ref mut array) =>
             {
                 let ret = array.pop().ok_or_else(|| minierr("error: tried to call pop() on an empty array"))?;
-                Ok(ArrowRet::Mut{var: Value::Array(array), ret})
+                Ok(ret)
             }
             _ => plainerr("error: pop() must be called with an array as the first argument")
         }

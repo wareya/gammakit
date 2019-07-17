@@ -22,7 +22,7 @@ impl Interpreter
     {
         match self.top_frame.pop()
         {
-            Some(StackValue::Var(x)) => self.evaluate_or_store(&x, None).ok()?,
+            Some(StackValue::Var(x)) => self.evaluate(&x).ok()?.to_val().ok(),
             Some(StackValue::Val(x)) => Some(x),
             _ => None
         }
@@ -50,7 +50,7 @@ impl Interpreter
             {
                 StackValue::Val(val) =>
                 {
-                    let (_, ret) = binding(val, args)?.into_parts();
+                    let ret = binding(ValRefReadOnly::from_val(val), args)?;
                     if isexpr
                     {
                         self.stack_push_val(ret);
@@ -58,14 +58,8 @@ impl Interpreter
                 }
                 StackValue::Var(source) =>
                 {
-                    let val = self.evaluate_or_store(&source, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just accessing a variable"))?;
-                    let (var, ret) = binding(val, args)?.into_parts();
-                    
-                    if let Some(var) = var
-                    {
-                        self.evaluate_or_store(&source, Some(var))?;
-                    }
-                    
+                    let val = self.evaluate(&source)?;
+                    let ret = binding(val, args)?;
                     if isexpr
                     {
                         self.stack_push_val(ret);

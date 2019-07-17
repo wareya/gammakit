@@ -33,19 +33,6 @@ fn assign_val(value : Value, var : &mut Value) -> Result<(), String>
     }
 }
 
-fn assign_or_return_valref(value : Option<Value>, var : Box<dyn ValRef>) -> Result<Option<Value>, String>
-{
-    match value
-    {
-        Some(value) =>
-        {
-            var.assign(value)?;
-            Ok(None)
-        }
-        _ => var.to_val().map(|x| Some(x))
-    }
-}
-
 pub (crate) fn assign_indexed(value : Value, var : &mut Value, indexes : &[HashableValue]) -> Result<(), String>
 {
     if let (Some(index), Some(new_indexes)) = (indexes.get(0), indexes.get(1..))
@@ -147,9 +134,9 @@ pub (crate) fn return_indexed(var : &Value, indexes : &[HashableValue]) -> Resul
     }
 }
 
-fn access_frame(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectVar, seen_instance : &mut bool) -> Option<Box<dyn ValRef>>
+fn access_frame(global : &GlobalState, frame : &Frame, dirvar : &DirectVar, seen_instance : &mut bool) -> Option<Box<dyn ValRef>>
 {
-    for scope in frame.scopes.iter_mut().rev()
+    for scope in frame.scopes.iter().rev()
     {
         if let Some(var) = scope.get(&dirvar.name)
         {
@@ -184,117 +171,18 @@ fn access_frame(global : &mut GlobalState, frame : &mut Frame, dirvar : &DirectV
 
 impl Interpreter
 {
-    fn evaluate_or_store_of_array(&mut self, arrayvar : &ArrayVar, value : Option<Value>) -> Result<Option<Value>, String>
+    fn evaluate_of_array(&self, arrayvar : &ArrayVar) -> Result<Box<dyn ValRef>, String>
     {
         match &arrayvar.location
         {
-            NonArrayVariable::Indirect(ref indirvar) =>
-            {
-                match indirvar.source
-                {
-                    IndirectSource::Ident(ident) =>
-                    {
-                        if let Some(value) = value
-                        {
-                            let instance = self.global.instances.get(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, ident))?;
-                            let var = instance.variables.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, ident))?;
-                            assign_indexed(value, &mut *var.borrow_mut()?, &arrayvar.indexes)?;
-                            Ok(None)
-                        }
-                        else
-                        {
-                            let instance = self.global.instances.get(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, ident))?;
-                            let var = instance.variables.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, ident))?;
-                            Ok(Some(return_indexed(&*var.borrow()?, &arrayvar.indexes)?))
-                        }
-                    }
-                    IndirectSource::Global =>
-                    {
-                        if let Some(value) = value
-                        {
-                            let var = self.global.variables.get(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", indirvar.name))?;
-                            assign_indexed(value, &mut *var.borrow_mut()?, &arrayvar.indexes)?;
-                            Ok(None)
-                        }
-                        else
-                        {
-                            let var = self.global.variables.get(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", indirvar.name))?;
-                            Ok(Some(return_indexed(&*var.borrow()?, &arrayvar.indexes)?))
-                        }
-                    }
-                }
-            }
-            NonArrayVariable::Direct(ref dirvar) =>
-            {
-                let mut seen_instance = false;
-                let mut my_ref = access_frame(&mut self.global, &mut self.top_frame, dirvar, &mut seen_instance);
-                if my_ref.is_none() && !self.top_frame.impassable
-                {
-                    for mut frame in self.frames.iter_mut().rev()
-                    {
-                        my_ref = access_frame(&mut self.global, &mut frame, dirvar, &mut seen_instance);
-                        if frame.impassable || my_ref.is_some()
-                        {
-                            break;
-                        }
-                    }
-                }
-                if self.global.objectnames.contains_key(&dirvar.name)
-                {
-                    return plainerr!("error: tried to index into object name as though it was an array");
-                }
-                if self.global.functions.contains_key(&dirvar.name)
-                {
-                    return plainerr!("error: tried to index into global function name as though it was an array");
-                }
-                if self.get_binding(&dirvar.name).is_some() || self.get_simple_binding(&dirvar.name).is_some()
-                {
-                    return plainerr!("error: tried to index into internal function name as though it was an array");
-                }
-                match my_ref
-                {
-                    Some(my_ref) =>
-                    {
-                        if let Some(value) = value
-                        {
-                            assign_indexed(value, &mut *my_ref.borrow_mut()?, &arrayvar.indexes)?;
-                            Ok(None)
-                        }
-                        else
-                        {
-                            Ok(Some(return_indexed(&*my_ref.borrow()?, &arrayvar.indexes)?))
-                        }
-                    }
-                    None => Err(format!("error: unknown variable `{}`", dirvar.name))
-                }
-            }
-            NonArrayVariable::ActualArray(array) =>
-            {
-                if value.is_none()
-                {
-                    return Ok(Some(return_indexed(&Value::Array(array.clone()), &arrayvar.indexes)?));
-                }
-                plainerr!("error: tried to assign to an index of a non-variable array value")
-            }
-            NonArrayVariable::ActualDict(dict) =>
-            {
-                if value.is_none()
-                {
-                    return Ok(Some(return_indexed(&Value::Dict(dict.clone()), &arrayvar.indexes)?));
-                }
-                plainerr!("error: tried to assign to an index of a non-variable dict value")
-            }
-            NonArrayVariable::ActualText(string) =>
-            {
-                if value.is_none()
-                {
-                    return Ok(Some(return_indexed(&Value::Text(string.clone()), &arrayvar.indexes)?));
-                }
-                plainerr!("error: tried to assign to an index of a non-variable string value")
-            }
+            NonArrayVariable::Indirect(ref indirvar) => Ok(ValRefArray::from_ref(self.evaluate_of_indirect(indirvar)?.extract_ref()?, arrayvar.indexes.clone())),
+            NonArrayVariable::Direct(ref dirvar) => Ok(ValRefArray::from_ref(self.evaluate_of_direct(dirvar)?.extract_ref()?, arrayvar.indexes.clone())),
+            NonArrayVariable::ActualArray(array) => Ok(ValRefArrayReadOnly::from_val(Value::Array(array.clone()), arrayvar.indexes.clone())),
+            NonArrayVariable::ActualDict(dict) => Ok(ValRefArrayReadOnly::from_val(Value::Dict(dict.clone()), arrayvar.indexes.clone())),
+            NonArrayVariable::ActualText(string) => Ok(ValRefArrayReadOnly::from_val(Value::Text(string.clone()), arrayvar.indexes.clone())),
         }
     }
-    fn evaluate_or_store_of_indirect(&mut self, indirvar : &IndirectVar, value : Option<Value>) -> Result<Option<Value>, String>
+    fn evaluate_of_indirect(&self, indirvar : &IndirectVar,) -> Result<Box<dyn ValRef>, String>
     {
         match indirvar.source
         {
@@ -304,7 +192,7 @@ impl Interpreter
                 
                 if let Some(var) = instance.variables.get(&indirvar.name)
                 {
-                    assign_or_return_valref(value, var.refclone())
+                    Ok(var.refclone())
                 }
                 else
                 {
@@ -312,36 +200,32 @@ impl Interpreter
                     
                     let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, ident))?;
                     
-                    if value.is_none()
-                    {
-                        let mut mydata = funcdat.clone();
-                        mydata.forcecontext = ident;
-                        return Ok(Some(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata))));
-                    }
-                    Err(format!("error: tried to assign to function `{}` in instance of object type `{}`", indirvar.name, objspec.name))
+                    let mut mydata = funcdat.clone();
+                    mydata.forcecontext = ident;
+                    return Ok(ValRefReadOnly::from_val(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata))));
                 }
             }
             IndirectSource::Global =>
             {
                 let var = self.global.variables.get(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", indirvar.name))?;
-                assign_or_return_valref(value, var.refclone())
+                Ok(var.refclone())
             }
         }
     }
-    fn evaluate_or_store_of_direct(&mut self, dirvar : &DirectVar, value : Option<Value>) -> Result<Option<Value>, String>
+    fn evaluate_of_direct(&self, dirvar : &DirectVar) -> Result<Box<dyn ValRef>, String>
     {
         let mut seen_instance = false;
-        if let Some(my_ref) = access_frame(&mut self.global, &mut self.top_frame, dirvar, &mut seen_instance)
+        if let Some(my_ref) = access_frame(&self.global, &self.top_frame, dirvar, &mut seen_instance)
         {
-            return assign_or_return_valref(value, my_ref);
+            return Ok(my_ref.refclone());
         }
         if !self.top_frame.impassable
         {
-            for mut frame in self.frames.iter_mut().rev()
+            for frame in self.frames.iter().rev()
             {
-                if let Some(my_ref) = access_frame(&mut self.global, &mut frame, dirvar, &mut seen_instance)
+                if let Some(my_ref) = access_frame(&self.global, &frame, dirvar, &mut seen_instance)
                 {
-                    return assign_or_return_valref(value, my_ref);
+                    return Ok(my_ref.refclone());
                 }
                 if frame.impassable { break; }
             }
@@ -349,74 +233,43 @@ impl Interpreter
         
         if let Some(var) = self.global.objectnames.get(&dirvar.name)
         {
-            if value.is_none()
-            {
-                return Ok(Some(Value::Object(*var)));
-            }
-            return Err(format!("error: tried to assign to read-only object name `{}`", dirvar.name));
+            return Ok(ValRefSimple::from_val(Value::Object(*var)));
         }
         if let Some(var) = self.global.functions.get(&dirvar.name)
         {
-            if value.is_none()
-            {
-                return Ok(Some(var.clone()));
-            }
-            return Err(format!("error: tried to assign to global function `{}` (no such identifier exists in any other scope, you should declare it with 'var' to override this logic)", dirvar.name));
+            return Ok(ValRefSimple::from_val(var.clone()));
         }
         if self.get_binding(&dirvar.name).is_some() || self.get_simple_binding(&dirvar.name).is_some()
         {
-            if value.is_none()
-            {
-                return Ok(Some(Value::new_funcval(true, Some(dirvar.name.clone()), None, None)));
-            }
-            return plainerr!("error: tried to assign to internal function name");
+            return Ok(ValRefSimple::from_val(Value::new_funcval(true, Some(dirvar.name.clone()), None, None)));
         }
         
         Err(format!("error: unknown identifier `{}`", dirvar.name))
     }
-    pub (crate) fn evaluate_self(&mut self, value : Option<Value>) -> Result<Option<Value>, String>
+    pub (crate) fn evaluate_self(&self) -> Result<Box<dyn ValRef>, String>
     {
-        if value.is_some()
-        {
-            return plainerr!("error: cannot assign to variable called \"self\" (special read-only name)");
-        }
-        if let Some(id) = self.top_frame.instancestack.last()
-        {
-            return Ok(Some(Value::Instance(*id)));
-        }
-        return plainerr!("error: tried to access `self` while not inside of instance scope");
+        let id = self.top_frame.instancestack.last().ok_or_else(|| "error: tried to access `self` while not inside of instance scope".to_string())?;
+        Ok(ValRefSimple::from_val(Value::Instance(*id)))
     }
-    pub (crate) fn evaluate_global(&mut self, value : Option<Value>) -> Result<Option<Value>, String>
+    pub (crate) fn evaluate_global(&self) -> Result<Box<dyn ValRef>, String>
     {
-        if value.is_some()
-        {
-            return plainerr!("error: cannot assign to variable called \"global\" (special read-only name)");
-        }
-        return Ok(Some(Value::Special(Special::Global)));
+        Ok(ValRefSimple::from_val(Value::Special(Special::Global)))
     }
-    pub (crate) fn evaluate_other(&mut self, value : Option<Value>) -> Result<Option<Value>, String>
+    pub (crate) fn evaluate_other(&self) -> Result<Box<dyn ValRef>, String>
     {
-        if value.is_some()
-        {
-            return plainerr!("error: cannot assign to variable called \"other\" (special read-only name)");
-        }
-        if let Some(id) = self.top_frame.instancestack.get(self.top_frame.instancestack.len()-2)
-        {
-            return Ok(Some(Value::Instance(*id)));
-        }
-        return plainerr!("error: tried to access `other` while not inside of at least two instance scopes");
+        let id = self.top_frame.instancestack.get(self.top_frame.instancestack.len()-2).ok_or_else(|| "error: tried to access `other` while not inside of at least two instance scopes".to_string())?;
+        Ok(ValRefSimple::from_val(Value::Instance(*id)))
     }
-    // if value is None, finds and returns appropriate value; otherwise, stores value and returns None
-    pub (crate) fn evaluate_or_store(&mut self, variable : &Variable, value : Option<Value>) -> Result<Option<Value>, String>
+    pub (crate) fn evaluate(&self, variable : &Variable) -> Result<Box<dyn ValRef>, String>
     {
         let ret = match &variable
         {
-            Variable::Array(ref arrayvar) => self.evaluate_or_store_of_array(arrayvar, value),
-            Variable::Indirect(ref indirvar) => self.evaluate_or_store_of_indirect(indirvar, value),
-            Variable::Direct(ref dirvar) => self.evaluate_or_store_of_direct(dirvar, value),
-            Variable::Selfref => self.evaluate_self(value),
-            Variable::Global => self.evaluate_global(value),
-            Variable::Other => self.evaluate_other(value),
+            Variable::Array(ref arrayvar) => self.evaluate_of_array(arrayvar),
+            Variable::Indirect(ref indirvar) => self.evaluate_of_indirect(indirvar),
+            Variable::Direct(ref dirvar) => self.evaluate_of_direct(dirvar),
+            Variable::Selfref => self.evaluate_self(),
+            Variable::Global => self.evaluate_global(),
+            Variable::Other => self.evaluate_other(),
         };
         return ret;
     }

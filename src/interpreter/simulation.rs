@@ -118,7 +118,7 @@ impl Interpreter
             "other" => Variable::Other,
             _ => Variable::Direct(DirectVar{name})
         };
-        let val = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("error: tried to evaluate non-extant variable"))?;
+        let val = self.evaluate(&var)?.to_val()?;
         self.stack_push_val(val);
         Ok(())
     }
@@ -201,16 +201,16 @@ impl Interpreter
             
             StackValue::Var(var) =>
             {
-                let value = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just accessing a variable"))?;
-                match value
+                let value = self.evaluate(&var)?;
+                match *value.borrow()?
                 {
-                    Value::Instance(ident) =>
+                    Value::Instance(ref ident) =>
                     {
                         if !self.global.instances.contains_key(&ident)
                         {
                             return Err(format!("error: tried to perform indirection on instance {} that doesn't exist", ident));
                         }
-                        self.stack_push_var(IndirectVar::from_ident(ident, name));
+                        self.stack_push_var(IndirectVar::from_ident(*ident, name));
                     }
                     Value::Special(Special::Global) =>
                         self.stack_push_var(IndirectVar::from_global(name)),
@@ -230,7 +230,7 @@ impl Interpreter
                             _ => return plainerr("internal error: tried to treat a special read-only variable as the left hand of a . operation instead of using its value")
                         }
                     }
-                }
+                };
             }
             _ => return plainerr("error: tried to use indirection on a type that doesn't support it (only instances, dictionaries, and 'special' values are allowed)")
         }
@@ -258,7 +258,7 @@ impl Interpreter
             return Err(format!("internal error: EVALUATION instruction requires 1 values on the stack but only found {}", self.stack_len()));
         }
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: failed to find a variable on the stack in EVALUATION"))?;
-        let value = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just accessing a variable"))?;
+        let value = self.evaluate(&var)?.to_val()?;
         self.stack_push_val(value);
         Ok(())
     }
@@ -274,9 +274,9 @@ impl Interpreter
     {
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: not enough variables on stack to run instruction INVOKE"))?;
         
-        let val = self.evaluate_or_store(&var, None)?;
+        let val = self.evaluate(&var)?.to_val()?;
         
-        if let Some(Value::Generator(generator_state)) = val
+        if let Value::Generator(generator_state) = val
         {
             let frame = generator_state.frame.ok_or_else(|| minierr("error: tried to invoke a dead generator"))?;
             self.stack_push_var(var.clone());
@@ -299,7 +299,7 @@ impl Interpreter
         let _yielded = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 2 to INVOKECALL must be a value"))?;
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: stack argument 3 to INVOKECALL must be a variable"))?;
         
-        self.evaluate_or_store(&var, Some(generator))?;
+        self.evaluate(&var)?.assign(generator)?;
         
         Ok(())
     }
@@ -313,7 +313,7 @@ impl Interpreter
         let yielded = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 2 to INVOKEEXPR must be a value"))?;
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: stack argument 3 to INVOKEEXPR must be a variable"))?;
         
-        self.evaluate_or_store(&var, Some(generator))?;
+        self.evaluate(&var)?.assign(generator)?;
         
         self.stack_push_val(yielded);
         
@@ -641,16 +641,16 @@ impl Interpreter
         
         if immediate == 0x00
         {
-            self.evaluate_or_store(&var, Some(value))?;
+            self.evaluate(&var)?.assign(value)?;
         }
         else
         {
             let opfunc = get_binop_function(immediate).ok_or_else(|| format!("internal error: unknown binary operation 0x{:02X}", immediate))?;
             
-            let var_initial_value = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just accessing value"))?;
+            let var_initial_value = self.evaluate(&var)?;
             
-            let var_new_value = opfunc(&var_initial_value, &value).or_else(|text| Err(format!("error: disallowed binary statement\n({})", text)))?;
-            self.evaluate_or_store(&var, Some(var_new_value))?;
+            let var_new_value = opfunc(&var_initial_value.to_val()?, &value).or_else(|text| Err(format!("error: disallowed binary statement\n({})", text)))?;
+            var_initial_value.assign(var_new_value)?;
         }
         Ok(())
     }
@@ -666,10 +666,8 @@ impl Interpreter
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: argument to UNSTATE could not be found or was not a variable"))?;
         
         let opfunc = get_unstate_function(immediate).ok_or_else(|| format!("internal error: unknown unary statement operation 0x{:02X}", immediate))?;
-        let mut value = self.evaluate_or_store(&var, None)?.ok_or_else(|| minierr("internal error: evaluate_or_store returned None when just accessing value"))?;
-        value = opfunc(&value).or_else(|text| Err(format!("error: disallowed unary statement operation\n({})", text)))?;
-        
-        self.evaluate_or_store(&var, Some(value))?;
+        let var = self.evaluate(&var)?;
+        var.assign(opfunc(&var.to_val()?).or_else(|text| Err(format!("error: disallowed unary statement operation\n({})", text)))?)?;
         Ok(())
     }
     
