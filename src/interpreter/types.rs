@@ -123,6 +123,13 @@ pub (crate) enum IndirectSource {
     Ident(usize), // id of an instance
     Global,
 }
+impl IndirectSource {
+    pub (crate) fn upgrade(self, name : String) -> Variable
+    {
+        Variable::Indirect(IndirectVar{source: self, name})
+    }
+}
+
 #[derive(Debug, Clone)]
 pub (crate) struct IndirectVar { // for x.y
     pub (super) source: IndirectSource,
@@ -242,6 +249,27 @@ impl ValRef {
     pub (crate) fn from_ref(reference : Rc<RefCell<Value>>, indexes : Vec<HashableValue>, readonly : bool) -> ValRef
     {
         ValRef{reference, indexes : Some(indexes), readonly}
+    }
+    pub (crate) fn is_indir_source(&self) -> Result<Option<IndirectSource>, String>
+    {
+        if self.indexes.is_none()
+        {
+            match *self.borrow()?
+            {
+                Value::Instance(ref ident) => Ok(Some(IndirectSource::Ident(*ident))),
+                Value::Special(Special::Global) => Ok(Some(IndirectSource::Global)),
+                _ => Ok(None)
+            }
+        }
+        else
+        {
+            match self.to_val()?
+            {
+                Value::Instance(ident) => Ok(Some(IndirectSource::Ident(ident))),
+                Value::Special(Special::Global) => Ok(Some(IndirectSource::Global)),
+                _ => Ok(None)
+            }
+        }
     }
     pub fn refclone(&self) -> ValRef
     {

@@ -187,13 +187,7 @@ impl Interpreter
         match source
         {
             StackValue::Val(Value::Instance(ident)) =>
-            {
-                if !self.global.instances.contains_key(&ident)
-                {
-                    return Err(format!("error: tried to perform indirection on instance {} that doesn't exist", ident));
-                }
-                self.stack_push_var(IndirectVar::from_ident(ident, name));
-            }
+                self.stack_push_var(IndirectVar::from_ident(ident, name)),
             StackValue::Val(Value::Special(Special::Global)) =>
                 self.stack_push_var(IndirectVar::from_global(name)),
             StackValue::Val(Value::Dict(dict)) =>
@@ -202,35 +196,24 @@ impl Interpreter
             StackValue::Var(var) =>
             {
                 let value = self.evaluate(&var)?;
-                match *value.borrow()?
+                if let Some(source) = value.is_indir_source()?
                 {
-                    Value::Instance(ref ident) =>
+                    self.stack_push_var(source.upgrade(name));
+                    return Ok(())
+                }
+                match var
+                {
+                    Variable::Array(mut arrayvar) =>
                     {
-                        if !self.global.instances.contains_key(&ident)
-                        {
-                            return Err(format!("error: tried to perform indirection on instance {} that doesn't exist", ident));
-                        }
-                        self.stack_push_var(IndirectVar::from_ident(*ident, name));
+                        arrayvar.indexes.push(HashableValue::Text(name));
+                        self.stack_push_var(Variable::Array(arrayvar));
                     }
-                    Value::Special(Special::Global) =>
-                        self.stack_push_var(IndirectVar::from_global(name)),
-                    _ =>
-                    {
-                        match var
-                        {
-                            Variable::Array(mut arrayvar) =>
-                            {
-                                arrayvar.indexes.push(HashableValue::Text(name));
-                                self.stack_push_var(Variable::Array(arrayvar));
-                            }
-                            Variable::Direct(dirvar) =>
-                                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(HashableValue::Text(name)) } )),
-                            Variable::Indirect(indirvar) =>
-                                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(HashableValue::Text(name)) } )),
-                            _ => return plainerr("internal error: tried to treat a special read-only variable as the left hand of a . operation instead of using its value")
-                        }
-                    }
-                };
+                    Variable::Direct(dirvar) =>
+                        self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(HashableValue::Text(name)) } )),
+                    Variable::Indirect(indirvar) =>
+                        self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(HashableValue::Text(name)) } )),
+                    _ => return plainerr("internal error: tried to treat a special read-only variable as the left hand of a . operation instead of using its value")
+                }
             }
             _ => return plainerr("error: tried to use indirection on a type that doesn't support it (only instances, dictionaries, and 'special' values are allowed)")
         }

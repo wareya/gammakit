@@ -81,7 +81,7 @@ pub (crate) fn assign_indexed(value : Value, var : &mut Value, indexes : &[Hasha
                     Err(format!("error: tried to assign to an index into a string with a string that was not exactly one character long (was {} characters long)", mychar.len()))
                 }
             }
-            _ => plainerr!("error: tried to index into a non-array, non-dict value")
+            _ => Err(format!("error: tried to index into a non-array, non-dict, non-text value {:?} with index {:?}", var, index))
         }
     }
     else
@@ -125,7 +125,7 @@ pub (crate) fn return_indexed(var : &Value, indexes : &[HashableValue]) -> Resul
                 newstr.push(*codepoint);
                 Ok(Value::Text(newstr))
             }
-            _ => plainerr!("error: tried to index into a non-array, non-dict value")
+            _ => Err(format!("error: tried to index into a non-array, non-dict, non-text value {:?} with index {:?}", var, index))
         }
     }
     else
