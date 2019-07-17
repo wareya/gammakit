@@ -35,6 +35,12 @@ struct CompilerState {
     last_type : String,
 }
 
+fn compile_raw_string(code : &mut Vec<u8>, text : &str)
+{
+    code.extend(text.bytes());
+    code.push(0x00);
+}
+
 impl CompilerState {
     fn new() -> CompilerState
     {
@@ -60,7 +66,7 @@ impl CompilerState {
         self.add_hook(&"lhunop", &CompilerState::compile_children);
         self.add_hook(&"simplexpr", &CompilerState::compile_children);
         self.add_hook(&"supersimplexpr", &CompilerState::compile_children);
-        self.add_hook(&"string", &CompilerState::compile_string);
+        self.add_hook(&"string", &CompilerState::compile_push_string);
         self.add_hook(&"condition", &CompilerState::compile_children);
         self.add_hook(&"barestatement", &CompilerState::compile_children);
         self.add_hook(&"block", &CompilerState::compile_block);
@@ -106,11 +112,14 @@ impl CompilerState {
         self.code.push(PUSHFLT);
         self.code.extend(pack_f64(float));
     }
+    fn compile_raw_string(&mut self, text : &str)
+    {
+        compile_raw_string(&mut self.code, text);
+    }
     fn compile_string_with_prefix(&mut self, prefix : u8, text : &str)
     {
         self.code.push(prefix);
-        self.code.extend(text.bytes());
-        self.code.push(0x00);
+        self.compile_raw_string(text);
     }
 
     fn compile_unscope(&mut self) -> Result<(), String>
@@ -195,8 +204,7 @@ impl CompilerState {
         self.code.push(DEBUGINFO);
         self.code.extend(pack_u64(self.last_line as u64));
         self.code.extend(pack_u64(self.last_index as u64));
-        self.code.extend(self.last_type.bytes());
-        self.code.push(0x00);
+        compile_raw_string(&mut self.code, &self.last_type);
         self.compile_nth_child(ast, 0)
     }
     
@@ -322,7 +330,7 @@ impl CompilerState {
         }
         Ok(())
     }
-    fn compile_string(&mut self, ast : &ASTNode) -> Result<(), String>
+    fn compile_push_string(&mut self, ast : &ASTNode) -> Result<(), String>
     {
         self.compile_string_with_prefix(PUSHSTR, &unescape(&slice(&ast.child(0)?.text, 1, -1)));
         Ok(())
@@ -479,8 +487,7 @@ impl CompilerState {
         
         self.compile_context_wrapped(Context::Unknown, &|x|
         {
-            x.code.extend(name.bytes());
-            x.code.push(0x00);
+            x.compile_raw_string(&name);
             x.code.extend(pack_u16(ast.child(3)?.children.len() as u16));
             
             let body_len_position = x.code.len();
@@ -488,8 +495,7 @@ impl CompilerState {
             
             for arg in &ast.child(3)?.children
             {
-                x.code.extend(arg.child(0)?.text.bytes());
-                x.code.push(0x00);
+                x.compile_raw_string(&arg.child(0)?.text);
             }
             
             let position_1 = x.code.len();
@@ -683,8 +689,7 @@ impl CompilerState {
           
         for arg in args
         {
-            self.code.extend(arg.child(0)?.text.bytes());
-            self.code.push(0x00);
+            self.compile_raw_string(&arg.child(0)?.text);
         }
         
         let position_1 = self.code.len();

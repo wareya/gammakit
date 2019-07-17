@@ -262,7 +262,7 @@ impl Interpreter
     }
     pub (crate) fn evaluate(&self, variable : &Variable) -> Result<ValRef, String>
     {
-        let ret = match &variable
+        match &variable
         {
             Variable::Array(ref arrayvar) => self.evaluate_of_array(arrayvar),
             Variable::Indirect(ref indirvar) => self.evaluate_of_indirect(indirvar),
@@ -270,7 +270,6 @@ impl Interpreter
             Variable::Selfref => self.evaluate_self(),
             Variable::Global => self.evaluate_global(),
             Variable::Other => self.evaluate_other(),
-        };
-        return ret;
+        }
     }
 }

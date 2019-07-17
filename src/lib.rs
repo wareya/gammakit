@@ -112,7 +112,6 @@ mod tests {
         
         println!("simulation took {:?}", Instant::now().duration_since(start_time));
         println!("steps {:?}", steps);
-        //println!("op map {:?}", interpreter.op_map);
         let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>();
         op_map.sort_by(|a, b| a.1.cmp(&b.1));
         for (op, time) in op_map

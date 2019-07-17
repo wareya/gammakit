@@ -24,9 +24,17 @@ regex = "1"
 
 [profile.bench]
 opt-level = 3
-debug = 2
-incremental = true
-overflow-checks = true
+debug = false
+incremental = false
+overflow-checks = false
+lto = true
+
+[profile.release]
+opt-level = 3
+debug = false
+incremental = false
+overflow-checks = false
+lto = true
 
 [profile.test]
 opt-level = 3

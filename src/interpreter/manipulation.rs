@@ -88,9 +88,8 @@ impl Interpreter
             end += 1;
         }
         
-        let res = String::from_utf8_lossy(&code[start..end]).to_string();
         self.set_pc(end+1);
-        Ok(res)
+        Ok(String::from_utf8_lossy(&code[start..end]).to_string())
     }
     pub (crate) fn read_function(&mut self, subroutine : bool, generator : bool) -> Result<(String, FuncSpec), String>
     {
