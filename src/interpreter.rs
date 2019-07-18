@@ -141,22 +141,18 @@ impl Interpreter {
         let op = self.pull_single_from_code()?;
         let opfunc = match_or_err!(self.get_opfunc(op), Some(opfunc) => opfunc, Some(format!("internal error: unknown operation 0x{:02X}", op)))?;
         
-        if self.track_op_performance
+        if !self.track_op_performance
+        {
+            opfunc(self).map_err(Some)?;
+        }
+        else
         {
             let start_time = Instant::now();
             opfunc(self).map_err(Some)?;
             *self.op_map.entry(op).or_insert(0) += Instant::now().duration_since(start_time).as_nanos();
         }
-        else
-        {
-            opfunc(self).map_err(Some)?;
-        }
         
-        if self.doexit
-        {
-            return Err(None);
-        }
-        Ok(())
+        return if self.doexit { Err(None) } else { Ok(()) }
     }
     /// Steps the interpreter by a single operation.
     ///

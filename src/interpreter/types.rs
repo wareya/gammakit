@@ -255,27 +255,6 @@ impl ValRef {
     {
         ValRef{reference, indexes : Some(indexes), readonly}
     }
-    pub (crate) fn is_indir_source(&self) -> Result<Option<IndirectSource>, String>
-    {
-        if self.indexes.is_none()
-        {
-            match *self.borrow()?
-            {
-                Value::Instance(ref ident) => Ok(Some(IndirectSource::Ident(*ident))),
-                Value::Special(Special::Global) => Ok(Some(IndirectSource::Global)),
-                _ => Ok(None)
-            }
-        }
-        else
-        {
-            match self.to_val()?
-            {
-                Value::Instance(ident) => Ok(Some(IndirectSource::Ident(ident))),
-                Value::Special(Special::Global) => Ok(Some(IndirectSource::Global)),
-                _ => Ok(None)
-            }
-        }
-    }
     pub fn refclone(&self) -> ValRef
     {
         ValRef{reference : Rc::clone(&self.reference), indexes : self.indexes.clone(), readonly : self.readonly}

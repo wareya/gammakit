@@ -162,16 +162,6 @@ impl Interpreter
         Ok((captures, FuncSpec { varnames : args, code : code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : true, generator : false }))
     }
     
-    /*
-    pub (crate) fn stack_pop_number(&mut self) -> Option<f64>
-    {
-        match_or_none!(self.stack_pop_val(), Some(Value::Number(val)) => val)
-    }
-    */
-    pub (crate) fn stack_pop_text(&mut self) -> Option<String>
-    {
-        match_or_none!(self.stack_pop_val(), Some(Value::Text(val)) => val)
-    }
     pub (crate) fn stack_pop_name(&mut self) -> Option<usize>
     {
         match_or_none!(self.stack_pop_var(), Some(Variable::Direct(name)) => name)

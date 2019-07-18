@@ -78,10 +78,6 @@ impl Code
     {
         self.code.get(index)
     }
-    pub (crate) fn get_mut<I : std::slice::SliceIndex<[u8]>>(&mut self, index : I) -> Option<&mut I::Output>
-    {
-        Rc::get_mut(&mut self.code).unwrap().get_mut(index)
-    }
     fn add_debug_info(&mut self, pc : usize, last_line : usize, last_index : usize, last_type : &str)
     {
         Rc::get_mut(&mut self.debug).unwrap().insert(pc, DebugInfo{last_line, last_index, last_type : last_type.to_string()});
