@@ -93,7 +93,7 @@ impl Interpreter {
             global : GlobalState::new(parser),
             last_error : None,
             op_map : HashMap::new(),
-            track_op_performance : true
+            track_op_performance : false
         }
     }
     /// Loads new code into the interpreter.
