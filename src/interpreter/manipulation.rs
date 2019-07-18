@@ -81,6 +81,10 @@ impl Interpreter
     {
         self.get_code().get_string_index(string)
     }
+    pub (crate) fn get_indexed_string(&self, index : usize) -> String
+    {
+        self.get_code().get_string(index)
+    }
     
     pub (crate) fn read_string(&mut self) -> Result<String, String>
     {

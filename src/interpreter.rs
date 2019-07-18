@@ -76,6 +76,7 @@ pub struct Interpreter {
     pub last_error: Option<String>,
     pub (crate) op_map: HashMap<u8, u128>,
     doexit: bool,
+    pub (crate) track_op_performance: bool
 }
 
 impl Interpreter {
@@ -92,6 +93,7 @@ impl Interpreter {
             global : GlobalState::new(parser),
             last_error : None,
             op_map : HashMap::new(),
+            track_op_performance : true
         }
     }
     /// Loads new code into the interpreter.
@@ -129,7 +131,7 @@ impl Interpreter {
     }
     fn step_internal(&mut self) -> StepResult
     {
-        //use std::time::Instant;
+        use std::time::Instant;
         
         if self.get_pc() < self.top_frame.startpc || self.get_pc() > self.top_frame.endpc
         {
@@ -139,11 +141,16 @@ impl Interpreter {
         let op = self.pull_single_from_code()?;
         let opfunc = match_or_err!(self.get_opfunc(op), Some(opfunc) => opfunc, Some(format!("internal error: unknown operation 0x{:02X}", op)))?;
         
-        //println!("running op 0x{:02X} at 0x{:X}", op, self.get_pc()-1);
-        
-        //let start_time = Instant::now();
-        opfunc(self).map_err(Some)?;
-        //*self.op_map.entry(op).or_insert(0) += Instant::now().duration_since(start_time).as_nanos();
+        if self.track_op_performance
+        {
+            let start_time = Instant::now();
+            opfunc(self).map_err(Some)?;
+            *self.op_map.entry(op).or_insert(0) += Instant::now().duration_since(start_time).as_nanos();
+        }
+        else
+        {
+            opfunc(self).map_err(Some)?;
+        }
         
         if self.doexit
         {

@@ -66,6 +66,10 @@ impl Code
     {
         self.bookkeeping.get_string_index(string)
     }
+    pub (crate) fn get_string(&self, index : usize) -> String
+    {
+        self.bookkeeping.get_string(index)
+    }
     pub (crate) fn len(&self) -> usize
     {
         self.code.len()

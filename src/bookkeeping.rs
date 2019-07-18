@@ -8,6 +8,7 @@ struct BookkeepingInternal
 {
     string_index : usize,
     string_table : HashMap<String, usize>,
+    string_table_reverse : HashMap<usize, String>,
 }
 
 #[derive(Debug)]
@@ -26,7 +27,13 @@ impl Bookkeeping
         string_table.insert("other".to_string(), 3);
         string_table.insert("id".to_string(), 4);
         string_table.insert("create".to_string(), 5);
-        Bookkeeping{internal : Rc::new(RefCell::new(BookkeepingInternal{string_index : 6, string_table }))}
+        let mut string_table_reverse = HashMap::new();
+        string_table_reverse.insert(1, "global".to_string());
+        string_table_reverse.insert(2, "self".to_string());
+        string_table_reverse.insert(3, "other".to_string());
+        string_table_reverse.insert(4, "id".to_string());
+        string_table_reverse.insert(5, "create".to_string());
+        Bookkeeping{internal : Rc::new(RefCell::new(BookkeepingInternal{string_index : 6, string_table, string_table_reverse}))}
     }
     pub (crate) fn refclone(&self) -> Bookkeeping
     {
@@ -44,7 +51,19 @@ impl Bookkeeping
             let index = internal.string_index;
             internal.string_index += 1;
             internal.string_table.insert(string.clone(), index);
+            internal.string_table_reverse.insert(index, string.clone());
             index
+        }
+    }
+    pub (crate) fn get_string(&self, index : usize) -> String
+    {
+        if let Some(string) = self.internal.borrow().string_table_reverse.get(&index)
+        {
+            string.clone()
+        }
+        else
+        {
+            format!("<index {} with no associated string>", index)
         }
     }
 }

@@ -188,7 +188,7 @@ impl Interpreter
         {
             IndirectSource::Ident(ident) =>
             {
-                let instance = self.global.instances.get(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", indirvar.name, ident))?;
+                let instance = self.global.instances.get(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
                 
                 if let Some(var) = instance.variables.get(&indirvar.name)
                 {
@@ -196,9 +196,9 @@ impl Interpreter
                 }
                 else
                 {
-                    let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, ident))?;
+                    let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
                     
-                    let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", indirvar.name, ident))?;
+                    let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
                     
                     let mut mydata = funcdat.clone();
                     mydata.forcecontext = ident;
@@ -207,7 +207,7 @@ impl Interpreter
             }
             IndirectSource::Global =>
             {
-                let var = self.global.variables.get(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", indirvar.name))?;
+                let var = self.global.variables.get(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", self.get_indexed_string(indirvar.name)))?;
                 Ok(var.refclone())
             }
         }
@@ -244,7 +244,7 @@ impl Interpreter
             return Ok(ValRef::from_val(Value::new_funcval(true, Some(name.clone()), None, None)));
         }
         
-        Err(format!("error: unknown identifier `{}`", name))
+        Err(format!("error: unknown identifier `{}`", self.get_indexed_string(name)))
     }
     pub (crate) fn evaluate_self(&self) -> Result<ValRef, String>
     {
