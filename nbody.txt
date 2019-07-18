@@ -68,13 +68,13 @@ var zv = [];
 var mass = [];
 for(var i = 0; i < NUM_BODIES; i++)
 {
-    x->push(bodies[i].x);
-    y->push(bodies[i].y);
-    z->push(bodies[i].z);
-    xv->push(bodies[i].xv);
-    yv->push(bodies[i].yv);
-    zv->push(bodies[i].zv);
-    mass->push(bodies[i].mass);
+    x->push(bodies[i]{x});
+    y->push(bodies[i]{y});
+    z->push(bodies[i]{z});
+    xv->push(bodies[i]{xv});
+    yv->push(bodies[i]{yv});
+    zv->push(bodies[i]{zv});
+    mass->push(bodies[i]{mass});
 }
 
 bodies = [];

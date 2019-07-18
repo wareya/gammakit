@@ -195,25 +195,8 @@ impl Interpreter
             
             StackValue::Var(var) =>
             {
-                let value = self.evaluate(&var)?;
-                if let Some(source) = value.is_indir_source()?
-                {
-                    self.stack_push_var(source.upgrade(name));
-                    return Ok(())
-                }
-                match var
-                {
-                    Variable::Array(mut arrayvar) =>
-                    {
-                        arrayvar.indexes.push(HashableValue::Text(name));
-                        self.stack_push_var(Variable::Array(arrayvar));
-                    }
-                    Variable::Direct(dirvar) =>
-                        self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(HashableValue::Text(name)) } )),
-                    Variable::Indirect(indirvar) =>
-                        self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(HashableValue::Text(name)) } )),
-                    _ => return plainerr("internal error: tried to treat a special read-only variable as the left hand of a . operation instead of using its value")
-                }
+                let value = self.evaluate(&var)?.to_val()?;
+                self.stack_push_var(IndirectSource::from_value(value)?.upgrade(name));
             }
             _ => return plainerr("error: tried to use indirection on a type that doesn't support it (only instances, dictionaries, and 'special' values are allowed)")
         }

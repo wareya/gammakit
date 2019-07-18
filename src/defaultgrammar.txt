@@ -27,11 +27,15 @@ indirection:
 dismember:
 -> $name$
 
+dictindex:
+{ $name$ }
+
 rhunexpr_right:
 $funcargs$
 $dismember$
 $arrayindex$
 $indirection$
+$dictindex$
 
 rhunexpr:
 $supersimplexpr$ $rhunexpr_right$+

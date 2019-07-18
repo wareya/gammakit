@@ -128,6 +128,15 @@ impl IndirectSource {
     {
         Variable::Indirect(IndirectVar{source: self, name})
     }
+    pub (crate) fn from_value(value : Value) -> Result<IndirectSource, String>
+    {
+        match value
+        {
+            Value::Instance(id) => Ok(IndirectSource::Ident(id)),
+            Value::Special(Special::Global) => Ok(IndirectSource::Global),
+            _ => Err("error: tried to use indirection on a non-instance or non-global value".to_string())
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

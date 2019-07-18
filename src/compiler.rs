@@ -87,6 +87,7 @@ impl CompilerState {
         self.add_hook(&"rhunexpr", &CompilerState::compile_rhunexpr);
         self.add_hook(&"unary", &CompilerState::compile_unary);
         self.add_hook(&"indirection", &CompilerState::compile_indirection);
+        self.add_hook(&"dictindex", &CompilerState::compile_dictindex);
         self.add_hook(&"binexpr_0", &CompilerState::compile_binexpr);
         self.add_hook(&"binexpr_1", &CompilerState::compile_binexpr);
         self.add_hook(&"binexpr_2", &CompilerState::compile_binexpr);
@@ -655,6 +656,18 @@ impl CompilerState {
     {
         self.compile_string_with_prefix(PUSHNAME, &ast.child(1)?.child(0)?.text); // FIXME make this use PUSHSTR
         self.code.push(DISMEMBER);
+        Ok(())
+    }
+    fn compile_dictindex(&mut self, ast : &ASTNode) -> Result<(), String>
+    {
+        self.compile_string_with_prefix(PUSHSTR, &ast.child(1)?.child(0)?.text);
+        self.code.push(ARRAYEXPR);
+        
+        if matches!(self.context, Context::Expr)
+        {
+            self.code.push(EVALUATION);
+        }
+        
         Ok(())
     }
     fn compile_arrayindex(&mut self, ast : &ASTNode) -> Result<(), String>
