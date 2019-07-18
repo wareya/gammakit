@@ -18,7 +18,7 @@ impl Interpreter
             return plainerr("error: provided too many arguments to function");
         }
         
-        self.push_new_frame(Frame::new_from_call(Rc::clone(&function.code), function.startaddr, function.endaddr, isexpr, if function.impassable {None} else {Some(&self.top_frame)}, false))?;
+        self.push_new_frame(Frame::new_from_call(&function.code, function.startaddr, function.endaddr, isexpr, if function.impassable {None} else {Some(&self.top_frame)}, false))?;
         
         // copy lambda's universe, if there is one
         if let Some(ref universe) = funcdata.predefined
@@ -58,12 +58,12 @@ impl Interpreter
             // if they do, we need to add the return value to the old frame instead of the current frame
             let frames_len_before = self.frames.len();
             let ret = 
-            if let Some(binding_wrapper) = self.get_binding(&name)
+            if let Some(binding_wrapper) = self.get_binding(name)
             {
                 let binding = &mut *binding_wrapper.try_borrow_mut().or_else(|_| plainerr("error: tried to borrow internal function while it was borrowed elsewhere"))?;
                 binding(self, args)?
             }
-            else if let Some(binding_wrapper) = self.get_simple_binding(&name)
+            else if let Some(binding_wrapper) = self.get_simple_binding(name)
             {
                 let binding = &mut *binding_wrapper.try_borrow_mut().or_else(|_| plainerr("error: tried to borrow internal function while it was borrowed elsewhere"))?;
                 binding(args)?
@@ -104,7 +104,7 @@ impl Interpreter
                     {
                         return plainerr("error: provided too many arguments to function");
                     }
-                    let mut new_frame = Frame::new_from_call(Rc::clone(&defdata.code), defdata.startaddr, defdata.endaddr, true, None, true);
+                    let mut new_frame = Frame::new_from_call(&defdata.code, defdata.startaddr, defdata.endaddr, true, None, true);
                     
                     let scope = new_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: no scope in top frame despite just making it in jump_to_function (this error should be unreachable!)"))?;
                     if let Some(ref name) = funcdata.name

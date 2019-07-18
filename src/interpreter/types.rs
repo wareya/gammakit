@@ -37,7 +37,7 @@ pub (crate) struct ForEachData {
     pub (super) scopes: u16,
     pub (super) loop_start: usize,
     pub (super) loop_end: usize,
-    pub (super) name: String,
+    pub (super) name: usize,
     pub (super) values: ForEachValues,
 }
 
@@ -59,11 +59,11 @@ pub (crate) enum Controller {
 
 #[derive(Debug, Clone)]
 pub (crate) struct Frame {
-    pub (super) code: Rc<Vec<u8>>,
+    pub (super) code: Code,
     pub (super) startpc: usize,
     pub (super) pc: usize,
     pub (super) endpc: usize,
-    pub (super) scopes: Vec<HashMap<String, ValRef>>,
+    pub (super) scopes: Vec<HashMap<usize, ValRef>>,
     pub (super) instancestack: Vec<usize>,
     pub (super) controlstack: Vec<Controller>,
     pub (super) stack: Vec<StackValue>,
@@ -77,8 +77,8 @@ pub (crate) struct Frame {
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub (crate) struct FuncSpec {
-    pub (super) varnames: Vec<String>,
-    pub (super) code: Rc<Vec<u8>>,
+    pub (super) varnames: Vec<usize>,
+    pub (super) code: Code,
     pub (super) startaddr: usize,
     pub (super) endaddr: usize,
     pub (super) fromobj: bool, // function is associated with an object type and must be placed in the context of an instance to be used
@@ -91,13 +91,13 @@ pub (crate) struct ObjSpec {
     #[allow(unused)]
     pub (super) ident: usize,
     #[allow(unused)]
-    pub (super) name: String,
-    pub (super) functions: HashMap<String, FuncSpec>
+    pub (super) name: usize,
+    pub (super) functions: HashMap<usize, FuncSpec>
 }
 pub (crate) struct Instance {
     pub (super) objtype: usize,
     pub (super) ident: usize,
-    pub (super) variables: HashMap<String, ValRef>
+    pub (super) variables: HashMap<usize, ValRef>
 }
 
 // variable types (i.e. how to access a variable as an lvalue)
@@ -106,7 +106,7 @@ pub (crate) struct Instance {
 #[derive(Debug, Clone)]
 pub (super) enum NonArrayVariable {
     Indirect(IndirectVar), // x.y.z evaluates x.y before storing it as the instance identity under which to find y
-    Direct(String),
+    Direct(usize),
     ActualArray(Vec<Value>),
     ActualDict(HashMap<HashableValue, Value>),
     ActualText(String)
@@ -124,7 +124,7 @@ pub (crate) enum IndirectSource {
     Global,
 }
 impl IndirectSource {
-    pub (crate) fn upgrade(self, name : String) -> Variable
+    pub (crate) fn upgrade(self, name : usize) -> Variable
     {
         Variable::Indirect(IndirectVar{source: self, name})
     }
@@ -142,15 +142,15 @@ impl IndirectSource {
 #[derive(Debug, Clone)]
 pub (crate) struct IndirectVar { // for x.y
     pub (super) source: IndirectSource,
-    pub (super) name: String
+    pub (super) name: usize
 }
 
 impl IndirectVar {
-    pub (crate) fn from_ident(ident : usize, name : String) -> Variable
+    pub (crate) fn from_ident(ident : usize, name : usize) -> Variable
     {
         Variable::Indirect(IndirectVar{source: IndirectSource::Ident(ident), name})
     }
-    pub (crate) fn from_global(name : String) -> Variable
+    pub (crate) fn from_global(name : usize) -> Variable
     {
         Variable::Indirect(IndirectVar{source: IndirectSource::Global, name})
     }
@@ -160,7 +160,7 @@ impl IndirectVar {
 pub (crate) enum Variable {
     Array(ArrayVar),
     Indirect(IndirectVar),
-    Direct(String),
+    Direct(usize),
     Selfref,
     Global,
     Other,
@@ -172,8 +172,8 @@ pub (crate) enum Variable {
 /// Intentionally opaque. Wrapped by Value.
 pub struct FuncVal {
     pub (super) internal: bool,
-    pub (super) name: Option<String>,
-    pub (super) predefined: Option<HashMap<String, ValRef>>,
+    pub (super) name: Option<usize>,
+    pub (super) predefined: Option<HashMap<usize, ValRef>>,
     pub (super) userdefdata: Option<FuncSpec>
 }
 
@@ -207,7 +207,7 @@ pub (crate) enum Reference {
 /// Intentionally opaque. Wrapped by Value.
 pub struct SubFuncVal {
     pub (super) source: StackValue,
-    pub (super) name: String
+    pub (super) name: usize
 }
 
 /// Stores typed values (e.g. variables after evaluation, raw literal values).
@@ -363,15 +363,15 @@ pub enum HashableValue {
 // implementations
 
 impl Frame {
-    pub (super) fn new_root(code : Rc<Vec<u8>>) -> Frame
+    pub (super) fn new_root(code : &Code) -> Frame
     {
         let codelen = code.len();
-        Frame { code, startpc : 0, pc : 0, endpc : codelen, scopes : vec!(HashMap::new()), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0, impassable: true, generator: false }
+        Frame { code : code.clone(), startpc : 0, pc : 0, endpc : codelen, scopes : vec!(HashMap::new()), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0, impassable: true, generator: false }
     }
-    pub (super) fn new_from_call(code : Rc<Vec<u8>>, startpc : usize, endpc : usize, isexpr : bool, outer : Option<&Frame>, generator : bool) -> Frame
+    pub (super) fn new_from_call(code : &Code, startpc : usize, endpc : usize, isexpr : bool, outer : Option<&Frame>, generator : bool) -> Frame
     {
         let instancestack = if let Some(outer) = outer { outer.instancestack.clone() } else { Vec::new() };
-        Frame { code, startpc, pc : startpc, endpc, scopes : vec!(HashMap::new()), instancestack, controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, impassable : outer.is_none(), generator }
+        Frame { code : code.clone(), startpc, pc : startpc, endpc, scopes : vec!(HashMap::new()), instancestack, controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, impassable : outer.is_none(), generator }
     }
     pub (super) fn len(&mut self) -> usize
     {
@@ -405,7 +405,7 @@ impl Frame {
 
 impl Value
 {
-    pub (crate) fn new_funcval(internal : bool, name : Option<String>, predefined : Option<HashMap<String, ValRef>>, userdefdata : Option<FuncSpec>) -> Value
+    pub (crate) fn new_funcval(internal : bool, name : Option<usize>, predefined : Option<HashMap<usize, ValRef>>, userdefdata : Option<FuncSpec>) -> Value
     {
         Value::Func(Box::new(FuncVal{internal, name, predefined, userdefdata}))
     }

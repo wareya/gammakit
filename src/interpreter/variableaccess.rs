@@ -134,11 +134,11 @@ pub (crate) fn return_indexed(var : &Value, indexes : &[HashableValue]) -> Resul
     }
 }
 
-fn access_frame(global : &GlobalState, frame : &Frame, name : &String, seen_instance : &mut bool) -> Option<ValRef>
+fn access_frame(global : &GlobalState, frame : &Frame, name : usize, seen_instance : &mut bool) -> Option<ValRef>
 {
     for scope in frame.scopes.iter().rev()
     {
-        if let Some(var) = scope.get(name)
+        if let Some(var) = scope.get(&name)
         {
             return Some(var.refclone());
         }
@@ -150,17 +150,17 @@ fn access_frame(global : &GlobalState, frame : &Frame, name : &String, seen_inst
             *seen_instance = true;
             if let Some(inst) = global.instances.get(id)
             {
-                if let Some(var) = inst.variables.get(name)
+                if let Some(var) = inst.variables.get(&name)
                 {
                     return Some(var.refclone());
                 }
                 else if let Some(objspec) = global.objects.get(&inst.objtype)
                 {
-                    if let Some(funcdat) = objspec.functions.get(name)
+                    if let Some(funcdat) = objspec.functions.get(&name)
                     {
                         let mut mydata = funcdat.clone();
                         mydata.forcecontext = inst.ident;
-                        return Some(ValRef::from_val(Value::new_funcval(false, Some(name.clone()), None, Some(mydata))));
+                        return Some(ValRef::from_val(Value::new_funcval(false, Some(name), None, Some(mydata))));
                     }
                 }
             }
@@ -176,13 +176,13 @@ impl Interpreter
         match &arrayvar.location
         {
             NonArrayVariable::Indirect(ref indirvar) => Ok(ValRef::from_ref(self.evaluate_of_indirect(indirvar)?.extract_ref()?, arrayvar.indexes.clone(), false)),
-            NonArrayVariable::Direct(ref dirvar) => Ok(ValRef::from_ref(self.evaluate_of_direct(dirvar)?.extract_ref()?, arrayvar.indexes.clone(), false)),
+            NonArrayVariable::Direct(dirvar) => Ok(ValRef::from_ref(self.evaluate_of_direct(*dirvar)?.extract_ref()?, arrayvar.indexes.clone(), false)),
             NonArrayVariable::ActualArray(array) => Ok(ValRef::from_val_indexed_readonly(Value::Array(array.clone()), arrayvar.indexes.clone())),
             NonArrayVariable::ActualDict(dict) => Ok(ValRef::from_val_indexed_readonly(Value::Dict(dict.clone()), arrayvar.indexes.clone())),
             NonArrayVariable::ActualText(string) => Ok(ValRef::from_val_indexed_readonly(Value::Text(string.clone()), arrayvar.indexes.clone())),
         }
     }
-    fn evaluate_of_indirect(&self, indirvar : &IndirectVar,) -> Result<ValRef, String>
+    fn evaluate_of_indirect(&self, indirvar : &IndirectVar) -> Result<ValRef, String>
     {
         match indirvar.source
         {
@@ -212,7 +212,7 @@ impl Interpreter
             }
         }
     }
-    pub(crate) fn evaluate_of_direct(&self, name : &String) -> Result<ValRef, String>
+    pub(crate) fn evaluate_of_direct(&self, name : usize) -> Result<ValRef, String>
     {
         let mut seen_instance = false;
         if let Some(my_ref) = access_frame(&self.global, &self.top_frame, name, &mut seen_instance)
@@ -231,11 +231,11 @@ impl Interpreter
             }
         }
         
-        if let Some(var) = self.global.objectnames.get(name)
+        if let Some(var) = self.global.objectnames.get(&name)
         {
             return Ok(ValRef::from_val(Value::Object(*var)));
         }
-        if let Some(var) = self.global.functions.get(name)
+        if let Some(var) = self.global.functions.get(&name)
         {
             return Ok(ValRef::from_val(var.clone()));
         }
@@ -266,7 +266,7 @@ impl Interpreter
         {
             Variable::Array(ref arrayvar) => self.evaluate_of_array(arrayvar),
             Variable::Indirect(ref indirvar) => self.evaluate_of_indirect(indirvar),
-            Variable::Direct(ref name) => self.evaluate_of_direct(name),
+            Variable::Direct(name) => self.evaluate_of_direct(*name),
             Variable::Selfref => self.evaluate_self(),
             Variable::Global => self.evaluate_global(),
             Variable::Other => self.evaluate_other(),

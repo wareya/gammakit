@@ -39,11 +39,11 @@ struct GlobalState {
     object_id: usize,
     instances: HashMap<usize, Instance>,
     instances_by_type: HashMap<usize, BTreeSet<usize>>,
-    objectnames: HashMap<String, usize>,
+    objectnames: HashMap<usize, usize>,
     objects: HashMap<usize, ObjSpec>,
     parser: Option<Parser>,
-    variables: HashMap<String, ValRef>, // accessed as global.varname
-    functions: HashMap<String, Value>, // accessed as funcname
+    variables: HashMap<usize, ValRef>, // accessed as global.varname
+    functions: HashMap<usize, Value>, // accessed as funcname
 }
 
 impl GlobalState {
@@ -68,9 +68,9 @@ impl GlobalState {
 pub struct Interpreter {
     top_frame: Frame,
     frames: Vec<Frame>,
-    bindings: HashMap<String, Rc<RefCell<Binding>>>,
-    simple_bindings: HashMap<String, Rc<RefCell<SimpleBinding>>>,
-    arrow_bindings: HashMap<String, Rc<RefCell<ArrowBinding>>>,
+    pub (crate) bindings: HashMap<usize, Rc<RefCell<Binding>>>,
+    pub (crate) simple_bindings: HashMap<usize, Rc<RefCell<SimpleBinding>>>,
+    pub (crate) arrow_bindings: HashMap<usize, Rc<RefCell<ArrowBinding>>>,
     global: GlobalState,
     /// Last error returned by step(). Gets cleared (reset to None) when step() runs without returning an error.
     pub last_error: Option<String>,
@@ -80,10 +80,10 @@ pub struct Interpreter {
 
 impl Interpreter {
     /// Creates a new interpreter 
-    pub fn new(code : &Rc<Vec<u8>>, parser : Option<Parser>) -> Interpreter
+    pub fn new(code : &Code, parser : Option<Parser>) -> Interpreter
     {
         Interpreter {
-            top_frame : Frame::new_root(Rc::clone(code)),
+            top_frame : Frame::new_root(code),
             frames : vec!(),
             doexit : false,
             bindings : HashMap::new(),
@@ -103,9 +103,9 @@ impl Interpreter {
     /// Does not unload internal function bindings.
     /// 
     /// Does not reset global state (objects/instances).
-    pub fn restart(&mut self, code: &Rc<Vec<u8>>) -> StepResult
+    pub fn restart(&mut self, code: &Code) -> StepResult
     {
-        self.top_frame = Frame::new_root(Rc::clone(code));
+        self.top_frame = Frame::new_root(code);
         self.frames = vec!();
         self.doexit = false;
         self.last_error = None;
@@ -139,6 +139,8 @@ impl Interpreter {
         let op = self.pull_single_from_code()?;
         let opfunc = match_or_err!(self.get_opfunc(op), Some(opfunc) => opfunc, Some(format!("internal error: unknown operation 0x{:02X}", op)))?;
         
+        //println!("running op 0x{:02X} at 0x{:X}", op, self.get_pc()-1);
+        
         //let start_time = Instant::now();
         opfunc(self).map_err(Some)?;
         //*self.op_map.entry(op).or_insert(0) += Instant::now().duration_since(start_time).as_nanos();
@@ -161,7 +163,7 @@ impl Interpreter {
     pub fn step(&mut self) -> StepResult
     {
         let ret = self.step_internal();
-        self.last_error = ret.clone().err().unwrap_or(None).map(|x| format!("{}\nline:{}", x, self.top_frame.currline));
+        self.last_error = ret.clone().err().unwrap_or(None).map(|x| format!("{}\nline:{}\npc:0x{:X}\ncodelen:0x{:X}", x, self.top_frame.currline, self.get_pc(), self.get_code().len()));
         ret
     }
 }

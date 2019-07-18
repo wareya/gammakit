@@ -75,7 +75,7 @@ impl Interpreter
     
     pub (crate) fn sim_NOP(&mut self) -> OpResult
     {
-        Ok(())
+        plainerr("NOP")
     }
     pub (crate) fn sim_PUSHFLT(&mut self) -> OpResult
     {
@@ -97,26 +97,26 @@ impl Interpreter
     }
     pub (crate) fn sim_PUSHNAME(&mut self) -> OpResult
     {
-        let name = self.read_string()?;
-        let var = match name.as_str()
+        let index = self.read_usize()?;
+        let var = match index
         {
-            "self" => Variable::Selfref,
-            "global" => Variable::Global,
-            "other" => Variable::Other,
-            _ => Variable::Direct(name)
+            1 => Variable::Global,
+            2 => Variable::Selfref,
+            3 => Variable::Other,
+            _ => Variable::Direct(index)
         };
         self.stack_push_var(var);
         Ok(())
     }
     pub (crate) fn sim_PUSHVAR(&mut self) -> OpResult
     {
-        let name = self.read_string()?;
-        let val = match name.as_str()
+        let index = self.read_usize()?;
+        let val = match index
         {
-            "self" => self.evaluate_self()?,
-            "global" => self.evaluate_global()?,
-            "other" => self.evaluate_other()?,
-            _ => self.evaluate_of_direct(&name)?
+            1 => self.evaluate_global()?,
+            2 => self.evaluate_self()?,
+            3 => self.evaluate_other()?,
+            _ => self.evaluate_of_direct(index)?
         };
         self.stack_push_val(val.to_val()?);
         Ok(())
@@ -190,8 +190,6 @@ impl Interpreter
                 self.stack_push_var(IndirectVar::from_ident(ident, name)),
             StackValue::Val(Value::Special(Special::Global)) =>
                 self.stack_push_var(IndirectVar::from_global(name)),
-            StackValue::Val(Value::Dict(dict)) =>
-                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualDict(dict), indexes : vec!(HashableValue::Text(name)) } )),
             
             StackValue::Var(var) =>
             {
@@ -713,12 +711,12 @@ impl Interpreter
     pub (crate) fn sim_LAMBDA(&mut self) -> OpResult
     {
         let (captures, myfuncspec) = self.read_lambda()?;
-        self.stack_push_val(Value::new_funcval(false, Some("lambda_self".to_string()), Some(captures), Some(myfuncspec)));
+        self.stack_push_val(Value::new_funcval(false, Some(self.get_string_index(&"lambda_self".to_string())), Some(captures), Some(myfuncspec)));
         Ok(())
     }
     pub (crate) fn sim_OBJDEF(&mut self) -> OpResult
     {
-        let name = self.read_string()?;
+        let name = self.read_string_index()?;
         if self.global.objectnames.contains_key(&name)
         {
             return Err(format!("error: redeclared object {}", name));
@@ -727,7 +725,7 @@ impl Interpreter
         let object_id = self.global.object_id;
         let numfuncs = self.read_u16()?;
         
-        let mut funcs = HashMap::<String, FuncSpec>::new();
+        let mut funcs = HashMap::new();
         for _ in 0..numfuncs
         {
             let (funcname, mut myfuncspec) = self.read_function(false, false)?;

@@ -27,14 +27,13 @@ mod bytecode;
 mod grammar;
 mod compiler;
 mod interpreter;
+mod bookkeeping;
 
 pub use crate::{parser::*, compiler::*, interpreter::*};
 
-use std::rc::Rc;
-
 impl Parser {
     /// optional helper function to simplify the process of compiling from text to bytecode
-    pub fn give_me_bytecode(&mut self, text: &str) -> Result<Rc<Vec<u8>>, String>
+    pub fn give_me_bytecode(&mut self, text: &str) -> Result<Code, String>
     {
         let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
         
@@ -42,7 +41,7 @@ impl Parser {
         
         let ast = self.parse_program(&tokens, &program_lines, false)?.ok_or_else(|| "failed to parse program".to_string())?;
         
-        Ok(Rc::new(compile_bytecode(&ast)?))
+        Ok(compile_bytecode(&ast)?)
     }
 }
 
@@ -50,6 +49,7 @@ impl Parser {
 mod tests {
     use std::fs::File;
     use std::io::Read;
+    use std::io::Write;
     
     use super::*;
     
@@ -62,6 +62,8 @@ mod tests {
         File::open("program.txt").or_else(|_| Err("failed to open program".to_string()))?.read_to_string(&mut program).or_else(|_| Err("failed to read program into memory".to_string()))?;
         
         let code = parser.give_me_bytecode(&program)?;
+        
+        File::create("bytecode_dump_main.bin").unwrap().write_all(code.get(..).unwrap()).unwrap();
         
         let mut interpreter = Interpreter::new(&code, Some(parser));
         interpreter.insert_default_bindings();
@@ -98,6 +100,8 @@ mod tests {
         File::open("nbody.txt").or_else(|_| Err("failed to open program".to_string()))?.read_to_string(&mut program).or_else(|_| Err("failed to read program into memory".to_string()))?;
         
         let code = parser.give_me_bytecode(&program)?;
+        
+        File::create("bytecode_dump_nbodies.bin").unwrap().write_all(code.get(..).unwrap()).unwrap();
         
         let mut interpreter = Interpreter::new(&code, Some(parser));
         interpreter.insert_default_bindings();

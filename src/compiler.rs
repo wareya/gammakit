@@ -1,9 +1,92 @@
 #![allow(clippy::len_zero)]
 
-use super::{strings::*, ast::*, bytecode::*};
+use super::{strings::*, ast::*, bytecode::*, bookkeeping::*};
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::collections::HashMap;
+
+#[derive(Debug)]
+pub struct Code
+{
+    pub (crate) code : Rc<Vec<u8>>,
+    pub (crate) bookkeeping : Bookkeeping,
+}
+
+impl std::clone::Clone for Code
+{
+    fn clone(&self) -> Code
+    {
+        Code{code : Rc::clone(&self.code), bookkeeping : self.bookkeeping.refclone()}
+    }
+}
+
+impl std::cmp::PartialEq for Code
+{
+    fn eq(&self, other : &Code) -> bool
+    {
+        self.code == other.code
+    }
+}
+impl Eq for Code {}
+
+impl Code
+{
+    pub (crate) fn new() -> Code
+    {
+        Code{code : Rc::new(Vec::new()), bookkeeping : Bookkeeping::new()}
+    }
+    pub (crate) fn new_share_bookkeeping(other : &Code) -> Code
+    {
+        Code{code : Rc::new(Vec::new()), bookkeeping : other.bookkeeping.refclone()}
+    }
+    fn compile_raw_string(&mut self, text : &str)
+    {
+        let code = Rc::get_mut(&mut self.code).unwrap();
+        code.extend(text.bytes());
+        code.push(0x00);
+    }
+    fn extend<I : IntoIterator<Item = u8>>(&mut self, iter : I)
+    {
+        Rc::get_mut(&mut self.code).unwrap().extend(iter);
+    }
+    fn push(&mut self, byte : u8)
+    {
+        Rc::get_mut(&mut self.code).unwrap().push(byte);
+    }
+    pub (crate) fn get_string_index(&self, string : &String) -> usize
+    {
+        self.bookkeeping.get_string_index(string)
+    }
+    pub (crate) fn len(&self) -> usize
+    {
+        self.code.len()
+    }
+    pub (crate) fn get<I : std::slice::SliceIndex<[u8]>>(&self, index : I) -> Option<&I::Output>
+    {
+        self.code.get(index)
+    }
+    pub (crate) fn get_mut<I : std::slice::SliceIndex<[u8]>>(&mut self, index : I) -> Option<&mut I::Output>
+    {
+        Rc::get_mut(&mut self.code).unwrap().get_mut(index)
+    }
+}
+
+impl<I: std::slice::SliceIndex<[u8]>> std::ops::Index<I> for Code
+{
+    type Output = I::Output;
+    fn index(&self, index: I) -> &Self::Output
+    {
+        &self.code[index]
+    }
+}
+
+impl<I: std::slice::SliceIndex<[u8]>> std::ops::IndexMut<I> for Code
+{
+    fn index_mut(&mut self, index: I) -> &mut Self::Output
+    {
+        &mut Rc::get_mut(&mut self.code).unwrap()[index]
+    }
+}
 
 type CompilerBinding = Fn(&mut CompilerState, &ASTNode) -> Result<(), String>;
 
@@ -26,8 +109,8 @@ enum Context {
 }
 
 struct CompilerState {
+    code : Code,
     hooks : HashMap<String, Rc<RefCell<CompilerBinding>>>,
-    code : Vec<u8>,
     scopedepth : usize,
     context : Context,
     last_line : usize,
@@ -35,21 +118,21 @@ struct CompilerState {
     last_type : String,
 }
 
-fn compile_raw_string(code : &mut Vec<u8>, text : &str)
-{
-    code.extend(text.bytes());
-    code.push(0x00);
-}
-
 impl CompilerState {
     fn new() -> CompilerState
     {
-        let mut ret = CompilerState{hooks: HashMap::new(), code: Vec::new(), scopedepth: 0, context: Context::Unknown, last_line: 0, last_index: 0, last_type: "".to_string()};
+        let mut ret = CompilerState{hooks: HashMap::new(), code: Code::new(), scopedepth: 0, context: Context::Unknown, last_line: 0, last_index: 0, last_type: "".to_string()};
+        ret.insert_default_hooks();
+        ret
+    }
+    fn new_share_bookkeeping(code : &Code) -> CompilerState
+    {
+        let mut ret = CompilerState{hooks: HashMap::new(), code: Code::new_share_bookkeeping(code), scopedepth: 0, context: Context::Unknown, last_line: 0, last_index: 0, last_type: "".to_string()};
         ret.insert_default_hooks();
         ret
     }
     
-    fn add_hook<T:ToString>(&mut self, name: &T, fun : &'static CompilerBinding)
+    fn add_hook<T : ToString>(&mut self, name: &T, fun : &'static CompilerBinding)
     {
         self.hooks.insert(name.to_string(), Rc::new(RefCell::new(fun)));
     }
@@ -115,12 +198,22 @@ impl CompilerState {
     }
     fn compile_raw_string(&mut self, text : &str)
     {
-        compile_raw_string(&mut self.code, text);
+        self.code.compile_raw_string(text);
     }
     fn compile_string_with_prefix(&mut self, prefix : u8, text : &str)
     {
         self.code.push(prefix);
         self.compile_raw_string(text);
+    }
+    fn compile_string_index(&mut self, text : &String)
+    {
+        let myu64 = pack_u64(self.code.get_string_index(text) as u64);
+        self.code.extend(myu64);
+    }
+    fn compile_string_index_with_prefix(&mut self, prefix : u8, text : &String)
+    {
+        self.code.push(prefix);
+        self.compile_string_index(text);
     }
 
     fn compile_unscope(&mut self) -> Result<(), String>
@@ -199,13 +292,14 @@ impl CompilerState {
     }
     fn compile_statement(&mut self, ast : &ASTNode) -> Result<(), String>
     {
+        // FIXME move to bookkeeping
         self.last_line = ast.line;
         self.last_index = ast.position;
         self.last_type = ast.text.clone();
         self.code.push(DEBUGINFO);
         self.code.extend(pack_u64(self.last_line as u64));
         self.code.extend(pack_u64(self.last_index as u64));
-        compile_raw_string(&mut self.code, &self.last_type);
+        self.code.compile_raw_string(&self.last_type);
         self.compile_nth_child(ast, 0)
     }
     
@@ -216,7 +310,7 @@ impl CompilerState {
             //eprintln!("{:?}", child);
             if child.text == "name"
             {
-                self.compile_string_with_prefix(PUSHNAME, &child.child(0)?.text);
+                self.compile_pushname(&child.child(0)?.text)?;
             }
             else
             {
@@ -242,7 +336,7 @@ impl CompilerState {
         {
             if child.text == "name"
             {
-                self.compile_string_with_prefix(PUSHNAME, &child.child(0)?.text);
+                self.compile_pushname(&child.child(0)?.text)?;
             }
             else
             {
@@ -251,9 +345,24 @@ impl CompilerState {
         }
         self.compile_context_wrapped(Context::Statement, &|x| x.compile_last_child(ast))
     }
+    fn compile_pushvar(&mut self, string : &String) -> Result<(), String>
+    {
+        self.compile_string_index_with_prefix(PUSHVAR, string);
+        Ok(())
+    }
+    fn compile_pushname(&mut self, string : &String) -> Result<(), String>
+    {
+        self.compile_string_index_with_prefix(PUSHNAME, string);
+        Ok(())
+    }
+    fn compile_pushstr(&mut self, string : &String) -> Result<(), String>
+    {
+        self.compile_string_with_prefix(PUSHSTR, string);
+        Ok(())
+    }
     fn compile_name(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.compile_string_with_prefix(PUSHVAR, &ast.child(0)?.text);
+        self.compile_pushvar(&ast.child(0)?.text)?;
         Ok(())
     }
     fn compile_funcargs(&mut self, ast : &ASTNode) -> Result<(), String>
@@ -333,7 +442,7 @@ impl CompilerState {
     }
     fn compile_push_string(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.compile_string_with_prefix(PUSHSTR, &unescape(&slice(&ast.child(0)?.text, 1, -1)));
+        self.compile_pushstr(&unescape(&slice(&ast.child(0)?.text, 1, -1)))?;
         Ok(())
     }
     fn compile_whilecondition(&mut self, ast : &ASTNode) -> Result<(), String>
@@ -452,7 +561,7 @@ impl CompilerState {
     }
     fn compile_objdef(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.compile_string_with_prefix(OBJDEF, &ast.child(1)?.child(0)?.text);
+        self.compile_string_index_with_prefix(OBJDEF, &ast.child(1)?.child(0)?.text);
         let funcs = ast.child_slice(3, -1)?;
         if funcs.len() > 0xFFFF
         {
@@ -488,7 +597,7 @@ impl CompilerState {
         
         self.compile_context_wrapped(Context::Unknown, &|x|
         {
-            x.compile_raw_string(&name);
+            x.compile_string_index(&name);
             x.code.extend(pack_u16(ast.child(3)?.children.len() as u16));
             
             let body_len_position = x.code.len();
@@ -496,7 +605,7 @@ impl CompilerState {
             
             for arg in &ast.child(3)?.children
             {
-                x.compile_raw_string(&arg.child(0)?.text);
+                x.compile_string_index(&arg.child(0)?.text);
             }
             
             let position_1 = x.code.len();
@@ -556,17 +665,17 @@ impl CompilerState {
                 {
                     "globalvar" =>
                     {
-                        self.compile_string_with_prefix(PUSHVAR, "global");
-                        self.compile_string_with_prefix(PUSHNAME, &name);
+                        self.compile_pushvar(&"global".to_string())?;
+                        self.compile_pushname(&name)?;
                         self.code.push(INDIRECTION);
                     }
-                    _ => self.compile_string_with_prefix(PUSHNAME, &name)
+                    _ => self.compile_pushname(&name)?
                 }
                 self.compile_nth_child(child, 2)?;
             }
             
             // declare the variable
-            self.compile_string_with_prefix(PUSHNAME, &name);
+            self.compile_pushname(&name)?;
             match decl_type
             {
                 "var" => self.code.push(DECLVAR),
@@ -615,7 +724,7 @@ impl CompilerState {
     {
         if ast.child(0)?.text == "name"
         {
-            self.compile_string_with_prefix(PUSHNAME, &ast.child(0)?.child(0)?.text);
+            self.compile_pushname(&ast.child(0)?.child(0)?.text)?;
         }
         else
         {
@@ -642,7 +751,7 @@ impl CompilerState {
     }
     fn compile_indirection(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.compile_string_with_prefix(PUSHNAME, &ast.child(1)?.child(0)?.text); // FIXME make this use PUSHSTR
+        self.compile_pushname(&ast.child(1)?.child(0)?.text)?;
         self.code.push(INDIRECTION);
         
         if matches!(self.context, Context::Expr)
@@ -654,13 +763,13 @@ impl CompilerState {
     }
     fn compile_dismember(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.compile_string_with_prefix(PUSHNAME, &ast.child(1)?.child(0)?.text); // FIXME make this use PUSHSTR
+        self.compile_pushname(&ast.child(1)?.child(0)?.text)?;
         self.code.push(DISMEMBER);
         Ok(())
     }
     fn compile_dictindex(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.compile_string_with_prefix(PUSHSTR, &ast.child(1)?.child(0)?.text);
+        self.compile_pushstr(&ast.child(1)?.child(0)?.text)?;
         self.code.push(ARRAYEXPR);
         
         if matches!(self.context, Context::Expr)
@@ -688,21 +797,27 @@ impl CompilerState {
         let args : &Vec<ASTNode> = &ast.child(4)?.children;
         let statements : &Vec<ASTNode> = &ast.child(7)?.children;
         
+        let mut capturenames = Vec::new();
+        
         for capture in captures
         {
-            self.compile_string_with_prefix(PUSHSTR, &capture.child(0)?.child(0)?.text);
+            capturenames.push(self.code.get_string_index(&capture.child(0)?.child(0)?.text));
             self.compile_nth_child(capture, 2)?;
         }
         
         self.code.push(LAMBDA);
         self.code.extend(pack_u64(captures.len() as u64));
+        for capture_name_index in capturenames.iter().rev()
+        {
+            self.code.extend(pack_u64(*capture_name_index as u64));
+        }
         self.code.extend(pack_u16(args.len() as u16));
         let len_position = self.code.len();
         self.code.extend(pack_u64(0 as u64));
           
         for arg in args
         {
-            self.compile_raw_string(&arg.child(0)?.text);
+            self.compile_string_index(&arg.child(0)?.text);
         }
         
         let position_1 = self.code.len();
@@ -901,7 +1016,7 @@ impl CompilerState {
         
         self.compile_scope_wrapped(&|x|
         {
-            x.compile_string_with_prefix(PUSHNAME, &ast.child(2)?.child(0)?.text);
+            x.compile_pushname(&ast.child(2)?.child(0)?.text)?;
             
             x.compile_nth_child(ast, 4)?;
             x.code.push(FOREACH);
@@ -1022,10 +1137,24 @@ impl CompilerState {
     }
 }
 
-/// Compiles an AST into byteself.code.
-pub fn compile_bytecode(ast : &ASTNode) -> Result<Vec<u8>, String>
+/// Compiles an AST into bytes.
+pub fn compile_bytecode(ast : &ASTNode) -> Result<Code, String>
 {
     let mut state = CompilerState::new();
+    if let Err(err) = state.compile_any(ast)
+    {
+        eprintln!("compiler hit an error on line {}, position {}, node type {}:", state.last_line, state.last_index, state.last_type);
+        Err(err)
+    }
+    else
+    {
+        Ok(state.code)
+    }
+}
+/// Same as compile_bytecode, but shares bookkeeping with an existing compilation result. Necessary for dynamically compiling subroutines and executing them from other code.
+pub fn compile_bytecode_share_bookkeeping(code : &Code, ast : &ASTNode) -> Result<Code, String>
+{
+    let mut state = CompilerState::new_share_bookkeeping(code);
     if let Err(err) = state.compile_any(ast)
     {
         eprintln!("compiler hit an error on line {}, position {}, node type {}:", state.last_line, state.last_index, state.last_type);

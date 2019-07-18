@@ -18,9 +18,9 @@ macro_rules! vec_pop_front_generic { ( $list:expr, $x:ident ) =>
 
 impl Interpreter
 {
-    pub (crate) fn get_code(&self) -> Rc<Vec<u8>>
+    pub (crate) fn get_code(&self) -> Code
     {
-        Rc::clone(&self.top_frame.code)
+        self.top_frame.code.clone()
     }
     pub (crate) fn get_pc(&self) -> usize
     {
@@ -72,6 +72,15 @@ impl Interpreter
     {
         Ok(unpack_u64(&self.pull_from_code(8)?)? as usize)
     }
+    pub (crate) fn read_string_index(&mut self) -> Result<usize, String>
+    {
+        self.read_usize()
+    }
+    
+    pub (crate) fn get_string_index(&self, string : &String) -> usize
+    {
+        self.get_code().get_string_index(string)
+    }
     
     pub (crate) fn read_string(&mut self) -> Result<String, String>
     {
@@ -91,45 +100,41 @@ impl Interpreter
         self.set_pc(end+1);
         Ok(String::from_utf8_lossy(&code[start..end]).to_string())
     }
-    pub (crate) fn read_function(&mut self, subroutine : bool, generator : bool) -> Result<(String, FuncSpec), String>
+    pub (crate) fn read_function(&mut self, subroutine : bool, generator : bool) -> Result<(usize, FuncSpec), String>
     {
         let code = self.get_code();
-        //eprintln!("about to read function name; next byte is {:02X}", self.top_frame.code[self.get_pc()]);
-        let name = self.read_string()?;
-        //eprintln!("read most of function");
+        let name = self.read_string_index()?;
         let argcount = self.read_u16()?;
         let bodylen = self.read_usize()?;
         
         let mut args = Vec::<_>::new();
         for _ in 0..argcount
         {
-            //eprintln!("about to read arg name; next byte is {:02X}", self.top_frame.code[self.get_pc()]);
-            args.push(self.read_string()?);
+            args.push(self.read_string_index()?);
         }
-        //eprintln!("read args");
         
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        Ok((name, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : !subroutine, generator }))
+        Ok((name, FuncSpec { varnames : args, code : code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : !subroutine, generator }))
     }
     
-    pub (crate) fn read_lambda(&mut self) -> Result<(HashMap<String, ValRef>, FuncSpec), String>
+    pub (crate) fn read_lambda(&mut self) -> Result<(HashMap<usize, ValRef>, FuncSpec), String>
     {
         let code = self.get_code();
         
         let capturecount = self.read_usize()?;
         
-        if self.top_frame.stack.len() < capturecount*2
+        if self.top_frame.stack.len() < capturecount
         {
-            return Err(format!("internal error: not enough values on stack to satisfy requirements of read_lambda (need {}, have {})", capturecount*2, self.top_frame.stack.len()));
+            return Err(format!("internal error: not enough values on stack to satisfy requirements of read_lambda (need {}, have {})", capturecount, self.top_frame.stack.len()));
         }
         
-        let mut captures = HashMap::<String, _>::new();
+        let mut captures = HashMap::new();
         for _i in 0..capturecount
         {
             let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: read_lambda failed to collect capture value from stack"))?;
-            let name = self.stack_pop_text().ok_or_else(|| minierr("internal error: read_lambda failed to collect capture name from stack"))?;
+            let name = self.read_usize()?;
             
             if captures.contains_key(&name)
             {
@@ -139,19 +144,18 @@ impl Interpreter
         }
         
         let argcount = self.read_u16()?;
-        
         let bodylen = self.read_usize()?;
         
-        let mut args = Vec::<String>::new();
+        let mut args = Vec::<usize>::new();
         for _ in 0..argcount
         {
-            args.push(self.read_string()?);
+            args.push(self.read_string_index()?);
         }
         
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        Ok((captures, FuncSpec { varnames : args, code : Rc::clone(&code), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : true, generator : false }))
+        Ok((captures, FuncSpec { varnames : args, code : code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : true, generator : false }))
     }
     
     /*
@@ -164,9 +168,9 @@ impl Interpreter
     {
         match_or_none!(self.stack_pop_val(), Some(Value::Text(val)) => val)
     }
-    pub (crate) fn stack_pop_name(&mut self) -> Option<String>
+    pub (crate) fn stack_pop_name(&mut self) -> Option<usize>
     {
-        match_or_none!(self.stack_pop_var(), Some(Variable::Direct(text)) => text)
+        match_or_none!(self.stack_pop_var(), Some(Variable::Direct(name)) => name)
     }
     
     pub (crate) fn drain_scopes(&mut self, desired_depth : u16)

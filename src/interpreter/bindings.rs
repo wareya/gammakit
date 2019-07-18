@@ -110,19 +110,22 @@ impl Interpreter
     /// The reference cell wrapping is required to support lambdas that have closure over mutable references, because that closure may indirectly include the interpreter itself. See magmakit for examples.
     pub fn insert_binding(&mut self, funcname : String, func : Rc<RefCell<Binding>>)
     {
-        self.simple_bindings.remove(&funcname);
-        self.bindings.insert(funcname, func);
+        let index = self.get_string_index(&funcname);
+        self.simple_bindings.remove(&index);
+        self.bindings.insert(index, func);
     }
     /// Insert a normal binding that does not need access to the interpreter.
     pub fn insert_simple_binding(&mut self, funcname : String, func : Rc<RefCell<SimpleBinding>>)
     {
-        self.bindings.remove(&funcname);
-        self.simple_bindings.insert(funcname, func);
+        let index = self.get_string_index(&funcname);
+        self.bindings.remove(&index);
+        self.simple_bindings.insert(index, func);
     }
     /// Insert an associated function ("arrow" function) binding.
     pub fn insert_arrow_binding(&mut self, funcname : String, func : Rc<RefCell<ArrowBinding>>)
     {
-        self.arrow_bindings.insert(funcname, func);
+        let index = self.get_string_index(&funcname);
+        self.arrow_bindings.insert(index, func);
     }
     /// Inserts or reinserts the default bindings. These SHOULD be safe, but if you're paranoid or you're making a very restrictive implementation of gammakit, you can feel free not to call this after initializing the interpreter.
     pub fn insert_default_bindings(&mut self)
@@ -159,17 +162,17 @@ impl Interpreter
         insert_arrow!("push"            , sim_subfunc_push              );
         insert_arrow!("pop"             , sim_subfunc_pop               );
     }
-    pub (crate) fn get_binding(&self, name : &str) -> Option<Rc<RefCell<Binding>>>
+    pub (crate) fn get_binding(&self, name : usize) -> Option<Rc<RefCell<Binding>>>
     {
-        match_or_none!(self.bindings.get(name), Some(f) => Rc::clone(f))
+        match_or_none!(self.bindings.get(&name), Some(f) => Rc::clone(f))
     }
-    pub (crate) fn get_simple_binding(&self, name : &str) -> Option<Rc<RefCell<SimpleBinding>>>
+    pub (crate) fn get_simple_binding(&self, name : usize) -> Option<Rc<RefCell<SimpleBinding>>>
     {
-        match_or_none!(self.simple_bindings.get(name), Some(f) => Rc::clone(f))
+        match_or_none!(self.simple_bindings.get(&name), Some(f) => Rc::clone(f))
     }
-    pub (crate) fn get_arrow_binding(&self, name : &str) -> Option<Rc<RefCell<ArrowBinding>>>
+    pub (crate) fn get_arrow_binding(&self, name : usize) -> Option<Rc<RefCell<ArrowBinding>>>
     {
-        match_or_none!(self.arrow_bindings.get(name), Some(f) => Rc::clone(f))
+        match_or_none!(self.arrow_bindings.get(&name), Some(f) => Rc::clone(f))
     }
     pub (crate) fn sim_func_print(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
@@ -241,7 +244,7 @@ impl Interpreter
         let object = self.global.objects.get(&object_id).ok_or_else(|| format!("error: tried to create instance of non-extant object type {}", object_id))?;
         
         let mut variables = HashMap::new();
-        variables.insert("id".to_string(), ValRef::from_val(Value::Instance(instance_id)));
+        variables.insert(self.get_string_index(&"id".to_string()), ValRef::from_val(Value::Instance(instance_id)));
         self.global.instances.insert(instance_id, Instance { objtype : object_id, ident : instance_id, variables });
         
         if let Some(ref mut instance_list) = self.global.instances_by_type.get_mut(&object_id)
@@ -255,11 +258,11 @@ impl Interpreter
             self.global.instances_by_type.insert(object_id, instance_list);
         }
         
-        if let Some(function) = object.functions.get("create")
+        if let Some(function) = object.functions.get(&self.get_string_index(&"create".to_string()))
         {
             let mut mydata = function.clone();
             mydata.forcecontext = instance_id;
-            let pseudo_funcvar = FuncVal{internal : false, name : Some("create".to_string()), predefined : None, userdefdata : Some(mydata)};
+            let pseudo_funcvar = FuncVal{internal : false, name : Some(5), predefined : None, userdefdata : Some(mydata)};
             self.call_function(pseudo_funcvar, Vec::new(), false)?;
         }
         
@@ -327,7 +330,7 @@ impl Interpreter
         
         let dict = self.vec_pop_front_dict(&mut args).ok_or_else(|| minierr("error: first argument to compile_ast() must be a dictionary"))?;
         let ast = dict_to_ast(&dict)?;
-        let code = compile_bytecode(&ast)?;
+        let code = compile_bytecode_share_bookkeeping(&self.get_code(), &ast)?;
         
         // endaddr at the start because Rc::new() moves `code`
         Ok
@@ -338,7 +341,7 @@ impl Interpreter
             Some(FuncSpec
             { endaddr : code.len(), // must be before code : Rc::new(code)
               varnames : Vec::new(),
-              code : Rc::new(code),
+              code,
               startaddr : 0,
               fromobj : false,
               parentobj : 0,
@@ -363,7 +366,7 @@ impl Interpreter
         let tokens = parser.tokenize(&program_lines, true)?;
         let ast = parser.parse_program(&tokens, &program_lines, true)?.ok_or_else(|| minierr("error: string failed to parse"))?;
         
-        let code = compile_bytecode(&ast)?;
+        let code = compile_bytecode_share_bookkeeping(&self.get_code(), &ast)?;
         
         // endaddr at the start because Rc::new() moves `code`
         Ok
@@ -374,7 +377,7 @@ impl Interpreter
             Some(FuncSpec
             { endaddr : code.len(), // must be before code : Rc::new(code)
               varnames : Vec::new(),
-              code : Rc::new(code),
+              code,
               startaddr : 0,
               fromobj : false,
               parentobj : 0,
