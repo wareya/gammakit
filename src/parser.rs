@@ -274,7 +274,7 @@ impl Parser {
                     if let Some(text) = self.internal_regexes.match_at(&rule, &line, offset)
                     {
                         // TODO: fix position everywhere to be codepoints instead of bytes
-                        ret.push(LexToken{text : text.clone(), line : linecount, position : offset});
+                        ret.push(LexToken{text : text.clone(), line : linecount, position : offset+1});
                         offset += text.len();
                         continue_the_while = true;
                         break;
@@ -287,7 +287,7 @@ impl Parser {
                     {
                         if segment == text.as_str()
                         {
-                            ret.push(LexToken{text : text.clone(), line : linecount, position : offset});
+                            ret.push(LexToken{text : text.clone(), line : linecount, position : offset+1});
                             offset += text.len();
                             continue_the_while = true;
                             break;
@@ -306,7 +306,7 @@ impl Parser {
                             {
                                 continue;
                             }
-                            ret.push(LexToken{text : text.clone(), line : linecount, position : offset});
+                            ret.push(LexToken{text : text.clone(), line : linecount, position : offset+1});
                             offset += text.len();
                             continue_the_while = true;
                             break;

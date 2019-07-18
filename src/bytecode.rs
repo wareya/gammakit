@@ -117,8 +117,6 @@ pub (crate) const EXIT : u8 = 0xF0;
 pub (crate) const RETURN : u8 = 0xF1;
 pub (crate) const YIELD : u8 = 0xF2;
 
-pub (crate) const LINENUM : u8 = 0xF8;
-pub (crate) const DEBUGINFO : u8 = 0xFF;
 
 
 pub (crate) fn get_assignment_type(optext : &str) -> Option<u8>

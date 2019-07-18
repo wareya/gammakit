@@ -151,3 +151,5 @@ for(var i = 0; i < 5000; i++)
     advance(0.01);
 }
 print(energy());
+
+energy = as;

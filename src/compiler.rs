@@ -6,9 +6,18 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 #[derive(Debug)]
+pub (crate) struct DebugInfo
+{
+    pub (crate) last_line : usize,
+    pub (crate) last_index : usize,
+    pub (crate) last_type : String,
+}
+
+#[derive(Debug)]
 pub struct Code
 {
     pub (crate) code : Rc<Vec<u8>>,
+    pub (crate) debug : Rc<HashMap<usize, DebugInfo>>,
     pub (crate) bookkeeping : Bookkeeping,
 }
 
@@ -16,7 +25,7 @@ impl std::clone::Clone for Code
 {
     fn clone(&self) -> Code
     {
-        Code{code : Rc::clone(&self.code), bookkeeping : self.bookkeeping.refclone()}
+        Code{code : Rc::clone(&self.code), debug : Rc::clone(&self.debug), bookkeeping : self.bookkeeping.refclone()}
     }
 }
 
@@ -33,11 +42,11 @@ impl Code
 {
     pub (crate) fn new() -> Code
     {
-        Code{code : Rc::new(Vec::new()), bookkeeping : Bookkeeping::new()}
+        Code{code : Rc::new(Vec::new()), debug : Rc::new(HashMap::new()), bookkeeping : Bookkeeping::new()}
     }
     pub (crate) fn new_share_bookkeeping(other : &Code) -> Code
     {
-        Code{code : Rc::new(Vec::new()), bookkeeping : other.bookkeeping.refclone()}
+        Code{code : Rc::new(Vec::new()), debug : Rc::new(HashMap::new()), bookkeeping : other.bookkeeping.refclone()}
     }
     fn compile_raw_string(&mut self, text : &str)
     {
@@ -68,6 +77,14 @@ impl Code
     pub (crate) fn get_mut<I : std::slice::SliceIndex<[u8]>>(&mut self, index : I) -> Option<&mut I::Output>
     {
         Rc::get_mut(&mut self.code).unwrap().get_mut(index)
+    }
+    fn add_debug_info(&mut self, pc : usize, last_line : usize, last_index : usize, last_type : &str)
+    {
+        Rc::get_mut(&mut self.debug).unwrap().insert(pc, DebugInfo{last_line, last_index, last_type : last_type.to_string()});
+    }
+    pub (crate) fn get_debug_info(&self, pc : usize) -> Option<&DebugInfo>
+    {
+        self.debug.get(&pc)
     }
 }
 
@@ -249,17 +266,12 @@ impl CompilerState {
     }
     fn compile_any(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        //self.last_line = ast.line;
-        //self.last_index = ast.position;
-        //self.last_type = ast.text.clone();
-        //if !matches!(self.last_type.as_str(), "funcdef")
-        //{
-        //    self.code.push(DEBUGINFO);
-        //    self.code.extend(pack_u64(self.last_line as u64));
-        //    self.code.extend(pack_u64(self.last_index as u64));
-        //    self.code.extend(self.last_type.bytes());
-        //    self.code.push(0x00);
-        //}
+        self.last_line = ast.line;
+        self.last_index = ast.position;
+        self.last_type = ast.text.clone();
+        
+        self.code.add_debug_info(self.code.len(), self.last_line, self.last_index, &self.last_type);
+        
         let hook = Rc::clone(self.hooks.get(&ast.text).ok_or_else(|| minierr(&format!("internal error: no handler for AST node with name `{}`", ast.text)))?);
         let hook = hook.try_borrow().or_else(|_| Err(format!("internal error: hook for AST node type `{}` is already in use", ast.text)))?;
         hook(self, ast)
@@ -292,14 +304,6 @@ impl CompilerState {
     }
     fn compile_statement(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        // FIXME move to bookkeeping
-        self.last_line = ast.line;
-        self.last_index = ast.position;
-        self.last_type = ast.text.clone();
-        self.code.push(DEBUGINFO);
-        self.code.extend(pack_u64(self.last_line as u64));
-        self.code.extend(pack_u64(self.last_index as u64));
-        self.code.compile_raw_string(&self.last_type);
         self.compile_nth_child(ast, 0)
     }
     

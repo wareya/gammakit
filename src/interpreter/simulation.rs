@@ -67,8 +67,6 @@ impl Interpreter
             EXIT => enbox!(sim_EXIT),
             RETURN => enbox!(sim_RETURN),
             YIELD => enbox!(sim_YIELD),
-            LINENUM => enbox!(sim_LINENUM),
-            DEBUGINFO => enbox!(sim_DEBUGINFO),
             _ => None
         }
     }
@@ -1033,23 +1031,6 @@ impl Interpreter
         {
             return plainerr("internal error: generators must always return into an expression");
         }
-        Ok(())
-    }
-    pub (crate) fn sim_LINENUM(&mut self) -> OpResult
-    {
-        self.top_frame.currline = self.read_usize()? as usize;
-        Ok(())
-    }
-    pub (crate) fn sim_DEBUGINFO(&mut self) -> OpResult
-    {
-        let line = self.read_usize()? as usize;
-        let pos = self.read_usize()? as usize;
-        let name = self.read_string()?;
-        if false
-        {
-            eprintln!("at {}:{}, type {}, bytecode {}", line, pos, name, self.get_pc());
-        }
-        self.top_frame.currline = line;
         Ok(())
     }
 }

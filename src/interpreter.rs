@@ -162,8 +162,23 @@ impl Interpreter {
     /// If there is an error string (i.e. Err(Some(string))), exit was non-graceful (i.e. there was an error). Otherwise (i.e. Err(None)), it was graceful.
     pub fn step(&mut self) -> StepResult
     {
+        let start_pc = self.get_pc();
         let ret = self.step_internal();
-        self.last_error = ret.clone().err().unwrap_or(None).map(|x| format!("{}\nline:{}\npc:0x{:X}\ncodelen:0x{:X}", x, self.top_frame.currline, self.get_pc(), self.get_code().len()));
+        if let Err(Some(err)) = &ret
+        {
+            if let Some(info) = self.get_code().get_debug_info(start_pc)
+            {
+                if false
+                {
+                    eprintln!("at {}:{}, type {}, bytecode {}", info.last_line, info.last_index, info.last_type, self.get_pc());
+                }
+                self.last_error = Some(format!("{}\nline: {}\ncolumn: {}", err, info.last_line, info.last_index))
+            }
+            else
+            {
+                self.last_error = Some(format!("{}\n(unknown or missing context)", err))
+            }
+        }
         ret
     }
 }
