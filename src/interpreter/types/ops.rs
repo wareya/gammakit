@@ -333,25 +333,24 @@ BINOP_TYPES = \
 }
 */
 
-pub (crate) fn get_binop_function(op : u8) -> Option<Box<Fn(&Value, &Value) -> Result<Value, String>>>
+pub (crate) fn do_binop_function(op : u8, left : &Value, right : &Value) -> Result<Value, String>
 {
-    macro_rules! enbox { ( $x:ident ) => { Some(Box::new($x)) } }
     match op
     {
-        0x10 => enbox!(value_op_and),
-        0x11 => enbox!(value_op_or),
-        0x20 => enbox!(value_op_equal),
-        0x21 => enbox!(value_op_not_equal),
-        0x22 => enbox!(value_op_greater_or_equal),
-        0x23 => enbox!(value_op_less_or_equal),
-        0x24 => enbox!(value_op_greater),
-        0x25 => enbox!(value_op_less),
-        0x30 => enbox!(value_op_add),
-        0x31 => enbox!(value_op_subtract),
-        0x40 => enbox!(value_op_multiply),
-        0x41 => enbox!(value_op_divide),
-        0x42 => enbox!(value_op_modulo),
-        _ => None
+        0x10 => value_op_and(left, right),
+        0x11 => value_op_or(left, right),
+        0x20 => value_op_equal(left, right),
+        0x21 => value_op_not_equal(left, right),
+        0x22 => value_op_greater_or_equal(left, right),
+        0x23 => value_op_less_or_equal(left, right),
+        0x24 => value_op_greater(left, right),
+        0x25 => value_op_less(left, right),
+        0x30 => value_op_add(left, right),
+        0x31 => value_op_subtract(left, right),
+        0x40 => value_op_multiply(left, right),
+        0x41 => value_op_divide(left, right),
+        0x42 => value_op_modulo(left, right),
+        _ => Err(format!("internal error: unknown binary operation 0x{:02X}", op))
     }
 }
 
@@ -379,17 +378,16 @@ fn value_op_not(value : &Value) -> Result<Value, String>
         _ => Err("type incompatible with not operator".to_string())
     }
 }
-        
-pub (crate) fn get_unop_function(op : u8) -> Option<Box<Fn(&Value) -> Result<Value, String>>>
+
+pub (crate) fn do_unop_function(op : u8, val : &Value) -> Result<Value, String>
 {
-    macro_rules! enbox { ( $x:ident ) => { Some(Box::new($x)) } }
     match op
     {
-        0x10 => enbox!(value_op_negative),
-        0x11 => enbox!(value_op_positive),
-        0x20 => enbox!(value_op_not),
+        0x10 => value_op_negative(val),
+        0x11 => value_op_positive(val),
+        0x20 => value_op_not(val),
         // TODO: add "bitwise not"?
-        _ => None
+        _ => Err(format!("internal error: unknown unary operation 0x{:02X}", op))
     }
 }
 
@@ -401,14 +399,13 @@ fn value_op_decrement(value : &Value) -> Result<Value, String>
 {
     value_op_subtract(value, &Value::Number(1.0))
 }
-pub (crate) fn get_unstate_function(op : u8) -> Option<Box<Fn(&Value) -> Result<Value, String>>>
+pub (crate) fn do_unstate_function(op : u8,  val : &Value) -> Result<Value, String>
 {
-    macro_rules! enbox { ( $x:ident ) => { Some(Box::new($x)) } }
     match op
     {
-        0x00 => enbox!(value_op_increment),
-        0x01 => enbox!(value_op_decrement),
-        _ => None
+        0x00 => value_op_increment(val),
+        0x01 => value_op_decrement(val),
+        _ => Err(format!("internal error: unknown unary state operator 0x{:02X}", op))
     }
 }
 

@@ -114,15 +114,70 @@ mod tests {
             steps += 1;
         }
         
-        println!("simulation took {:?}", Instant::now().duration_since(start_time));
+        let duration = Instant::now().duration_since(start_time);
+        println!("simulation took {:?}", duration);
         println!("steps {:?}", steps);
+        println!("{:?} steps per second", steps as f64 / (duration.as_millis() as f64 / 1000.0));
+        println!("{:?} seconds per step", duration.as_millis() as f64 / 1000.0 / steps as f64);
         let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>();
         op_map.sort_by(|a, b| a.1.cmp(&b.1));
+        let mut total = 0.0;
         for (op, time) in op_map
         {
             let time = (time/1000000) as f64 / 1000.0;
+            total  += time;
             println!("{:02X}:{}", op, time);
         }
+        println!("total: {}", total);
+        println!("({} steps per second)", steps as f64 / total);
+        
+        if let Some(err) = &interpreter.last_error
+        {
+            panic!("{}", err);
+        }
+        
+        Ok(())
+    }
+    
+    #[test]
+    fn test_nopspeed() -> Result<(), String>
+    {
+        use std::time::Instant;
+        use std::collections::BTreeMap;
+        use std::rc::Rc;
+        use bookkeeping::*;
+
+        let mut code = Code{code : Rc::new(vec!(0; 10_000_000)), debug : Rc::new(BTreeMap::new()), bookkeeping : Bookkeeping::new()};
+        
+        let end = code.code.len()-1;
+        Rc::get_mut(&mut code.code).unwrap()[end] = bytecode::EXIT;
+        
+        let mut interpreter = Interpreter::new(&code, None);
+        interpreter.insert_default_bindings();
+        
+        let start_time = Instant::now();
+        
+        let mut steps = 0;
+        while interpreter.step().is_ok()
+        {
+            steps += 1;
+        }
+        
+        let duration = Instant::now().duration_since(start_time);
+        println!("simulation took {:?}", duration);
+        println!("steps {:?}", steps);
+        println!("{:?} steps per second", steps as f64 / (duration.as_millis() as f64 / 1000.0));
+        println!("{:?} seconds per step", duration.as_millis() as f64 / 1000.0 / steps as f64);
+        let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>();
+        op_map.sort_by(|a, b| a.1.cmp(&b.1));
+        let mut total = 0.0;
+        for (op, time) in op_map
+        {
+            let time = (time/1000000) as f64 / 1000.0;
+            total  += time;
+            println!("{:02X}:{}", op, time);
+        }
+        println!("total: {}", total);
         
         if let Some(err) = &interpreter.last_error
         {

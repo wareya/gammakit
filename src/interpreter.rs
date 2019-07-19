@@ -1,4 +1,4 @@
-use std::collections::{HashMap, HashSet, BTreeSet};
+use std::collections::{HashMap, HashSet, BTreeMap, BTreeSet};
 use std::rc::Rc;
 use std::cell::RefCell;
 
@@ -97,7 +97,7 @@ impl Interpreter {
             last_error : None,
             opfunc_map : Interpreter::build_opfunc_table(),
             op_map : HashMap::new(),
-            track_op_performance : false
+            track_op_performance : true
         }
     }
     /// Loads new code into the interpreter.
@@ -178,7 +178,7 @@ impl Interpreter {
             }
             else
             {
-                self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced)", err))
+                self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, start_pc, self.get_code().debug))
             }
         }
         ret

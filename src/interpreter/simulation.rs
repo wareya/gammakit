@@ -92,7 +92,7 @@ impl Interpreter
     }
     pub (crate) fn sim_PUSHFLT(&mut self) -> OpResult
     {
-        let value = unpack_f64(&self.pull_from_code(8)?)?;
+        let value = self.read_float()?;
         self.stack_push_val(Value::Number(value));
         Ok(())
     }
@@ -137,14 +137,13 @@ impl Interpreter
     pub (crate) fn sim_PUSHVAR(&mut self) -> OpResult
     {
         let index = self.read_usize()?;
-        let val = match index
+        self.stack_push_val(match index
         {
             1 => self.evaluate_global()?,
             2 => self.evaluate_self()?,
             3 => self.evaluate_other()?,
             _ => self.evaluate_of_direct(index)?
-        };
-        self.stack_push_val(val.to_val()?);
+        }.to_val()?);
         Ok(())
     }
     
@@ -160,7 +159,7 @@ impl Interpreter
         if scope.contains_key(&name)
         {
             //return Ok(());
-            return Err(format!("error: redeclared lexical variable {}", name))
+            return Err(format!("error: redeclared lexical variable {}", self.get_indexed_string(name)))
         }
         scope.insert(name, ValRef::from_val(Value::Number(0.0)));
         
@@ -177,7 +176,7 @@ impl Interpreter
         let instance = self.global.instances.get_mut(instance_id).ok_or_else(|| format!("error: tried to declare instance variable but instance of current scope ({}) no longer exists", instance_id))?;
         if instance.variables.contains_key(&name)
         {
-            return Err(format!("error: redeclared instance variable {}", name));
+            return Err(format!("error: redeclared instance variable {}", self.get_indexed_string(name)));
         }
         instance.variables.insert(name, ValRef::from_val(Value::Number(0.0)));
         Ok(())
@@ -192,7 +191,7 @@ impl Interpreter
         
         if self.global.variables.contains_key(&name)
         {
-            return Err(format!("error: redeclared global variable identifier {}", name))
+            return Err(format!("error: redeclared global variable {}", self.get_indexed_string(name)))
         }
         self.global.variables.insert(name, ValRef::from_val(Value::Number(0.0)));
         
@@ -312,7 +311,7 @@ impl Interpreter
     
     pub (crate) fn sim_SCOPE(&mut self) -> OpResult
     {
-        self.top_frame.scopes.push(HashMap::new());
+        self.top_frame.scopes.push(BTreeMap::new());
         if self.top_frame.scopes.len() >= 0x10000
         {
             return Err(format!("error: scope recursion limit of 0x10000 reached at line {}\n(note: use more functions!)", self.top_frame.currline));
@@ -438,7 +437,7 @@ impl Interpreter
         let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
         if scope.contains_key(&name)
         {
-            return Err(format!("error: redeclared identifier {}", name))
+            return Err(format!("error: redeclared identifier {}", self.get_indexed_string(name)))
         }
         
         if let Value::Generator(genstate) = val
@@ -575,7 +574,7 @@ impl Interpreter
         
         if scope.contains_key(&funcname)
         {
-            return Err(format!("error: redeclared identifier {}", funcname));
+            return Err(format!("error: redeclared identifier {}", self.get_indexed_string(funcname)));
         }
         scope.insert(funcname.clone(), ValRef::from_val(Value::new_funcval(false, Some(funcname), None, Some(myfuncspec))));
         Ok(())
@@ -586,7 +585,7 @@ impl Interpreter
         
         if self.global.functions.contains_key(&funcname)
         {
-            return Err(format!("error: redeclared global function {}", funcname));
+            return Err(format!("error: redeclared global function {}", self.get_indexed_string(funcname)));
         }
         self.global.functions.insert(funcname.clone(), Value::new_funcval(false, Some(funcname), None, Some(myfuncspec)));
         Ok(())
@@ -598,7 +597,7 @@ impl Interpreter
         
         if scope.contains_key(&funcname)
         {
-            return Err(format!("error: redeclared identifier {}", funcname));
+            return Err(format!("error: redeclared identifier {}", self.get_indexed_string(funcname)));
         }
         scope.insert(funcname.clone(), ValRef::from_val(Value::new_funcval(false, Some(funcname), None, Some(myfuncspec))));
         Ok(())
@@ -610,7 +609,7 @@ impl Interpreter
         
         if scope.contains_key(&funcname)
         {
-            return Err(format!("error: redeclared identifier {}", funcname));
+            return Err(format!("error: redeclared identifier {}", self.get_indexed_string(funcname)));
         }
         scope.insert(funcname.clone(), ValRef::from_val(Value::new_funcval(false, Some(funcname), None, Some(myfuncspec))));
         Ok(())
@@ -635,11 +634,9 @@ impl Interpreter
         }
         else
         {
-            let opfunc = get_binop_function(immediate).ok_or_else(|| format!("internal error: unknown binary operation 0x{:02X}", immediate))?;
-            
             let var_initial_value = self.evaluate(&var)?;
             
-            let var_new_value = opfunc(&var_initial_value.to_val()?, &value).or_else(|text| Err(format!("error: disallowed binary statement\n({})", text)))?;
+            let var_new_value = do_binop_function(immediate, &var_initial_value.to_val()?, &value)?;
             var_initial_value.assign(var_new_value)?;
         }
         Ok(())
@@ -654,10 +651,8 @@ impl Interpreter
         let immediate = self.pull_single_from_code()?;
         
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: argument to UNSTATE could not be found or was not a variable"))?;
-        
-        let opfunc = get_unstate_function(immediate).ok_or_else(|| format!("internal error: unknown unary statement operation 0x{:02X}", immediate))?;
         let var = self.evaluate(&var)?;
-        var.assign(opfunc(&var.to_val()?).or_else(|text| Err(format!("error: disallowed unary statement operation\n({})", text)))?)?;
+        var.assign(do_unstate_function(immediate, &var.to_val()?)?)?;
         Ok(())
     }
     
@@ -673,14 +668,7 @@ impl Interpreter
         let right = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction BINOP (this error should be inaccessible!)"))?;
         let left = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction BINOP (this error should be inaccessible!)"))?;
         
-        let opfunc = get_binop_function(immediate).ok_or_else(|| format!("internal error: unknown binary operation 0x{:02X}", immediate))?;
-        
-        let new_value = opfunc(&left, &right).or_else(|text|
-        {
-            let left_fmt = format_val(&left).ok_or_else(|| minierr("internal error: failed to format left value for printing error when creating error for invalid binary expression"))?;
-            let right_fmt = format_val(&right).ok_or_else(|| minierr("internal error: failed to format right value for printing error when creating error for invalid binary expression"))?;
-            Err(format!("error: disallowed binary expression\n({})\n(value 1: {})\n(value 2: {})", text, left_fmt, right_fmt))
-        })?;
+        let new_value = do_binop_function(immediate, &left, &right)?;
         self.stack_push_val(new_value);
         Ok(())
     }
@@ -728,9 +716,7 @@ impl Interpreter
         let immediate = self.pull_single_from_code()?;
         
         let value = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction UNOP (this error should be inaccessible!)"))?;
-        let opfunc = get_unop_function(immediate).ok_or_else(|| format!("internal error: unknown unary operation 0x{:02X}", immediate))?;
-        
-        let new_value = opfunc(&value).or_else(|text| Err(format!("error: disallowed unary expression\n({})", text)))?;
+        let new_value = do_unop_function(immediate, &value)?;
         self.stack_push_val(new_value);
         Ok(())
     }
@@ -745,7 +731,7 @@ impl Interpreter
         let name = self.read_string_index()?;
         if self.global.objectnames.contains_key(&name)
         {
-            return Err(format!("error: redeclared object {}", name));
+            return Err(format!("error: redeclared object {}", self.get_indexed_string(name)));
         }
         
         let object_id = self.global.object_id;
@@ -759,7 +745,7 @@ impl Interpreter
             myfuncspec.parentobj = object_id;
             if funcs.contains_key(&funcname)
             {
-                return Err(format!("error: redeclared function {} in object {}", funcname, name));
+                return Err(format!("error: redeclared function {} in object {}", self.get_indexed_string(funcname), self.get_indexed_string(name)));
             }
             funcs.insert(funcname, myfuncspec);
         }

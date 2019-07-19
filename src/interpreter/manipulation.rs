@@ -38,11 +38,31 @@ impl Interpreter
     {
         self.top_frame.pc -= new;
     }
-    
-    pub (crate) fn pull_from_code(&mut self, n : usize) -> Result<Vec<u8>, String>
+    pub (crate) fn round_up_pc_2(&mut self)
     {
-        let vec = self.get_code().get(self.get_pc()..self.get_pc()+n).map(|v| v.to_vec()).ok_or_else(|| minierr("error: tried to access past end of code"))?;
-        self.add_pc(n);
+        if self.top_frame.pc > 0
+        {
+            self.top_frame.pc = (((self.top_frame.pc-1)>>1)+1)<<1;
+        }
+    }
+    pub (crate) fn round_up_pc_8(&mut self)
+    {
+        if self.top_frame.pc > 0
+        {
+            self.top_frame.pc = (((self.top_frame.pc-1)>>3)+1)<<3;
+        }
+    }
+    
+    pub (crate) fn pull_2_from_code(&mut self) -> Result<Vec<u8>, String>
+    {
+        let vec = self.get_code().get(self.get_pc()..self.get_pc()+2).map(|v| v.to_vec()).ok_or_else(|| minierr("error: tried to access past end of code"))?;
+        self.add_pc(2);
+        Ok(vec)
+    }
+    pub (crate) fn pull_8_from_code(&mut self) -> Result<Vec<u8>, String>
+    {
+        let vec = self.get_code().get(self.get_pc()..self.get_pc()+8).map(|v| v.to_vec()).ok_or_else(|| minierr("error: tried to access past end of code"))?;
+        self.add_pc(8);
         Ok(vec)
     }
     pub (crate) fn pull_single_from_code(&mut self) -> Result<u8, String>
@@ -70,11 +90,15 @@ impl Interpreter
     }
     pub (crate) fn read_u16(&mut self) -> Result<u16, String>
     {
-        Ok(unpack_u16(&self.pull_from_code(2)?)?)
+        Ok(unpack_u16(&self.pull_2_from_code()?)?)
     }
     pub (crate) fn read_usize(&mut self) -> Result<usize, String>
     {
-        Ok(unpack_u64(&self.pull_from_code(8)?)? as usize)
+        Ok(unpack_u64(&self.pull_8_from_code()?)? as usize)
+    }
+    pub (crate) fn read_float(&mut self) -> Result<f64, String>
+    {
+        Ok(unpack_f64(&self.pull_8_from_code()?)?)
     }
     pub (crate) fn read_string_index(&mut self) -> Result<usize, String>
     {
@@ -127,7 +151,7 @@ impl Interpreter
         Ok((name, FuncSpec { varnames : args, code : code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : !subroutine, generator }))
     }
     
-    pub (crate) fn read_lambda(&mut self) -> Result<(HashMap<usize, ValRef>, FuncSpec), String>
+    pub (crate) fn read_lambda(&mut self) -> Result<(BTreeMap<usize, ValRef>, FuncSpec), String>
     {
         let code = self.get_code();
         
@@ -138,7 +162,7 @@ impl Interpreter
             return Err(format!("internal error: not enough values on stack to satisfy requirements of read_lambda (need {}, have {})", capturecount, self.top_frame.stack.len()));
         }
         
-        let mut captures = HashMap::new();
+        let mut captures = BTreeMap::new();
         for _i in 0..capturecount
         {
             let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: read_lambda failed to collect capture value from stack"))?;

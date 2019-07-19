@@ -136,7 +136,7 @@ pub (crate) fn return_indexed(var : &Value, indexes : &[HashableValue]) -> Resul
 
 fn access_frame(global : &GlobalState, frame : &Frame, name : usize, seen_instance : &mut bool) -> Option<ValRef>
 {
-    for scope in frame.scopes.iter().rev()
+    for scope in frame.scopes.iter().rev().filter(|x| !x.is_empty())
     {
         if let Some(var) = scope.get(&name)
         {

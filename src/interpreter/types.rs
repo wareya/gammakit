@@ -8,6 +8,8 @@ pub (crate) mod ops;
 
 pub (crate) use self::ops::*;
 
+use std::collections::BTreeMap;
+
 // note: for loops are controlled the same way as while loops
 
 #[derive(Debug, Clone)]
@@ -63,7 +65,7 @@ pub (crate) struct Frame {
     pub (super) startpc: usize,
     pub (super) pc: usize,
     pub (super) endpc: usize,
-    pub (super) scopes: Vec<HashMap<usize, ValRef>>,
+    pub (super) scopes: Vec<BTreeMap<usize, ValRef>>,
     pub (super) instancestack: Vec<usize>,
     pub (super) controlstack: Vec<Controller>,
     pub (super) stack: Vec<StackValue>,
@@ -173,7 +175,7 @@ pub (crate) enum Variable {
 pub struct FuncVal {
     pub (super) internal: bool,
     pub (super) name: Option<usize>,
-    pub (super) predefined: Option<HashMap<usize, ValRef>>,
+    pub (super) predefined: Option<BTreeMap<usize, ValRef>>,
     pub (super) userdefdata: Option<FuncSpec>
 }
 
@@ -345,12 +347,12 @@ impl Frame {
     pub (super) fn new_root(code : &Code) -> Frame
     {
         let codelen = code.len();
-        Frame { code : code.clone(), startpc : 0, pc : 0, endpc : codelen, scopes : vec!(HashMap::new()), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0, impassable: true, generator: false }
+        Frame { code : code.clone(), startpc : 0, pc : 0, endpc : codelen, scopes : vec!(BTreeMap::new()), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0, impassable: true, generator: false }
     }
     pub (super) fn new_from_call(code : &Code, startpc : usize, endpc : usize, isexpr : bool, outer : Option<&Frame>, generator : bool) -> Frame
     {
         let instancestack = if let Some(outer) = outer { outer.instancestack.clone() } else { Vec::new() };
-        Frame { code : code.clone(), startpc, pc : startpc, endpc, scopes : vec!(HashMap::new()), instancestack, controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, impassable : outer.is_none(), generator }
+        Frame { code : code.clone(), startpc, pc : startpc, endpc, scopes : vec!(BTreeMap::new()), instancestack, controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, impassable : outer.is_none(), generator }
     }
     pub (super) fn len(&mut self) -> usize
     {
@@ -384,7 +386,7 @@ impl Frame {
 
 impl Value
 {
-    pub (crate) fn new_funcval(internal : bool, name : Option<usize>, predefined : Option<HashMap<usize, ValRef>>, userdefdata : Option<FuncSpec>) -> Value
+    pub (crate) fn new_funcval(internal : bool, name : Option<usize>, predefined : Option<BTreeMap<usize, ValRef>>, userdefdata : Option<FuncSpec>) -> Value
     {
         Value::Func(Box::new(FuncVal{internal, name, predefined, userdefdata}))
     }

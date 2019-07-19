@@ -3,7 +3,7 @@
 use super::{strings::*, ast::*, bytecode::*, bookkeeping::*};
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 
 #[derive(Debug)]
 pub (crate) struct DebugInfo
@@ -17,7 +17,7 @@ pub (crate) struct DebugInfo
 pub struct Code
 {
     pub (crate) code : Rc<Vec<u8>>,
-    pub (crate) debug : Rc<HashMap<usize, DebugInfo>>,
+    pub (crate) debug : Rc<BTreeMap<usize, DebugInfo>>,
     pub (crate) bookkeeping : Bookkeeping,
 }
 
@@ -42,11 +42,11 @@ impl Code
 {
     pub (crate) fn new() -> Code
     {
-        Code{code : Rc::new(Vec::new()), debug : Rc::new(HashMap::new()), bookkeeping : Bookkeeping::new()}
+        Code{code : Rc::new(Vec::new()), debug : Rc::new(BTreeMap::new()), bookkeeping : Bookkeeping::new()}
     }
     pub (crate) fn new_share_bookkeeping(other : &Code) -> Code
     {
-        Code{code : Rc::new(Vec::new()), debug : Rc::new(HashMap::new()), bookkeeping : other.bookkeeping.refclone()}
+        Code{code : Rc::new(Vec::new()), debug : Rc::new(BTreeMap::new()), bookkeeping : other.bookkeeping.refclone()}
     }
     fn compile_raw_string(&mut self, text : &str)
     {
@@ -84,7 +84,7 @@ impl Code
     }
     pub (crate) fn get_debug_info(&self, pc : usize) -> Option<&DebugInfo>
     {
-        self.debug.get(&pc)
+        self.debug.range(..=&pc).next_back().map(|x| x.1)
     }
 }
 
@@ -207,11 +207,26 @@ impl CompilerState {
         self.add_hook(&"switch", &CompilerState::compile_switch);
         self.add_hook(&"ternary", &CompilerState::compile_ternary);
     }
+    fn compile_u16(&mut self, num : u16) -> usize
+    {
+        self.code.extend(pack_u16(num));
+        self.code.len() - 2
+    }
+    fn compile_u64(&mut self, num : u64) -> usize
+    {
+        self.code.extend(pack_u64(num));
+        self.code.len() - 8
+    }
+    fn compile_f64(&mut self, num : f64) -> usize
+    {
+        self.code.extend(pack_f64(num));
+        self.code.len() - 8
+    }
     
     fn compile_push_float(&mut self, float : f64)
     {
         self.code.push(PUSHFLT);
-        self.code.extend(pack_f64(float));
+        self.compile_f64(float);
     }
     fn compile_raw_string(&mut self, text : &str)
     {
@@ -224,8 +239,7 @@ impl CompilerState {
     }
     fn compile_string_index(&mut self, text : &String)
     {
-        let myu64 = pack_u64(self.code.get_string_index(text) as u64);
-        self.code.extend(myu64);
+        self.compile_u64(self.code.get_string_index(text) as u64);
     }
     fn compile_string_index_with_prefix(&mut self, prefix : u8, text : &String)
     {
@@ -240,7 +254,7 @@ impl CompilerState {
             return plainerr("error: internal scope depth limit of 0xFFFF reached; nest your code less.");
         }
         self.code.push(UNSCOPE);
-        self.code.extend(pack_u16(self.scopedepth as u16));
+        self.compile_u16(self.scopedepth as u16);
         Ok(())
     }
     fn compile_context_wrapped(&mut self, context : Context, fun : &Fn(&mut CompilerState) -> Result<(), String>) -> Result<(), String>
@@ -424,7 +438,7 @@ impl CompilerState {
                 x.compile_any(child)?;
             }
             x.code.push(PUSHSHORT);
-            x.code.extend(pack_u16(args.len() as u16));
+            x.compile_u16(args.len() as u16);
             Ok(())
         })?;
         match self.context
@@ -460,14 +474,12 @@ impl CompilerState {
         if op == 0x10 // and
         {
             self.code.push(SHORTCIRCUITIFFALSE);
-            rewrite_location_jumplen = self.code.len();
-            self.code.extend(pack_u64(0));
+            rewrite_location_jumplen = self.compile_u64(0);
         }
         else if op == 0x11 // or
         {
             self.code.push(SHORTCIRCUITIFTRUE);
-            rewrite_location_jumplen = self.code.len();
-            self.code.extend(pack_u64(0));
+            rewrite_location_jumplen = self.compile_u64(0);
         }
         
         let position_1 = self.code.len();
@@ -493,10 +505,8 @@ impl CompilerState {
     fn compile_whilecondition(&mut self, ast : &ASTNode) -> Result<(), String>
     {
         self.code.push(WHILE);
-        let rewrite_location_exprlen = self.code.len();
-        self.code.extend(pack_u64(0));
-        let rewrite_location_codelen = self.code.len();
-        self.code.extend(pack_u64(0));
+        let rewrite_location_exprlen = self.compile_u64(0);
+        let rewrite_location_codelen = self.compile_u64(0);
         
         let point_1 = self.code.len();
         
@@ -535,7 +545,7 @@ impl CompilerState {
             "false" => 0.0,
             _ => ast.child(0)?.text.parse::<f64>().or_else(|_| Err(format!("internal error: text `{}` cannot be converted to a floating point number by rust", ast.child(0)?.text)))?
         };
-        self.code.extend(pack_f64(float));
+        self.compile_f64(float);
         Ok(())
     }
     fn compile_statementlist(&mut self, ast : &ASTNode) -> Result<(), String>
@@ -612,7 +622,7 @@ impl CompilerState {
         {
             return plainerr("error: can only have 0xFFFF (around 65000) functions to a single object");
         }
-        self.code.extend(pack_u16(funcs.len() as u16));
+        self.compile_u16(funcs.len() as u16);
         
         self.compile_context_wrapped(Context::Objdef, &|x|
         {
@@ -643,10 +653,9 @@ impl CompilerState {
         self.compile_context_wrapped(Context::Unknown, &|x|
         {
             x.compile_string_index(&name);
-            x.code.extend(pack_u16(ast.child(3)?.children.len() as u16));
+            x.compile_u16(ast.child(3)?.children.len() as u16);
             
-            let body_len_position = x.code.len();
-            x.code.extend(pack_u64(0 as u64));
+            let body_len_position = x.compile_u64(0 as u64);
             
             for arg in &ast.child(3)?.children
             {
@@ -681,8 +690,7 @@ impl CompilerState {
         self.compile_nth_child(ast, 1)?;
         self.code.push(WITH);
         
-        let len_position = self.code.len();
-        self.code.extend(pack_u64(0));
+        let len_position = self.compile_u64(0);
         
         let position_1 = self.code.len();
         self.compile_nth_child(ast, 2)?;
@@ -846,14 +854,13 @@ impl CompilerState {
         }
         
         self.code.push(LAMBDA);
-        self.code.extend(pack_u64(captures.len() as u64));
+        self.compile_u64(captures.len() as u64);
         for capture_name_index in capturenames.iter().rev()
         {
-            self.code.extend(pack_u64(*capture_name_index as u64));
+            self.compile_u64(*capture_name_index as u64);
         }
-        self.code.extend(pack_u16(args.len() as u16));
-        let len_position = self.code.len();
-        self.code.extend(pack_u64(0 as u64));
+        self.compile_u16(args.len() as u16);
+        let len_position = self.compile_u64(0 as u64);
           
         for arg in args
         {
@@ -887,7 +894,7 @@ impl CompilerState {
             elementcount += 1;
         }
         self.code.push(COLLECTARRAY);
-        self.code.extend(pack_u16(elementcount as u16));
+        self.compile_u16(elementcount as u16);
         
         Ok(())
     }
@@ -905,7 +912,7 @@ impl CompilerState {
             elementcount += 1;
         }
         self.code.push(COLLECTDICT);
-        self.code.extend(pack_u16(elementcount as u16));
+        self.compile_u16(elementcount as u16);
         
         Ok(())
     }
@@ -922,7 +929,7 @@ impl CompilerState {
             elementcount += 1;
         }
         self.code.push(COLLECTSET);
-        self.code.extend(pack_u16(elementcount as u16));
+        self.compile_u16(elementcount as u16);
         
         Ok(())
     }
@@ -934,8 +941,7 @@ impl CompilerState {
         if ast.children.len() == 3
         {
             self.code.push(IF);
-            let body_len_position = self.code.len();
-            self.code.extend(pack_u64(0));
+            let body_len_position = self.compile_u64(0);
             let position_1 = self.code.len();
             self.compile_nth_child(ast, 2)?;
             let position_2 = self.code.len();
@@ -945,14 +951,12 @@ impl CompilerState {
         else if ast.children.len() == 5 && ast.child(3)?.text == "else"
         {
             self.code.push(IF);
-            let body_len_position = self.code.len();
-            self.code.extend(pack_u64(0));
+            let body_len_position = self.compile_u64(0);
             
             let position_1 = self.code.len();
             self.compile_nth_child(ast, 2)?;
             self.code.push(JUMPRELATIVE);
-            let else_len_position = self.code.len();
-            self.code.extend(pack_u64(0));
+            let else_len_position = self.compile_u64(0);
             let position_2 = self.code.len();
             let body_len = position_2 - position_1;
             self.rewrite_code(body_len_position, pack_u64(body_len as u64))?;
@@ -989,12 +993,9 @@ impl CompilerState {
         }
         
         self.code.push(FOR);
-        let post_len_rewrite_pos = self.code.len();
-        self.code.extend(pack_u64(0));
-        let expr_len_rewrite_pos = self.code.len();
-        self.code.extend(pack_u64(0));
-        let block_len_rewrite_pos = self.code.len();
-        self.code.extend(pack_u64(0));
+        let post_len_rewrite_pos = self.compile_u64(0);
+        let expr_len_rewrite_pos = self.compile_u64(0);
+        let block_len_rewrite_pos = self.compile_u64(0);
         
         let position_1 = self.code.len();
         
@@ -1060,8 +1061,7 @@ impl CompilerState {
             
             x.compile_nth_child(ast, 4)?;
             x.code.push(FOREACH);
-            let block_len_rewrite_pos = x.code.len();
-            x.code.extend(pack_u64(0));
+            let block_len_rewrite_pos = x.compile_u64(0);
             let position_1 = x.code.len();
             x.code.push(FOREACHHEAD);
             x.compile_nth_child(ast, 6)?;
@@ -1082,12 +1082,12 @@ impl CompilerState {
         {
             self.compile_any(node)?;
             self.code.push(SWITCHCASE);
-            self.code.extend(pack_u16(which));
+            self.compile_u16(which);
         }
         if ast.child_slice(1, -2)?.is_empty()
         {
             self.code.push(SWITCHDEFAULT);
-            self.code.extend(pack_u16(which));
+            self.compile_u16(which);
         }
         Ok(())
     }
@@ -1117,14 +1117,14 @@ impl CompilerState {
         self.code.push(SWITCH);
         let cases = &ast.child(5)?.children;
         let num_case_blocks = cases.len();
-        self.code.extend(pack_u16(num_case_blocks as u16));
+        self.compile_u16(num_case_blocks as u16);
         let case_block_reference_point = self.code.len();
         
-        let block_count_rewrite_pos = self.code.len();
         for _ in 0..=num_case_blocks
         {
             self.code.extend(pack_u64(0));
         }
+        let block_count_rewrite_pos = self.code.len() - 8*num_case_blocks;
         
         for (i, node) in cases.iter().enumerate()
         {
@@ -1153,14 +1153,12 @@ impl CompilerState {
     {
         self.compile_nth_child(ast, 0)?;
         self.code.push(IF);
-        let block1_len_rewrite_pos = self.code.len();
-        self.code.extend(pack_u64(0));
+        let block1_len_rewrite_pos = self.compile_u64(0);
         
         let position_1 = self.code.len();
         self.compile_nth_child(ast, 2)?;
         self.code.push(JUMPRELATIVE);
-        let block2_len_rewrite_pos = self.code.len();
-        self.code.extend(pack_u64(0));
+        let block2_len_rewrite_pos = self.compile_u64(0);
         let position_2 = self.code.len();
         
         let position_3 = self.code.len();

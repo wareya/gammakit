@@ -1,14 +1,14 @@
 
 use std::rc::Rc;
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 
 #[derive(Debug)]
 struct BookkeepingInternal
 {
     string_index : usize,
     string_table : HashMap<String, usize>,
-    string_table_reverse : HashMap<usize, String>,
+    string_table_reverse : BTreeMap<usize, String>,
 }
 
 #[derive(Debug)]
@@ -27,7 +27,7 @@ impl Bookkeeping
         string_table.insert("other".to_string(), 3);
         string_table.insert("id".to_string(), 4);
         string_table.insert("create".to_string(), 5);
-        let mut string_table_reverse = HashMap::new();
+        let mut string_table_reverse = BTreeMap::new();
         string_table_reverse.insert(1, "global".to_string());
         string_table_reverse.insert(2, "self".to_string());
         string_table_reverse.insert(3, "other".to_string());
