@@ -309,19 +309,50 @@ impl CompilerState {
     
     fn compile_rhunexpr(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        for child in ast.child_slice(0, -1)?
+        if ast.child(0)?.text == "name" && ast.child(0)?.child(0)?.text == "global" && ast.child(1)?.child(0)?.text == "indirection"
         {
-            //eprintln!("{:?}", child);
-            if child.text == "name"
+            if matches!(self.context, Context::Expr)
             {
-                self.compile_pushname(&child.child(0)?.text)?;
+                self.compile_pushglobalval(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
             }
             else
             {
-                self.compile_any(child)?;
+                self.compile_pushglobal(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
             }
+            if ast.children.len() > 2
+            {
+                for child in ast.child_slice(2, -1)?
+                {
+                    //eprintln!("{:?}", child);
+                    if child.text == "name"
+                    {
+                        self.compile_pushname(&child.child(0)?.text)?;
+                    }
+                    else
+                    {
+                        self.compile_any(child)?;
+                    }
+                }
+                self.compile_last_child(ast)?;
+            }
+            Ok(())
         }
-        self.compile_last_child(ast)
+        else
+        {
+            for child in ast.child_slice(0, -1)?
+            {
+                //eprintln!("{:?}", child);
+                if child.text == "name"
+                {
+                    self.compile_pushname(&child.child(0)?.text)?;
+                }
+                else
+                {
+                    self.compile_any(child)?;
+                }
+            }
+            self.compile_last_child(ast)
+        }
     }
     fn compile_funccall(&mut self, ast : &ASTNode) -> Result<(), String>
     {
@@ -357,6 +388,16 @@ impl CompilerState {
     fn compile_pushname(&mut self, string : &String) -> Result<(), String>
     {
         self.compile_string_index_with_prefix(PUSHNAME, string);
+        Ok(())
+    }
+    fn compile_pushglobal(&mut self, string : &String) -> Result<(), String>
+    {
+        self.compile_string_index_with_prefix(PUSHGLOBAL, string);
+        Ok(())
+    }
+    fn compile_pushglobalval(&mut self, string : &String) -> Result<(), String>
+    {
+        self.compile_string_index_with_prefix(PUSHGLOBALVAL, string);
         Ok(())
     }
     fn compile_pushstr(&mut self, string : &String) -> Result<(), String>
@@ -667,12 +708,7 @@ impl CompilerState {
             {
                 match decl_type
                 {
-                    "globalvar" =>
-                    {
-                        self.compile_pushvar(&"global".to_string())?;
-                        self.compile_pushname(&name)?;
-                        self.code.push(INDIRECTION);
-                    }
+                    "globalvar" => self.compile_pushglobal(&name)?,
                     _ => self.compile_pushname(&name)?
                 }
                 self.compile_nth_child(child, 2)?;

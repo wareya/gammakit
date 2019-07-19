@@ -63,6 +63,8 @@ impl GlobalState {
     }
 }
 
+type OpFunc = fn(&mut Interpreter) -> OpResult;
+
 // interpreter state
 /// Interprets compiled bytecode.
 pub struct Interpreter {
@@ -74,16 +76,17 @@ pub struct Interpreter {
     global: GlobalState,
     /// Last error returned by step(). Gets cleared (reset to None) when step() runs without returning an error.
     pub last_error: Option<String>,
+    pub (crate) opfunc_map: Box<[OpFunc; 256]>,
     pub (crate) op_map: HashMap<u8, u128>,
     doexit: bool,
-    pub (crate) track_op_performance: bool
+    pub (crate) track_op_performance: bool,
 }
 
 impl Interpreter {
     /// Creates a new interpreter 
     pub fn new(code : &Code, parser : Option<Parser>) -> Interpreter
     {
-        Interpreter {
+        let mut ret = Interpreter {
             top_frame : Frame::new_root(code),
             frames : vec!(),
             doexit : false,
@@ -92,9 +95,12 @@ impl Interpreter {
             arrow_bindings : HashMap::new(),
             global : GlobalState::new(parser),
             last_error : None,
+            opfunc_map : Box::new([Interpreter::sim_INVALID; 256]),
             op_map : HashMap::new(),
             track_op_performance : false
-        }
+        };
+        ret.init_opfunc_table();
+        ret
     }
     /// Loads new code into the interpreter.
     /// 
@@ -139,16 +145,15 @@ impl Interpreter {
         }
         
         let op = self.pull_single_from_code()?;
-        let opfunc = match_or_err!(self.get_opfunc(op), Some(opfunc) => opfunc, Some(format!("internal error: unknown operation 0x{:02X}", op)))?;
         
         if !self.track_op_performance
         {
-            opfunc(self).map_err(Some)?;
+            self.run_opfunc(op)?;
         }
         else
         {
             let start_time = Instant::now();
-            opfunc(self).map_err(Some)?;
+            self.run_opfunc(op)?;
             *self.op_map.entry(op).or_insert(0) += Instant::now().duration_since(start_time).as_nanos();
         }
         
@@ -171,15 +176,11 @@ impl Interpreter {
         {
             if let Some(info) = self.get_code().get_debug_info(start_pc)
             {
-                if false
-                {
-                    eprintln!("at {}:{}, type {}, bytecode {}", info.last_line, info.last_index, info.last_type, self.get_pc());
-                }
                 self.last_error = Some(format!("{}\nline: {}\ncolumn: {}", err, info.last_line, info.last_index))
             }
             else
             {
-                self.last_error = Some(format!("{}\n(unknown or missing context)", err))
+                self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced)", err))
             }
         }
         ret

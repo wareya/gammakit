@@ -34,6 +34,10 @@ impl Interpreter
     {
         self.top_frame.pc += new;
     }
+    pub (crate) fn sub_pc(&mut self, new : usize)
+    {
+        self.top_frame.pc -= new;
+    }
     
     pub (crate) fn pull_from_code(&mut self, n : usize) -> Result<Vec<u8>, String>
     {

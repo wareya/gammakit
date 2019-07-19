@@ -4,76 +4,90 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
-    pub (crate) fn get_opfunc(&mut self, op : u8) -> Option<Box<Fn(&mut Interpreter) -> OpResult>>
+    pub (crate) fn init_opfunc_table(&mut self)
     {
-        macro_rules! enbox { ( $x:ident ) => { Some(Box::new(Interpreter::$x)) } }
-        match op
-        {
-            NOP => enbox!(sim_NOP),
-            PUSHFLT => enbox!(sim_PUSHFLT),
-            PUSHSHORT => enbox!(sim_PUSHSHORT),
-            PUSHSTR => enbox!(sim_PUSHSTR),
-            PUSHNAME => enbox!(sim_PUSHNAME),
-            PUSHVAR => enbox!(sim_PUSHVAR),
-            DECLVAR => enbox!(sim_DECLVAR),
-            DECLFAR => enbox!(sim_DECLFAR),
-            DECLGLOBALVAR => enbox!(sim_DECLGLOBALVAR),
-            BINSTATE => enbox!(sim_BINSTATE),
-            UNSTATE => enbox!(sim_UNSTATE),
-            BINOP => enbox!(sim_BINOP),
-            UNOP => enbox!(sim_UNOP),
-            SHORTCIRCUITIFTRUE => enbox!(sim_SHORTCIRCUITIFTRUE),
-            SHORTCIRCUITIFFALSE => enbox!(sim_SHORTCIRCUITIFFALSE),
-            INDIRECTION => enbox!(sim_INDIRECTION),
-            DISMEMBER => enbox!(sim_DISMEMBER),
-            EVALUATION => enbox!(sim_EVALUATION),
-            FUNCCALL => enbox!(sim_FUNCCALL),
-            FUNCEXPR => enbox!(sim_FUNCEXPR),
-            INVOKE => enbox!(sim_INVOKE),
-            INVOKECALL => enbox!(sim_INVOKECALL),
-            INVOKEEXPR => enbox!(sim_INVOKEEXPR),
-            FUNCDEF => enbox!(sim_FUNCDEF),
-            LAMBDA => enbox!(sim_LAMBDA),
-            OBJDEF => enbox!(sim_OBJDEF),
-            GLOBALFUNCDEF => enbox!(sim_GLOBALFUNCDEF),
-            SUBFUNCDEF => enbox!(sim_SUBFUNCDEF),
-            GENERATORDEF => enbox!(sim_GENERATORDEF),
-            COLLECTARRAY => enbox!(sim_COLLECTARRAY),
-            COLLECTDICT => enbox!(sim_COLLECTDICT),
-            COLLECTSET => enbox!(sim_COLLECTSET),
-            ARRAYEXPR => enbox!(sim_ARRAYEXPR),
-            BREAK => enbox!(sim_BREAK),
-            CONTINUE => enbox!(sim_CONTINUE),
-            IF => enbox!(sim_IF),
-            WHILE => enbox!(sim_WHILE),
-            FOR => enbox!(sim_FOR),
-            FOREACH => enbox!(sim_FOREACH),
-            SWITCH => enbox!(sim_SWITCH),
-            SWITCHCASE => enbox!(sim_SWITCHCASE),
-            SWITCHDEFAULT => enbox!(sim_SWITCHDEFAULT),
-            SWITCHEXIT => enbox!(sim_SWITCHEXIT),
-            SCOPE => enbox!(sim_SCOPE),
-            UNSCOPE => enbox!(sim_UNSCOPE),
-            WITH => enbox!(sim_WITH),
+        //self.opfunc_map = [Interpreter::sim_INVALID; 256];
+        
+        macro_rules! set { ( $x:ident, $y:ident ) => { self.opfunc_map[$x as usize] = Interpreter::$y; } }
+        
+        set!(NOP, sim_NOP);
+        set!(PUSHFLT, sim_PUSHFLT);
+        set!(PUSHSHORT, sim_PUSHSHORT);
+        set!(PUSHSTR, sim_PUSHSTR);
+        set!(PUSHNAME, sim_PUSHNAME);
+        set!(PUSHVAR, sim_PUSHVAR);
+        set!(PUSHGLOBAL, sim_PUSHGLOBAL);
+        set!(PUSHGLOBALVAL, sim_PUSHGLOBALVAL);
+        set!(DECLVAR, sim_DECLVAR);
+        set!(DECLFAR, sim_DECLFAR);
+        set!(DECLGLOBALVAR, sim_DECLGLOBALVAR);
+        set!(BINSTATE, sim_BINSTATE);
+        set!(UNSTATE, sim_UNSTATE);
+        set!(BINOP, sim_BINOP);
+        set!(UNOP, sim_UNOP);
+        set!(SHORTCIRCUITIFTRUE, sim_SHORTCIRCUITIFTRUE);
+        set!(SHORTCIRCUITIFFALSE, sim_SHORTCIRCUITIFFALSE);
+        set!(INDIRECTION, sim_INDIRECTION);
+        set!(DISMEMBER, sim_DISMEMBER);
+        set!(EVALUATION, sim_EVALUATION);
+        set!(FUNCCALL, sim_FUNCCALL);
+        set!(FUNCEXPR, sim_FUNCEXPR);
+        set!(INVOKE, sim_INVOKE);
+        set!(INVOKECALL, sim_INVOKECALL);
+        set!(INVOKEEXPR, sim_INVOKEEXPR);
+        set!(FUNCDEF, sim_FUNCDEF);
+        set!(LAMBDA, sim_LAMBDA);
+        set!(OBJDEF, sim_OBJDEF);
+        set!(GLOBALFUNCDEF, sim_GLOBALFUNCDEF);
+        set!(SUBFUNCDEF, sim_SUBFUNCDEF);
+        set!(GENERATORDEF, sim_GENERATORDEF);
+        set!(COLLECTARRAY, sim_COLLECTARRAY);
+        set!(COLLECTDICT, sim_COLLECTDICT);
+        set!(COLLECTSET, sim_COLLECTSET);
+        set!(ARRAYEXPR, sim_ARRAYEXPR);
+        set!(BREAK, sim_BREAK);
+        set!(CONTINUE, sim_CONTINUE);
+        set!(IF, sim_IF);
+        set!(WHILE, sim_WHILE);
+        set!(FOR, sim_FOR);
+        set!(FOREACH, sim_FOREACH);
+        set!(SWITCH, sim_SWITCH);
+        set!(SWITCHCASE, sim_SWITCHCASE);
+        set!(SWITCHDEFAULT, sim_SWITCHDEFAULT);
+        set!(SWITCHEXIT, sim_SWITCHEXIT);
+        set!(SCOPE, sim_SCOPE);
+        set!(UNSCOPE, sim_UNSCOPE);
+        set!(WITH, sim_WITH);
             
-            WHILETEST => enbox!(sim_WHILETEST),
-            WHILELOOP => enbox!(sim_WHILELOOP),
-            WITHLOOP => enbox!(sim_WITHLOOP),
-            FOREACHLOOP => enbox!(sim_FOREACHLOOP),
-            FOREACHHEAD => enbox!(sim_FOREACHHEAD),
+        set!(WHILETEST, sim_WHILETEST);
+        set!(WHILELOOP, sim_WHILELOOP);
+        set!(WITHLOOP, sim_WITHLOOP);
+        set!(FOREACHLOOP, sim_FOREACHLOOP);
+        set!(FOREACHHEAD, sim_FOREACHHEAD);
             
-            JUMPRELATIVE => enbox!(sim_JUMPRELATIVE),
+        set!(JUMPRELATIVE, sim_JUMPRELATIVE);
             
-            EXIT => enbox!(sim_EXIT),
-            RETURN => enbox!(sim_RETURN),
-            YIELD => enbox!(sim_YIELD),
-            _ => None
-        }
+        set!(EXIT, sim_EXIT);
+        set!(RETURN, sim_RETURN);
+        set!(YIELD, sim_YIELD);
+    }
+    
+    pub (crate) fn run_opfunc(&mut self, op : u8) -> OpResult
+    {
+        let func = self.opfunc_map[op as usize];
+        func(self)
+    }
+    
+    pub (crate) fn sim_INVALID(&mut self) -> OpResult
+    {
+        self.sub_pc(1);
+        Err(format!("internal error: no such operation 0x{:02X}", self.pull_single_from_code()?))
     }
     
     pub (crate) fn sim_NOP(&mut self) -> OpResult
     {
-        plainerr("NOP")
+        //plainerr("NOP")
+        Ok(())
     }
     pub (crate) fn sim_PUSHFLT(&mut self) -> OpResult
     {
@@ -104,6 +118,19 @@ impl Interpreter
             _ => Variable::Direct(index)
         };
         self.stack_push_var(var);
+        Ok(())
+    }
+    pub (crate) fn sim_PUSHGLOBAL(&mut self) -> OpResult
+    {
+        let index = self.read_usize()?;
+        self.stack_push_var(IndirectVar::from_global(index));
+        Ok(())
+    }
+    pub (crate) fn sim_PUSHGLOBALVAL(&mut self) -> OpResult
+    {
+        let index = self.read_usize()?;
+        let val = self.global.variables.get(&index).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", self.get_indexed_string(index)))?.to_val()?;
+        self.stack_push_val(val);
         Ok(())
     }
     pub (crate) fn sim_PUSHVAR(&mut self) -> OpResult

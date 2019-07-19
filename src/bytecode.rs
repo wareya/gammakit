@@ -54,6 +54,8 @@ pub (crate) const PUSHSHORT : u8 = 0x11;
 pub (crate) const PUSHSTR : u8 = 0x12;
 pub (crate) const PUSHVAR : u8 = 0x13;
 pub (crate) const PUSHNAME : u8 = 0x14;
+pub (crate) const PUSHGLOBAL : u8 = 0x15;
+pub (crate) const PUSHGLOBALVAL : u8 = 0x16;
 
 pub (crate) const BINOP : u8 = 0x20;
 pub (crate) const UNOP : u8 = 0x21;

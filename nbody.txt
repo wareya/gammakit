@@ -55,77 +55,77 @@ bodies->push({
     "mass": 5.15138902046611451e-05 * SOLAR_MASS
 });
 
-var NUM_BODIES = bodies->len();
+globalvar NUM_BODIES = bodies->len();
 print("num bodies:");
-print(NUM_BODIES);
+print(global.NUM_BODIES);
 
-var x = [];
-var y = [];
-var z = [];
-var xv = [];
-var yv = [];
-var zv = [];
-var mass = [];
-for(var i = 0; i < NUM_BODIES; i++)
+globalvar x = [];
+globalvar y = [];
+globalvar z = [];
+globalvar xv = [];
+globalvar yv = [];
+globalvar zv = [];
+globalvar mass = [];
+for(var i = 0; i < global.NUM_BODIES; i++)
 {
-    x->push(bodies[i]{x});
-    y->push(bodies[i]{y});
-    z->push(bodies[i]{z});
-    xv->push(bodies[i]{xv});
-    yv->push(bodies[i]{yv});
-    zv->push(bodies[i]{zv});
-    mass->push(bodies[i]{mass});
+    global.x->push(bodies[i]{x});
+    global.y->push(bodies[i]{y});
+    global.z->push(bodies[i]{z});
+    global.xv->push(bodies[i]{xv});
+    global.yv->push(bodies[i]{yv});
+    global.zv->push(bodies[i]{zv});
+    global.mass->push(bodies[i]{mass});
 }
 
 bodies = [];
 
-subdef advance(delta)
+def advance(delta)
 {
-    for(var i = 0; i < NUM_BODIES; i++)
+    for(var i = 0; i < global.NUM_BODIES; i++)
     {
-        for(var j = i+1; j < NUM_BODIES; j++)
+        for(var j = i+1; j < global.NUM_BODIES; j++)
         {
-            var dx = x[i] - x[j];
-            var dy = y[i] - y[j];
-            var dz = z[i] - z[j];
+            var dx = global.x[i] - global.x[j];
+            var dy = global.y[i] - global.y[j];
+            var dz = global.z[i] - global.z[j];
             var distance_sq = dx*dx + dy*dy + dz*dz;
             var distance = sqrt(distance_sq);
             var power = delta / distance_sq / distance;
-            var pj = mass[j] * power;
-            var pi = mass[i] * power;
-            xv[i] -= pj * dx;
-            yv[i] -= pj * dy;
-            zv[i] -= pj * dz;
-            xv[j] += pi * dx;
-            yv[j] += pi * dy;
-            zv[j] += pi * dz;
+            var pj = global.mass[j] * power;
+            var pi = global.mass[i] * power;
+            global.xv[i] -= pj * dx;
+            global.yv[i] -= pj * dy;
+            global.zv[i] -= pj * dz;
+            global.xv[j] += pi * dx;
+            global.yv[j] += pi * dy;
+            global.zv[j] += pi * dz;
         }
     }
-    for(var i = 0; i < NUM_BODIES; i++)
+    for(var i = 0; i < global.NUM_BODIES; i++)
     {
-        x[i] += xv[i] * delta;
-        y[i] += yv[i] * delta;
-        z[i] += zv[i] * delta;
+        global.x[i] += global.xv[i] * delta;
+        global.y[i] += global.yv[i] * delta;
+        global.z[i] += global.zv[i] * delta;
     }
 }
-subdef energy()
+def energy()
 {
     var e = 0;
-    for(var i = 0; i < NUM_BODIES; i++)
+    for(var i = 0; i < global.NUM_BODIES; i++)
     {
-        e += ( mass[i]
-             * ( xv[i] * xv[i]
-               + yv[i] * yv[i]
-               + zv[i] * zv[i]
+        e += ( global.mass[i]
+             * ( global.xv[i] * global.xv[i]
+               + global.yv[i] * global.yv[i]
+               + global.zv[i] * global.zv[i]
                )
              ) / 2;
-        for(var j = i+1; j < NUM_BODIES; j++)
+        for(var j = i+1; j < global.NUM_BODIES; j++)
         {
-            var dx = x[i] - x[j];
-            var dy = y[i] - y[j];
-            var dz = z[i] - z[j];
+            var dx = global.x[i] - global.x[j];
+            var dy = global.y[i] - global.y[j];
+            var dz = global.z[i] - global.z[j];
             var distance = sqrt(dx*dx + dy*dy + dz*dz);
-            e -= (mass[i] * mass[j])/distance;
+            e -= (global.mass[i] * global.mass[j])/distance;
         }
     }
     return e;
@@ -133,15 +133,15 @@ subdef energy()
 subdef offset_momentum()
 {
     var px = 0, py = 0, pz = 0;
-    for(var i = 0; i < NUM_BODIES; i++)
+    for(var i = 0; i < global.NUM_BODIES; i++)
     {
-        px += xv[i] * mass[i];
-        py += yv[i] * mass[i];
-        pz += zv[i] * mass[i];
+        px += global.xv[i] * global.mass[i];
+        py += global.yv[i] * global.mass[i];
+        pz += global.zv[i] * global.mass[i];
     }
-    xv[0] = -px/SOLAR_MASS;
-    yv[0] = -py/SOLAR_MASS;
-    zv[0] = -pz/SOLAR_MASS;
+    global.xv[0] = -px/SOLAR_MASS;
+    global.yv[0] = -py/SOLAR_MASS;
+    global.zv[0] = -pz/SOLAR_MASS;
 }
 
 offset_momentum();
