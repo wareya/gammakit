@@ -22,7 +22,7 @@ impl Interpreter
     {
         match self.top_frame.pop()
         {
-            Some(StackValue::Var(x)) => self.evaluate(&x).ok()?.to_val().ok(),
+            Some(StackValue::Var(x)) => self.evaluate(x).ok()?.to_val().ok(),
             Some(StackValue::Val(x)) => Some(x),
             _ => None
         }
@@ -58,7 +58,7 @@ impl Interpreter
                 }
                 StackValue::Var(source) =>
                 {
-                    let val = self.evaluate(&source)?;
+                    let val = self.evaluate(source)?;
                     let ret = binding(val, args)?;
                     if isexpr
                     {

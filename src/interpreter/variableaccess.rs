@@ -171,18 +171,18 @@ fn access_frame(global : &GlobalState, frame : &Frame, name : usize, seen_instan
 
 impl Interpreter
 {
-    fn evaluate_of_array(&self, arrayvar : &ArrayVar) -> Result<ValRef, String>
+    fn evaluate_of_array(&self, arrayvar : ArrayVar) -> Result<ValRef, String>
     {
-        match &arrayvar.location
+        match arrayvar.location
         {
-            NonArrayVariable::Indirect(ref indirvar) => Ok(ValRef::from_ref(self.evaluate_of_indirect(indirvar)?.extract_ref()?, arrayvar.indexes.clone(), false)),
-            NonArrayVariable::Direct(dirvar) => Ok(ValRef::from_ref(self.evaluate_of_direct(*dirvar)?.extract_ref()?, arrayvar.indexes.clone(), false)),
-            NonArrayVariable::ActualArray(array) => Ok(ValRef::from_val_indexed_readonly(Value::Array(array.clone()), arrayvar.indexes.clone())),
-            NonArrayVariable::ActualDict(dict) => Ok(ValRef::from_val_indexed_readonly(Value::Dict(dict.clone()), arrayvar.indexes.clone())),
-            NonArrayVariable::ActualText(string) => Ok(ValRef::from_val_indexed_readonly(Value::Text(string.clone()), arrayvar.indexes.clone())),
+            NonArrayVariable::Indirect(indirvar) => Ok(ValRef::from_ref(self.evaluate_of_indirect(indirvar)?.extract_ref()?, arrayvar.indexes, false)),
+            NonArrayVariable::Direct(dirvar) => Ok(ValRef::from_ref(self.evaluate_of_direct(dirvar)?.extract_ref()?, arrayvar.indexes, false)),
+            NonArrayVariable::ActualArray(array) => Ok(ValRef::from_val_indexed_readonly(Value::Array(array), arrayvar.indexes)),
+            NonArrayVariable::ActualDict(dict) => Ok(ValRef::from_val_indexed_readonly(Value::Dict(dict), arrayvar.indexes)),
+            NonArrayVariable::ActualText(string) => Ok(ValRef::from_val_indexed_readonly(Value::Text(string), arrayvar.indexes)),
         }
     }
-    fn evaluate_of_indirect(&self, indirvar : &IndirectVar) -> Result<ValRef, String>
+    fn evaluate_of_indirect(&self, indirvar : IndirectVar) -> Result<ValRef, String>
     {
         match indirvar.source
         {
@@ -202,7 +202,7 @@ impl Interpreter
                     
                     let mut mydata = funcdat.clone();
                     mydata.forcecontext = ident;
-                    return Ok(ValRef::from_val_readonly(Value::new_funcval(false, Some(indirvar.name.clone()), None, Some(mydata))));
+                    return Ok(ValRef::from_val_readonly(Value::new_funcval(false, Some(indirvar.name), None, Some(mydata))));
                 }
             }
             IndirectSource::Global =>
@@ -241,7 +241,7 @@ impl Interpreter
         }
         if self.get_binding(name).is_some() || self.get_simple_binding(name).is_some()
         {
-            return Ok(ValRef::from_val(Value::new_funcval(true, Some(name.clone()), None, None)));
+            return Ok(ValRef::from_val(Value::new_funcval(true, Some(name), None, None)));
         }
         
         Err(format!("error: unknown identifier `{}`", self.get_indexed_string(name)))
@@ -260,13 +260,13 @@ impl Interpreter
         let id = self.top_frame.instancestack.get(self.top_frame.instancestack.len()-2).ok_or_else(|| "error: tried to access `other` while not inside of at least two instance scopes".to_string())?;
         Ok(ValRef::from_val(Value::Instance(*id)))
     }
-    pub (crate) fn evaluate(&self, variable : &Variable) -> Result<ValRef, String>
+    pub (crate) fn evaluate(&self, variable : Variable) -> Result<ValRef, String>
     {
-        match &variable
+        match variable
         {
-            Variable::Array(ref arrayvar) => self.evaluate_of_array(arrayvar),
-            Variable::Indirect(ref indirvar) => self.evaluate_of_indirect(indirvar),
-            Variable::Direct(name) => self.evaluate_of_direct(*name),
+            Variable::Array(arrayvar) => self.evaluate_of_array(arrayvar),
+            Variable::Indirect(indirvar) => self.evaluate_of_indirect(indirvar),
+            Variable::Direct(name) => self.evaluate_of_direct(name),
             Variable::Selfref => self.evaluate_self(),
             Variable::Global => self.evaluate_global(),
             Variable::Other => self.evaluate_other(),
