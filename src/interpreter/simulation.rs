@@ -87,8 +87,8 @@ impl Interpreter
     
     pub (crate) fn sim_NOP(&mut self) -> OpResult
     {
-        //plainerr("NOP")
-        Ok(())
+        plainerr("NOP")
+        //Ok(())
     }
     pub (crate) fn sim_PUSHFLT(&mut self) -> OpResult
     {

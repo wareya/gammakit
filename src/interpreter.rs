@@ -97,7 +97,7 @@ impl Interpreter {
             last_error : None,
             opfunc_map : Interpreter::build_opfunc_table(),
             op_map : HashMap::new(),
-            track_op_performance : true
+            track_op_performance : false
         }
     }
     /// Loads new code into the interpreter.
@@ -174,7 +174,7 @@ impl Interpreter {
         {
             if let Some(info) = self.get_code().get_debug_info(start_pc)
             {
-                self.last_error = Some(format!("{}\nline: {}\ncolumn: {}", err, info.last_line, info.last_index))
+                self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X}", err, info.last_line, info.last_index, start_pc))
             }
             else
             {

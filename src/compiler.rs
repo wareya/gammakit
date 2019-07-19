@@ -209,16 +209,28 @@ impl CompilerState {
     }
     fn compile_u16(&mut self, num : u16) -> usize
     {
+        while self.code.len() % 2 != 0
+        {
+            self.code.push(0);
+        }
         self.code.extend(pack_u16(num));
         self.code.len() - 2
     }
     fn compile_u64(&mut self, num : u64) -> usize
     {
+        while self.code.len() % 8 != 0
+        {
+            self.code.push(0);
+        }
         self.code.extend(pack_u64(num));
         self.code.len() - 8
     }
     fn compile_f64(&mut self, num : f64) -> usize
     {
+        while self.code.len() % 8 != 0
+        {
+            self.code.push(0);
+        }
         self.code.extend(pack_f64(num));
         self.code.len() - 8
     }
@@ -1122,9 +1134,9 @@ impl CompilerState {
         
         for _ in 0..=num_case_blocks
         {
-            self.code.extend(pack_u64(0));
+            self.compile_u64(0);
         }
-        let block_count_rewrite_pos = self.code.len() - 8*num_case_blocks;
+        let block_count_rewrite_pos = self.code.len() - 8*(num_case_blocks+1);
         
         for (i, node) in cases.iter().enumerate()
         {
