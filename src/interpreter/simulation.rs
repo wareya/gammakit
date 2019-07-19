@@ -4,11 +4,11 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
-    pub (crate) fn init_opfunc_table(&mut self)
+    pub (crate) fn build_opfunc_table() -> Box<[OpFunc; 256]>
     {
-        //self.opfunc_map = [Interpreter::sim_INVALID; 256];
+        let mut opfunc_map = Box::new([Interpreter::sim_INVALID as OpFunc; 256]);
         
-        macro_rules! set { ( $x:ident, $y:ident ) => { self.opfunc_map[$x as usize] = Interpreter::$y; } }
+        macro_rules! set { ( $x:ident, $y:ident ) => { opfunc_map[$x as usize] = Interpreter::$y; } }
         
         set!(NOP, sim_NOP);
         set!(PUSHFLT, sim_PUSHFLT);
@@ -70,12 +70,13 @@ impl Interpreter
         set!(EXIT, sim_EXIT);
         set!(RETURN, sim_RETURN);
         set!(YIELD, sim_YIELD);
+        
+        opfunc_map
     }
     
     pub (crate) fn run_opfunc(&mut self, op : u8) -> OpResult
     {
-        let func = self.opfunc_map[op as usize];
-        func(self)
+        self.opfunc_map[op as usize](self)
     }
     
     pub (crate) fn sim_INVALID(&mut self) -> OpResult

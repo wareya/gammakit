@@ -86,7 +86,7 @@ impl Interpreter {
     /// Creates a new interpreter 
     pub fn new(code : &Code, parser : Option<Parser>) -> Interpreter
     {
-        let mut ret = Interpreter {
+        Interpreter {
             top_frame : Frame::new_root(code),
             frames : vec!(),
             doexit : false,
@@ -95,12 +95,10 @@ impl Interpreter {
             arrow_bindings : HashMap::new(),
             global : GlobalState::new(parser),
             last_error : None,
-            opfunc_map : Box::new([Interpreter::sim_INVALID; 256]),
+            opfunc_map : Interpreter::build_opfunc_table(),
             op_map : HashMap::new(),
             track_op_performance : false
-        };
-        ret.init_opfunc_table();
-        ret
+        }
     }
     /// Loads new code into the interpreter.
     /// 
