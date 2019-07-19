@@ -737,7 +737,7 @@ impl Interpreter
         let object_id = self.global.object_id;
         let numfuncs = self.read_u16()?;
         
-        let mut funcs = HashMap::new();
+        let mut funcs = BTreeMap::new();
         for _ in 0..numfuncs
         {
             let (funcname, mut myfuncspec) = self.read_function(false, false)?;

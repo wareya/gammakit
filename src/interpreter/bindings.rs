@@ -243,7 +243,7 @@ impl Interpreter
         }
         let object = self.global.objects.get(&object_id).ok_or_else(|| format!("error: tried to create instance of non-extant object type {}", object_id))?;
         
-        let mut variables = HashMap::new();
+        let mut variables = BTreeMap::new();
         variables.insert(self.get_string_index(&"id".to_string()), ValRef::from_val(Value::Instance(instance_id)));
         self.global.instances.insert(instance_id, Instance { objtype : object_id, ident : instance_id, variables });
         

@@ -37,13 +37,13 @@ fn plainerr<T>(mystr : &'static str) -> Result<T, String>
 struct GlobalState {
     instance_id: usize,
     object_id: usize,
-    instances: HashMap<usize, Instance>,
-    instances_by_type: HashMap<usize, BTreeSet<usize>>,
-    objectnames: HashMap<usize, usize>,
-    objects: HashMap<usize, ObjSpec>,
+    instances: BTreeMap<usize, Instance>,
+    instances_by_type: BTreeMap<usize, BTreeSet<usize>>,
+    objectnames: BTreeMap<usize, usize>,
+    objects: BTreeMap<usize, ObjSpec>,
     parser: Option<Parser>,
-    variables: HashMap<usize, ValRef>, // accessed as global.varname
-    functions: HashMap<usize, Value>, // accessed as funcname
+    variables: BTreeMap<usize, ValRef>, // accessed as global.varname
+    functions: BTreeMap<usize, Value>, // accessed as funcname
 }
 
 impl GlobalState {
@@ -52,13 +52,13 @@ impl GlobalState {
         GlobalState {
             instance_id : 1,
             object_id : 1,
-            instances : HashMap::new(),
-            instances_by_type : HashMap::new(),
-            objectnames : HashMap::new(),
-            objects : HashMap::new(),
+            instances : BTreeMap::new(),
+            instances_by_type : BTreeMap::new(),
+            objectnames : BTreeMap::new(),
+            objects : BTreeMap::new(),
             parser,
-            variables : HashMap::new(),
-            functions : HashMap::new(),
+            variables : BTreeMap::new(),
+            functions : BTreeMap::new(),
         }
     }
 }
@@ -70,14 +70,14 @@ type OpFunc = fn(&mut Interpreter) -> OpResult;
 pub struct Interpreter {
     top_frame: Frame,
     frames: Vec<Frame>,
-    pub (crate) bindings: HashMap<usize, Rc<RefCell<Binding>>>,
-    pub (crate) simple_bindings: HashMap<usize, Rc<RefCell<SimpleBinding>>>,
-    pub (crate) arrow_bindings: HashMap<usize, Rc<RefCell<ArrowBinding>>>,
+    pub (crate) bindings: BTreeMap<usize, Rc<RefCell<Binding>>>,
+    pub (crate) simple_bindings: BTreeMap<usize, Rc<RefCell<SimpleBinding>>>,
+    pub (crate) arrow_bindings: BTreeMap<usize, Rc<RefCell<ArrowBinding>>>,
     global: GlobalState,
     /// Last error returned by step(). Gets cleared (reset to None) when step() runs without returning an error.
     pub last_error: Option<String>,
     pub (crate) opfunc_map: Box<[OpFunc; 256]>,
-    pub (crate) op_map: HashMap<u8, u128>,
+    pub (crate) op_map: BTreeMap<u8, u128>,
     doexit: bool,
     pub (crate) track_op_performance: bool,
 }
@@ -90,13 +90,13 @@ impl Interpreter {
             top_frame : Frame::new_root(code),
             frames : vec!(),
             doexit : false,
-            bindings : HashMap::new(),
-            simple_bindings : HashMap::new(),
-            arrow_bindings : HashMap::new(),
+            bindings : BTreeMap::new(),
+            simple_bindings : BTreeMap::new(),
+            arrow_bindings : BTreeMap::new(),
             global : GlobalState::new(parser),
             last_error : None,
             opfunc_map : Interpreter::build_opfunc_table(),
-            op_map : HashMap::new(),
+            op_map : BTreeMap::new(),
             track_op_performance : false
         }
     }

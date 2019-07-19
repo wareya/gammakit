@@ -94,12 +94,12 @@ pub (crate) struct ObjSpec {
     pub (super) ident: usize,
     #[allow(unused)]
     pub (super) name: usize,
-    pub (super) functions: HashMap<usize, FuncSpec>
+    pub (super) functions: BTreeMap<usize, FuncSpec>
 }
 pub (crate) struct Instance {
     pub (super) objtype: usize,
     pub (super) ident: usize,
-    pub (super) variables: HashMap<usize, ValRef>
+    pub (super) variables: BTreeMap<usize, ValRef>
 }
 
 // variable types (i.e. how to access a variable as an lvalue)
