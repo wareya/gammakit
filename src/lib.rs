@@ -144,8 +144,8 @@ mod tests {
         println!("steps {:?}", steps);
         println!("{:?} steps per second", steps as f64 / (duration.as_millis() as f64 / 1000.0));
         println!("{:?} seconds per step", duration.as_millis() as f64 / 1000.0 / steps as f64);
-        //let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / *interpreter.op_map_hits.get(k).unwrap() as f64)).collect::<Vec<_>>();
-        let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / 1_000_000_000.0)).collect::<Vec<_>>();
+        let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / *interpreter.op_map_hits.get(k).unwrap() as f64)).collect::<Vec<_>>();
+        //let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / 1_000_000_000.0)).collect::<Vec<_>>();
         op_map.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
         for (op, time) in op_map
         {

@@ -288,7 +288,11 @@ impl Interpreter
         let _yielded = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 2 to INVOKECALL must be a value"))?;
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: stack argument 3 to INVOKECALL must be a variable"))?;
         
-        self.evaluate(var)?.assign(generator)?;
+        self.evaluate(var)?.mutate(move |var|
+        {
+            *var = generator;
+            Ok(())
+        })?;
         
         Ok(())
     }
@@ -302,7 +306,11 @@ impl Interpreter
         let yielded = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 2 to INVOKEEXPR must be a value"))?;
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: stack argument 3 to INVOKEEXPR must be a variable"))?;
         
-        self.evaluate(var)?.assign(generator)?;
+        self.evaluate(var)?.mutate(move |var|
+        {
+            *var = generator;
+            Ok(())
+        })?;
         
         self.stack_push_val(yielded);
         
@@ -630,14 +638,21 @@ impl Interpreter
         
         if immediate == 0x00
         {
-            self.evaluate(var)?.assign(value)?;
+            let var = self.evaluate(var)?;
+            var.mutate(move |val| 
+            {
+                *val = value;
+                Ok(())
+            })?;
         }
         else
         {
-            let var_initial_value = self.evaluate(var)?;
-            
-            let var_new_value = do_binop_function(immediate, &var_initial_value.to_val()?, &value)?;
-            var_initial_value.assign(var_new_value)?;
+            let var = self.evaluate(var)?;
+            var.mutate(move |val| 
+            {
+                *val = do_binop_function(immediate, val, &value)?;
+                Ok(())
+            })?;
         }
         Ok(())
     }
@@ -652,7 +667,11 @@ impl Interpreter
         
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: argument to UNSTATE could not be found or was not a variable"))?;
         let var = self.evaluate(var)?;
-        var.assign(do_unstate_function(immediate, &var.to_val()?)?)?;
+        var.mutate(move |val| 
+        {
+            *val = do_unstate_function(immediate, val)?;
+            Ok(())
+        })?;
         Ok(())
     }
     

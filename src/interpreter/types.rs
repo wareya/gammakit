@@ -275,6 +275,34 @@ impl ValRef {
             Ok((*self.reference).clone().into_inner())
         }
     }
+    pub fn mutate<F : FnOnce(&mut Value) -> Result<(), String>>(&self, mutator : F) -> Result<(), String>
+    {
+        if self.readonly
+        {
+            return Err("error: tried to assign to a read-only value".to_string());
+        }
+        if let Some(indexes) = &self.indexes
+        {
+            use super::variableaccess::mutate_indexed;
+            let mut myref = self.reference.borrow_mut();
+            mutate_indexed(mutator, &mut myref, indexes)?;
+            if matches!(*myref, Value::SubFunc(_))
+            {
+                return Err("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)".to_string());
+            }
+            Ok(())
+        }
+        else
+        {
+            let mut var = self.reference.borrow_mut();
+            mutator(&mut var)?;
+            if matches!(*var, Value::SubFunc(_))
+            {
+                return Err("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)".to_string());
+            }
+            Ok(())
+        }
+    }
     pub fn assign(&self, val : Value) -> Result<(), String>
     {
         if self.readonly

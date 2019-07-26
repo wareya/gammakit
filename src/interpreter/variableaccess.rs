@@ -21,15 +21,12 @@ macro_rules! plainerr { ( $x:expr ) => { Err($x.to_string()) } }
 
 fn assign_val(value : Value, var : &mut Value) -> Result<(), String>
 {
-    match value
+    if matches!(value, Value::SubFunc(_))
     {
-        Value::SubFunc(_) => plainerr!("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)"),
-        value =>
-        {
-            *var = value;
-            Ok(())
-        }
+        return plainerr!("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)");
     }
+    *var = value;
+    Ok(())
 }
 
 pub (crate) fn assign_indexed(value : Value, var : &mut Value, indexes : &[HashableValue]) -> Result<(), String>
@@ -86,6 +83,69 @@ pub (crate) fn assign_indexed(value : Value, var : &mut Value, indexes : &[Hasha
     else
     {
         assign_val(value, var)
+    }
+}
+pub (crate) fn mutate_indexed<F : FnOnce(&mut Value) -> Result<(), String>>(mutator : F, var : &mut Value, indexes : &[HashableValue]) -> Result<(), String>
+{
+    if let (Some(index), Some(new_indexes)) = (indexes.get(0), indexes.get(1..))
+    {
+        match var
+        {
+            Value::Array(ref mut var) =>
+            {
+                let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an array index"))?;
+                
+                let mut newvar = var.get_mut(indexnum.round() as usize).ok_or_else(|| format!("error: tried to access non-extant index {} of an array", indexnum))?;
+                mutate_indexed(mutator, &mut newvar, new_indexes)
+            }
+            Value::Dict(ref mut var) =>
+            {
+                let mut newvar = var.get_mut(index).ok_or_else(|| format!("error: tried to access non-extant index {:?} of a dict", index))?;
+                mutate_indexed(mutator, &mut newvar, new_indexes)
+            }
+            Value::Text(ref mut text) =>
+            {
+                if !new_indexes.is_empty()
+                {
+                    return plainerr!("error: tried to index into the value at another index in a string (i.e. tried to do something like \"asdf\"[0][0])");
+                }
+                
+                let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an index into a string"))?;
+                
+                let realindex = ((indexnum.round() as i64) % text.len() as i64) as usize;
+                let mut codepoints = text.chars().collect::<Vec<char>>();
+                let codepoint = codepoints.get_mut(realindex).ok_or_else(|| minierr("error: tried to assign to a character index that was past the end of a string"))?;
+                let mut mutatee = Value::Text(vec!(*codepoint).iter().collect());
+                mutator(&mut mutatee)?;
+                
+                let mutatee = match_or_err!(mutatee, Value::Text(mychar) => mychar, minierr("error: tried to assign non-string to an index into a string (assigning by codepoint is not supported yet)"))?;
+                
+                if mutatee.chars().count() == 1
+                {
+                    let mutatee = mutatee.chars().next().ok_or_else(|| minierr("internal error: failed to get first character of a string of length 1"))?;
+                    // turn into array of codepoints, then modify
+                    *codepoint = mutatee;
+                    // turn array of codepoints back into string
+                    let newstr : String = codepoints.iter().collect();
+                    *text = newstr;
+                    Ok(())
+                }
+                else
+                {
+                    Err(format!("error: tried to assign to an index into a string with a string that was not exactly one character long (was {} characters long)", mutatee.len()))
+                }
+            }
+            _ => Err(format!("error: tried to index into a non-array, non-dict, non-text value {:?} with index {:?}", var, index))
+        }
+    }
+    else
+    {
+        mutator(var)?;
+        if matches!(var, Value::SubFunc(_))
+        {
+            return plainerr!("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)");
+        }
+        Ok(())
     }
 }
 pub (crate) fn return_indexed(var : &Value, indexes : &[HashableValue]) -> Result<Value, String>
