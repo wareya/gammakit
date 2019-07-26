@@ -143,8 +143,8 @@ impl Interpreter
             1 => return Err("internal error: encountered `global` via pushvar".to_string()),
             2 => self.evaluate_self()?,
             3 => self.evaluate_other()?,
-            _ => self.evaluate_of_direct(index)?
-        }.to_val()?);
+            _ => self.evaluate_of_direct_as_val(index)?
+        });
         Ok(())
     }
     

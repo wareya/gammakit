@@ -168,6 +168,41 @@ fn access_frame(global : &GlobalState, frame : &Frame, name : usize, seen_instan
     None
 }
 
+fn access_frame_as_val(global : &GlobalState, frame : &Frame, name : usize, seen_instance : &mut bool) -> Option<Result<Value, String>>
+{
+    for scope in frame.scopes.iter().rev().filter(|x| !x.is_empty())
+    {
+        if let Some(var) = scope.get(&name)
+        {
+            return Some(var.to_val());
+        }
+    }
+    if !*seen_instance
+    {
+        if let Some(id) = frame.instancestack.last()
+        {
+            *seen_instance = true;
+            if let Some(inst) = global.instances.get(id)
+            {
+                if let Some(var) = inst.variables.get(&name)
+                {
+                    return Some(var.to_val());
+                }
+                else if let Some(objspec) = global.objects.get(&inst.objtype)
+                {
+                    if let Some(funcdat) = objspec.functions.get(&name)
+                    {
+                        let mut mydata = funcdat.clone();
+                        mydata.forcecontext = inst.ident;
+                        return Some(Ok(Value::new_funcval(false, Some(name), None, Some(mydata))));
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 impl Interpreter
 {
     fn evaluate_of_array(&self, arrayvar : ArrayVar) -> Result<ValRef, String>
@@ -241,17 +276,51 @@ impl Interpreter
         
         Err(format!("error: unknown identifier `{}`", self.get_indexed_string(name)))
     }
-    #[inline]
-    pub (crate) fn evaluate_self(&self) -> Result<ValRef, String>
+    pub(crate) fn evaluate_of_direct_as_val(&self, name : usize) -> Result<Value, String>
     {
-        let id = self.top_frame.instancestack.last().ok_or_else(|| "error: tried to access `self` while not inside of instance scope".to_string())?;
-        Ok(ValRef::from_val(Value::Instance(*id)))
+        let mut seen_instance = false;
+        if let Some(my_ref) = access_frame_as_val(&self.global, &self.top_frame, name, &mut seen_instance)
+        {
+            return my_ref;
+        }
+        if !self.top_frame.impassable
+        {
+            for frame in self.frames.iter().rev()
+            {
+                if let Some(my_ref) = access_frame_as_val(&self.global, &frame, name, &mut seen_instance)
+                {
+                    return my_ref;
+                }
+                if frame.impassable { break; }
+            }
+        }
+        
+        if let Some(var) = self.global.objectnames.get(&name)
+        {
+            return Ok(Value::Object(*var));
+        }
+        if let Some(var) = self.global.functions.get(&name)
+        {
+            return Ok(var.clone());
+        }
+        if self.get_binding(name).is_some() || self.get_simple_binding(name).is_some()
+        {
+            return Ok(Value::new_funcval(true, Some(name), None, None));
+        }
+        
+        Err(format!("error: unknown identifier `{}`", self.get_indexed_string(name)))
     }
     #[inline]
-    pub (crate) fn evaluate_other(&self) -> Result<ValRef, String>
+    pub (crate) fn evaluate_self(&self) -> Result<Value, String>
+    {
+        let id = self.top_frame.instancestack.last().ok_or_else(|| "error: tried to access `self` while not inside of instance scope".to_string())?;
+        Ok(Value::Instance(*id))
+    }
+    #[inline]
+    pub (crate) fn evaluate_other(&self) -> Result<Value, String>
     {
         let id = self.top_frame.instancestack.get(self.top_frame.instancestack.len()-2).ok_or_else(|| "error: tried to access `other` while not inside of at least two instance scopes".to_string())?;
-        Ok(ValRef::from_val(Value::Instance(*id)))
+        Ok(Value::Instance(*id))
     }
     pub (crate) fn evaluate(&self, variable : Variable) -> Result<ValRef, String>
     {
@@ -261,8 +330,8 @@ impl Interpreter
             Variable::Indirect(indirvar) => self.evaluate_of_indirect(indirvar),
             Variable::Global(globalvar) => self.evaluate_of_global(globalvar),
             Variable::Direct(name) => self.evaluate_of_direct(name),
-            Variable::Selfref => self.evaluate_self(),
-            Variable::Other => self.evaluate_other(),
+            Variable::Selfref => self.evaluate_self().map(|x| ValRef::from_val(x)),
+            Variable::Other => self.evaluate_other().map(|x| ValRef::from_val(x)),
         }
     }
 }
