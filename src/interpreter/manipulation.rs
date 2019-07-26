@@ -18,58 +18,82 @@ macro_rules! vec_pop_front_generic { ( $list:expr, $x:ident ) =>
 
 impl Interpreter
 {
-    pub (crate) fn get_code(&self) -> Code
-    {
-        self.top_frame.code.clone()
-    }
+    #[inline]
     pub (crate) fn get_pc(&self) -> usize
     {
         self.top_frame.pc
     }
+    #[inline]
     pub (crate) fn set_pc(&mut self, new : usize)
     {
         self.top_frame.pc = new;
     }
+    #[inline]
     pub (crate) fn add_pc(&mut self, new : usize)
     {
         self.top_frame.pc += new;
     }
+    #[inline]
     pub (crate) fn sub_pc(&mut self, new : usize)
     {
         self.top_frame.pc -= new;
     }
+    #[inline]
     pub (crate) fn round_up_pc_2(&mut self)
     {
-        if self.top_frame.pc > 0
-        {
-            self.top_frame.pc = (((self.top_frame.pc-1)>>1)+1)<<1;
-        }
+        self.top_frame.pc = (((self.top_frame.pc-1)>>1)+1)<<1;
     }
+    #[inline]
     pub (crate) fn round_up_pc_8(&mut self)
     {
-        if self.top_frame.pc > 0
-        {
-            self.top_frame.pc = (((self.top_frame.pc-1)>>3)+1)<<3;
-        }
+        self.top_frame.pc = (((self.top_frame.pc-1)>>3)+1)<<3;
     }
     
-    pub (crate) fn pull_2_from_code(&mut self) -> Result<Vec<u8>, String>
+    #[inline]
+    pub (crate) fn pull_2_from_code(&mut self) -> Result<[u8; 2], String>
     {
-        let vec = self.get_code().get(self.get_pc()..self.get_pc()+2).map(|v| v.to_vec()).ok_or_else(|| minierr("error: tried to access past end of code"))?;
-        self.add_pc(2);
-        Ok(vec)
+        if self.top_frame.pc+2 > self.top_frame.code.len()
+        {
+            return plainerr("error: tried to access past end of code");
+        }
+        self.round_up_pc_2();
+        let pc = self.top_frame.pc;
+        self.top_frame.pc += 2;
+        unsafe
+        {
+            let vec = self.top_frame.code.get_unchecked(pc..pc+2);
+            Ok([vec[0], vec[1]])
+        }
     }
-    pub (crate) fn pull_8_from_code(&mut self) -> Result<Vec<u8>, String>
+    #[inline]
+    pub (crate) fn pull_8_from_code(&mut self) -> Result<[u8; 8], String>
     {
-        let vec = self.get_code().get(self.get_pc()..self.get_pc()+8).map(|v| v.to_vec()).ok_or_else(|| minierr("error: tried to access past end of code"))?;
-        self.add_pc(8);
-        Ok(vec)
+        if self.top_frame.pc+8 > self.top_frame.code.len()
+        {
+            return plainerr("error: tried to access past end of code");
+        }
+        self.round_up_pc_8();
+        let pc = self.top_frame.pc;
+        self.top_frame.pc += 8;
+        unsafe
+        {
+            let vec = self.top_frame.code.get_unchecked(pc..pc+8);
+            Ok([vec[0], vec[1], vec[2], vec[3], vec[4], vec[5], vec[6], vec[7]])
+        }
     }
+    #[inline]
     pub (crate) fn pull_single_from_code(&mut self) -> Result<u8, String>
     {
-        let byte = self.get_code().get(self.get_pc()).cloned().ok_or_else(|| minierr("error: tried to access past end of code"))?;
-        self.add_pc(1);
-        Ok(byte)
+        if self.top_frame.pc+1 > self.top_frame.code.len()
+        {
+            return plainerr("error: tried to access past end of code");
+        }
+        let pc = self.top_frame.pc;
+        self.top_frame.pc += 1;
+        unsafe
+        {
+            Ok(*self.top_frame.code.code.get_unchecked(pc))
+        }
     }
     
     pub (crate) fn vec_pop_front_instance(&mut self, args : &mut Vec<Value>) -> Option<usize>
@@ -84,65 +108,62 @@ impl Interpreter
     {
         vec_pop_front_generic!(args, Text)
     }
-    pub (crate) fn vec_pop_front_dict(&mut self, args : &mut Vec<Value>) -> Option<HashMap<HashableValue, Value>>
+    pub (crate) fn vec_pop_front_dict(&mut self, args : &mut Vec<Value>) -> Option<Box<HashMap<HashableValue, Value>>>
     {
         vec_pop_front_generic!(args, Dict)
     }
     pub (crate) fn read_u16(&mut self) -> Result<u16, String>
     {
-        self.round_up_pc_2();
-        Ok(unpack_u16(&self.pull_2_from_code()?)?)
+        Ok(unpack_u16(self.pull_2_from_code()?)?)
     }
     pub (crate) fn read_usize(&mut self) -> Result<usize, String>
     {
-        self.round_up_pc_8();
-        Ok(unpack_u64(&self.pull_8_from_code()?)? as usize)
+        Ok(unpack_u64(self.pull_8_from_code()?)? as usize)
     }
     pub (crate) fn read_float(&mut self) -> Result<f64, String>
     {
-        self.round_up_pc_8();
-        Ok(unpack_f64(&self.pull_8_from_code()?)?)
+        Ok(unpack_f64(self.pull_8_from_code()?)?)
     }
     pub (crate) fn read_string_index(&mut self) -> Result<usize, String>
     {
         self.read_usize()
     }
     
+    #[inline]
     pub (crate) fn get_string_index(&self, string : &String) -> usize
     {
-        self.get_code().get_string_index(string)
+        self.top_frame.code.get_string_index(string)
     }
+    #[inline]
     pub (crate) fn get_indexed_string(&self, index : usize) -> String
     {
-        self.get_code().get_string(index)
+        self.top_frame.code.get_string(index)
     }
     
     pub (crate) fn read_string(&mut self) -> Result<String, String>
     {
-        let code = self.get_code();
         let start = self.get_pc();
-        if start >= code.len()
+        if start >= self.top_frame.code.len()
         {
             return Err("error: tried to decode a string past the end of code".to_string());
         }
         
         let mut end = start+1;
-        while end < code.len() && code[end] != 0
+        while end < self.top_frame.code.len() && self.top_frame.code[end] != 0
         {
             end += 1;
         }
         
         self.set_pc(end+1);
-        Ok(String::from_utf8_lossy(&code[start..end]).to_string())
+        Ok(String::from_utf8_lossy(&self.top_frame.code[start..end]).to_string())
     }
     pub (crate) fn read_function(&mut self, subroutine : bool, generator : bool) -> Result<(usize, FuncSpec), String>
     {
-        let code = self.get_code();
         let name = self.read_string_index()?;
-        let argcount = self.read_u16()?;
+        let argcount = self.read_u16()? as usize;
         let bodylen = self.read_usize()?;
         
-        let mut args = Vec::<_>::new();
+        let mut args = Vec::with_capacity(argcount);
         for _ in 0..argcount
         {
             args.push(self.read_string_index()?);
@@ -151,13 +172,11 @@ impl Interpreter
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        Ok((name, FuncSpec { varnames : args, code : code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : !subroutine, generator }))
+        Ok((name, FuncSpec { varnames : args, code : self.top_frame.code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : !subroutine, generator }))
     }
     
     pub (crate) fn read_lambda(&mut self) -> Result<(BTreeMap<usize, ValRef>, FuncSpec), String>
     {
-        let code = self.get_code();
-        
         let capturecount = self.read_usize()?;
         
         if self.top_frame.stack.len() < capturecount
@@ -178,10 +197,10 @@ impl Interpreter
             captures.insert(name, ValRef::from_val(val));
         }
         
-        let argcount = self.read_u16()?;
+        let argcount = self.read_u16()? as usize;
         let bodylen = self.read_usize()?;
         
-        let mut args = Vec::<usize>::new();
+        let mut args = Vec::with_capacity(argcount);
         for _ in 0..argcount
         {
             args.push(self.read_string_index()?);
@@ -190,14 +209,16 @@ impl Interpreter
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        Ok((captures, FuncSpec { varnames : args, code : code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : true, generator : false }))
+        Ok((captures, FuncSpec { varnames : args, code : self.top_frame.code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : true, generator : false }))
     }
     
+    #[inline]
     pub (crate) fn stack_pop_name(&mut self) -> Option<usize>
     {
         match_or_none!(self.stack_pop_var(), Some(Variable::Direct(name)) => name)
     }
     
+    #[inline]
     pub (crate) fn drain_scopes(&mut self, desired_depth : u16)
     {
         while self.top_frame.scopes.len() > desired_depth as usize
@@ -205,6 +226,7 @@ impl Interpreter
             self.top_frame.scopes.pop();
         }
     }
+    #[inline]
     pub (crate) fn pop_controlstack_until_loop(&mut self)
     {
         while let Some(controller) = self.top_frame.controlstack.last()

@@ -586,7 +586,7 @@ impl Parser {
             {
                 ast.children.pop();
             }
-            while (ast.text.starts_with("binexpr_") || ast.text == "simplexpr" || ast.text == "parenexpr" || ast.text == "supersimplexpr") && ast.children.len() == 1
+            while (ast.text.starts_with("binexpr_") || ast.text == "simplexpr" || ast.text == "supersimplexpr") && ast.children.len() == 1
             {
                 let mut temp = Vec::new();
                 std::mem::swap(&mut temp, &mut ast.children);

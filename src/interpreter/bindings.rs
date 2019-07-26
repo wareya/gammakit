@@ -58,14 +58,14 @@ pub (crate) fn ast_to_dict(ast : &ASTNode) -> Value
     
     let children : Vec<Value> = ast.children.iter().map(|child| ast_to_dict(child)).collect();
     
-    astdict.insert(to_key!("children"), Value::Array(children));
+    astdict.insert(to_key!("children"), Value::Array(Box::new(children)));
     
     if let Some(precedence) = ast.precedence
     {
         astdict.insert(to_key!("precedence"), Value::Number(precedence as f64));
     }
     
-    Value::Dict(astdict)
+    Value::Dict(Box::new(astdict))
 }
 
 pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTNode, String>
@@ -89,7 +89,7 @@ pub (crate) fn dict_to_ast(dict : &HashMap<HashableValue, Value>) -> Result<ASTN
     
     // ast.children from dummy_astnode() starts out extant but empty
     
-    for child in get!(Array, dict, "children")?
+    for child in get!(Array, dict, "children")?.iter()
     {
         let subnode = match_or_err!(child, Value::Dict(dict) => dict, minierr("error: values in list of children in ast node must be dictionaries that are themselves ast nodes"))?;
         ast.children.push(dict_to_ast(subnode)?);
@@ -134,12 +134,15 @@ impl Interpreter
         
         insert!("print"                 , sim_func_print                );
         insert!("printraw"              , sim_func_printraw             );
+        insert!("string"                , sim_func_string               );
+        
         insert!("parse_text"            , sim_func_parse_text           );
         insert!("compile_text"          , sim_func_compile_text         );
         insert!("compile_ast"           , sim_func_compile_ast          );
         insert!("instance_create"       , sim_func_instance_create      );
         insert!("instance_exists"       , sim_func_instance_exists      );
         insert!("instance_kill"         , sim_func_instance_kill        );
+        
         insert!("round"                 , sim_func_round                );
         insert!("floor"                 , sim_func_floor                );
         insert!("ceil"                  , sim_func_ceil                 );
@@ -189,6 +192,14 @@ impl Interpreter
             print!("{}", format_val(&arg).ok_or_else(|| minierr("error: tried to print unprintable value"))?);
         }
         Ok(Value::Number(0.0))
+    }
+    pub (crate) fn sim_func_string(&mut self, args : Vec<Value>) -> Result<Value, String>
+    {
+        if args.len() != 1
+        {
+            return Err(format!("error: wrong number of arguments to string(); expected 1, got {}", args.len()));
+        }
+        Ok(Value::Text(format_val(&args[0]).ok_or_else(|| minierr("error: tried to stringify an unprintable value"))?))
     }
     pub (crate) fn sim_func_round(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
@@ -330,7 +341,7 @@ impl Interpreter
         
         let dict = self.vec_pop_front_dict(&mut args).ok_or_else(|| minierr("error: first argument to compile_ast() must be a dictionary"))?;
         let ast = dict_to_ast(&dict)?;
-        let code = compile_bytecode_share_bookkeeping(&self.get_code(), &ast)?;
+        let code = compile_bytecode_share_bookkeeping(&self.top_frame.code, &ast)?;
         
         // endaddr at the start because Rc::new() moves `code`
         Ok
@@ -366,7 +377,7 @@ impl Interpreter
         let tokens = parser.tokenize(&program_lines, true)?;
         let ast = parser.parse_program(&tokens, &program_lines, true)?.ok_or_else(|| minierr("error: string failed to parse"))?;
         
-        let code = compile_bytecode_share_bookkeeping(&self.get_code(), &ast)?;
+        let code = compile_bytecode_share_bookkeeping(&self.top_frame.code, &ast)?;
         
         // endaddr at the start because Rc::new() moves `code`
         Ok
@@ -413,8 +424,8 @@ impl Interpreter
         
         Ok(match *myself.borrow()?
         {
-            Value::Array(ref array) => Value::Array((0..array.len()).map(|i| Value::Number(i as f64)).collect()),
-            Value::Dict(ref dict) => Value::Array(dict.iter().map(|(key, _)| hashval_to_val(key.clone())).collect()),
+            Value::Array(ref array) => Value::Array(Box::new((0..array.len()).map(|i| Value::Number(i as f64)).collect())),
+            Value::Dict(ref dict) => Value::Array(Box::new(dict.iter().map(|(key, _)| hashval_to_val(key.clone())).collect())),
             _ => return plainerr("error: tried to take length of lengthless type")
         })
     }
@@ -432,7 +443,7 @@ impl Interpreter
         Ok(match *myself.borrow()?
         {
             Value::Text(ref string) => slice_any(&string.chars().collect::<Vec<char>>(), start, end).map(|array| Value::Text(array.iter().cloned().collect())).ok_or_else(|| minierr("error: slice() on string went out of range"))?,
-            Value::Array(ref array) => slice_any(&array, start, end).map(|array| Value::Array(array.to_vec())).ok_or_else(|| minierr("error: slice() on array went out of range"))?,
+            Value::Array(ref array) => slice_any(&array, start, end).map(|array| Value::Array(Box::new(array.to_vec()))).ok_or_else(|| minierr("error: slice() on array went out of range"))?,
             _ => return plainerr("error: tried to slice lengthless type")
         })
     }

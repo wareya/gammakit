@@ -15,7 +15,7 @@ mod variableaccess;
 pub use self::types::*;
 
 /// Returned by the step() method of an interpreter.
-pub type StepResult = Result<(), Option<String>>;
+pub type StepResult = Result<bool, String>;
 type OpResult = Result<(), String>;
 /// Type signature of functions to be registered as bindings.
 pub type Binding = FnMut(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
@@ -77,6 +77,7 @@ pub struct Interpreter {
     /// Last error returned by step(). Gets cleared (reset to None) when step() runs without returning an error.
     pub last_error: Option<String>,
     pub (crate) opfunc_map: Box<[OpFunc; 256]>,
+    pub (crate) op_map_hits: BTreeMap<u8, u128>,
     pub (crate) op_map: BTreeMap<u8, u128>,
     doexit: bool,
     pub (crate) track_op_performance: bool,
@@ -96,6 +97,7 @@ impl Interpreter {
             global : GlobalState::new(parser),
             last_error : None,
             opfunc_map : Interpreter::build_opfunc_table(),
+            op_map_hits : BTreeMap::new(),
             op_map : BTreeMap::new(),
             track_op_performance : false
         }
@@ -109,13 +111,12 @@ impl Interpreter {
     /// Does not unload internal function bindings.
     /// 
     /// Does not reset global state (objects/instances).
-    pub fn restart(&mut self, code: &Code) -> StepResult
+    pub fn restart(&mut self, code: &Code)
     {
         self.top_frame = Frame::new_root(code);
         self.frames = vec!();
         self.doexit = false;
         self.last_error = None;
-        Ok(())
     }
     /// Clears global state (objects/instances).
     /// 
@@ -126,61 +127,99 @@ impl Interpreter {
     /// Does not unload internal function bindings.
     /// 
     /// Does not reset global state (objects/instances).
-    pub fn clear_global_state(&mut self) -> StepResult
+    pub fn clear_global_state(&mut self)
     {
         let mut parser : Option<Parser> = None;
         std::mem::swap(&mut parser, &mut self.global.parser);
         self.global = GlobalState::new(parser);
-        Ok(())
     }
-    fn step_internal(&mut self) -> StepResult
+    #[inline]
+    fn step_internal(&mut self) -> OpResult
     {
         use std::time::Instant;
-        
-        if self.get_pc() < self.top_frame.startpc || self.get_pc() > self.top_frame.endpc
+        if self.get_pc() < self.top_frame.startpc || self.get_pc() >= self.top_frame.endpc
         {
-            return Err(Some(minierr("internal error: simulation stepped while outside of the range of the frame it was in")));
+            return Err(minierr("internal error: simulation stepped while outside of the range of the frame it was in"));
         }
-        
-        let op = self.pull_single_from_code()?;
         
         if !self.track_op_performance
         {
+            let op = self.pull_single_from_code().unwrap();
             self.run_opfunc(op)?;
         }
         else
         {
             let start_time = Instant::now();
+            let op = self.pull_single_from_code().unwrap();
             self.run_opfunc(op)?;
+            *self.op_map_hits.entry(op).or_insert(0) += 1;
             *self.op_map.entry(op).or_insert(0) += Instant::now().duration_since(start_time).as_nanos();
         }
-        
-        return if self.doexit { Err(None) } else { Ok(()) }
+        Ok(())
     }
     /// Steps the interpreter by a single operation.
     ///
     /// Handles flow control after stepping, not before.
     ///
-    /// If execution can continue, Ok(()) is returned.
+    /// If execution can continue, Ok(true) is returned. Stepping the interpreter past this point will trigger an error.
     ///
-    /// If execution cannot continue, Err(Option<String>) is returned. This includes graceful exits (end of code).
+    /// If execution has exited normally, Ok(false) is returned.
     ///
-    /// If there is an error string (i.e. Err(Some(string))), exit was non-graceful (i.e. there was an error). Otherwise (i.e. Err(None)), it was graceful.
+    /// If an error occurs, Err(String) is returned. This includes graceful exits (end of code).
     pub fn step(&mut self) -> StepResult
     {
         let start_pc = self.get_pc();
         let ret = self.step_internal();
-        if let Err(Some(err)) = &ret
+        if self.doexit
         {
-            if let Some(info) = self.get_code().get_debug_info(start_pc)
+            Ok(false)
+        }
+        else if let Err(err) = &ret
+        {
+            if let Some(info) = self.top_frame.code.get_debug_info(start_pc)
             {
                 self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X}", err, info.last_line, info.last_index, start_pc))
             }
             else
             {
-                self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, start_pc, self.get_code().debug))
+                self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, start_pc, self.top_frame.code.debug))
+            }
+            Err(err.to_string())
+        }
+        else
+        {
+            Ok(true)
+        }
+    }
+    pub fn step_until_error_or_exit(&mut self) -> Result<u64, String>
+    {
+        let mut steps = 0;
+        let mut start_pc = self.get_pc();
+        loop
+        {
+            let ret = self.step_internal();
+            steps += 1;
+            if self.doexit
+            {
+                return Ok(steps);
+            }
+            else if let Ok(_) = ret
+            {
+                start_pc = self.get_pc();
+                continue;
+            }
+            else if let Err(err) = ret
+            {
+                if let Some(info) = self.top_frame.code.get_debug_info(start_pc)
+                {
+                    self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X}", err, info.last_line, info.last_index, start_pc))
+                }
+                else
+                {
+                    self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, start_pc, self.top_frame.code.debug))
+                }
+                return Err(err);
             }
         }
-        ret
     }
 }

@@ -43,6 +43,16 @@ impl Parser {
         
         Ok(compile_bytecode(&ast)?)
     }
+    pub fn give_me_bytecode_share_bookkeeping(&mut self, text: &str, code : &Code) -> Result<Code, String>
+    {
+        let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
+        
+        let tokens = self.tokenize(&program_lines, false)?;
+        
+        let ast = self.parse_program(&tokens, &program_lines, false)?.ok_or_else(|| "failed to parse program".to_string())?;
+        
+        Ok(compile_bytecode_share_bookkeeping(code, &ast)?)
+    }
 }
 
 #[cfg(test)]
@@ -77,10 +87,10 @@ mod tests {
         
         // test clearing interpreter state and restarting
         
-        interpreter.clear_global_state().unwrap_or(());
-        interpreter.restart(&code).unwrap_or(());
+        interpreter.clear_global_state();
+        interpreter.restart(&code);
         
-        while interpreter.step().is_ok(){}
+        while interpreter.step() == Ok(true){}
         
         if let Some(err) = &interpreter.last_error
         {
@@ -93,6 +103,21 @@ mod tests {
     #[test]
     fn test_nbodies() -> Result<(), String>
     {
+        use std::collections::HashMap;
+        println!("size of StackValue is {}", std::mem::size_of::<StackValue>());
+        println!("size of Value is {}", std::mem::size_of::<Value>());
+        println!("size of ValRef is {}", std::mem::size_of::<ValRef>());
+        println!("size of String is {}", std::mem::size_of::<String>());
+        println!("size of Variable is {}", std::mem::size_of::<Variable>());
+        println!("size of ArrayVar is {}", std::mem::size_of::<ArrayVar>());
+        println!("size of IndirectVar is {}", std::mem::size_of::<IndirectVar>());
+        println!("size of NonArrayVariable is {}", std::mem::size_of::<NonArrayVariable>());
+        println!("size of IndirectVar is {}", std::mem::size_of::<IndirectVar>());
+        println!("size of Box<Vec<Value>> is {}", std::mem::size_of::<Box<Vec<Value>>>());
+        println!("size of Box<HashMap<HashableValue, Value>> is {}", std::mem::size_of::<Box<HashMap<HashableValue, Value>>>());
+        println!("size of Vec<HashableValue> is {}", std::mem::size_of::<Vec<HashableValue>>());
+        println!("size of HashableValue is {}", std::mem::size_of::<HashableValue>());
+        
         use std::time::Instant;
         let mut parser = Parser::new_from_default()?;
 
@@ -108,10 +133,10 @@ mod tests {
         
         let start_time = Instant::now();
         
-        let mut steps = 0;
-        while interpreter.step().is_ok()
+        let steps = interpreter.step_until_error_or_exit().unwrap_or(0);
+        if let Some(err) = &interpreter.last_error
         {
-            steps += 1;
+            panic!("{}", err);
         }
         
         let duration = Instant::now().duration_since(start_time);
@@ -119,17 +144,13 @@ mod tests {
         println!("steps {:?}", steps);
         println!("{:?} steps per second", steps as f64 / (duration.as_millis() as f64 / 1000.0));
         println!("{:?} seconds per step", duration.as_millis() as f64 / 1000.0 / steps as f64);
-        let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>();
-        op_map.sort_by(|a, b| a.1.cmp(&b.1));
-        let mut total = 0.0;
+        //let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / *interpreter.op_map_hits.get(k).unwrap() as f64)).collect::<Vec<_>>();
+        let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / 1_000_000_000.0)).collect::<Vec<_>>();
+        op_map.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
         for (op, time) in op_map
         {
-            let time = (time/1000000) as f64 / 1000.0;
-            total  += time;
             println!("{:02X}:{}", op, time);
         }
-        println!("total: {}", total);
-        println!("({} steps per second)", steps as f64 / total);
         
         if let Some(err) = &interpreter.last_error
         {
@@ -146,6 +167,8 @@ mod tests {
         use std::collections::BTreeMap;
         use std::rc::Rc;
         use bookkeeping::*;
+        
+        println!("size of StackValue is {}", std::mem::size_of::<StackValue>());
 
         let mut code = Code{code : Rc::new(vec!(0; 10_000_000)), debug : Rc::new(BTreeMap::new()), bookkeeping : Bookkeeping::new()};
         
@@ -157,10 +180,10 @@ mod tests {
         
         let start_time = Instant::now();
         
-        let mut steps = 0;
-        while interpreter.step().is_ok()
+        let steps = interpreter.step_until_error_or_exit().unwrap_or(0);
+        if let Some(err) = &interpreter.last_error
         {
-            steps += 1;
+            panic!("{}", err);
         }
         
         let duration = Instant::now().duration_since(start_time);
@@ -168,16 +191,16 @@ mod tests {
         println!("steps {:?}", steps);
         println!("{:?} steps per second", steps as f64 / (duration.as_millis() as f64 / 1000.0));
         println!("{:?} seconds per step", duration.as_millis() as f64 / 1000.0 / steps as f64);
-        let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v)).collect::<Vec<_>>();
-        op_map.sort_by(|a, b| a.1.cmp(&b.1));
-        let mut total = 0.0;
+        //let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / *interpreter.op_map_hits.get(k).unwrap() as f64)).collect::<Vec<_>>();
+        let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / 1_000_000_000.0)).collect::<Vec<_>>();
+        op_map.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        //let mut total = 0.0;
         for (op, time) in op_map
         {
-            let time = (time/1000000) as f64 / 1000.0;
-            total  += time;
             println!("{:02X}:{}", op, time);
         }
-        println!("total: {}", total);
+        //println!("total: {}", total);
+        //println!("({} steps per second)", steps as f64 / total);
         
         if let Some(err) = &interpreter.last_error
         {

@@ -78,6 +78,10 @@ impl Code
     {
         self.code.get(index)
     }
+    pub (crate) unsafe fn get_unchecked<I : std::slice::SliceIndex<[u8]>>(&self, index : I) -> &I::Output
+    {
+        self.code.get_unchecked(index)
+    }
     fn add_debug_info(&mut self, pc : usize, last_line : usize, last_index : usize, last_type : &str)
     {
         Rc::get_mut(&mut self.debug).unwrap().insert(pc, DebugInfo{last_line, last_index, last_type : last_type.to_string()});
@@ -393,26 +397,65 @@ impl CompilerState {
             };
         }
         
-        for child in ast.child_slice(0, -1)?
+        if ast.child(0)?.text == "name" && ast.child(0)?.child(0)?.text == "global" && ast.child(1)?.child(0)?.text == "indirection"
         {
-            if child.text == "name"
+            if matches!(self.context, Context::Expr)
             {
-                self.compile_pushname(&child.child(0)?.text)?;
+                self.compile_pushglobalval(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
             }
             else
             {
-                self.compile_any(child)?;
+                self.compile_pushglobal(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
             }
+            if ast.children.len() > 2
+            {
+                for child in ast.child_slice(2, -1)?
+                {
+                    if child.text == "name"
+                    {
+                        self.compile_pushname(&child.child(0)?.text)?;
+                    }
+                    else
+                    {
+                        self.compile_any(child)?;
+                    }
+                }
+                self.compile_context_wrapped(Context::Statement, &|x| x.compile_last_child(ast))?;
+            }
+            Ok(())
         }
-        self.compile_context_wrapped(Context::Statement, &|x| x.compile_last_child(ast))
+        else
+        {
+            for child in ast.child_slice(0, -1)?
+            {
+                if child.text == "name"
+                {
+                    self.compile_pushname(&child.child(0)?.text)?;
+                }
+                else
+                {
+                    self.compile_any(child)?;
+                }
+            }
+            self.compile_context_wrapped(Context::Statement, &|x| x.compile_last_child(ast))
+        }
+        
     }
     fn compile_pushvar(&mut self, string : &String) -> Result<(), String>
     {
+        if string.as_str() == "global"
+        {
+            return Err(format!("internal error: attempted to compile `global` with PUSHVAR ({:?})", (self.last_line, self.last_index, &self.last_type)))
+        }
         self.compile_string_index_with_prefix(PUSHVAR, string);
         Ok(())
     }
     fn compile_pushname(&mut self, string : &String) -> Result<(), String>
     {
+        if string.as_str() == "global"
+        {
+            return Err(format!("internal error: attempted to compile `global` with PUSHNAME ({:?})", (self.last_line, self.last_index, &self.last_type)))
+        }
         self.compile_string_index_with_prefix(PUSHNAME, string);
         Ok(())
     }

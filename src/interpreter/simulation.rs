@@ -74,6 +74,7 @@ impl Interpreter
         opfunc_map
     }
     
+    #[inline]
     pub (crate) fn run_opfunc(&mut self, op : u8) -> OpResult
     {
         self.opfunc_map[op as usize](self)
@@ -87,8 +88,8 @@ impl Interpreter
     
     pub (crate) fn sim_NOP(&mut self) -> OpResult
     {
-        plainerr("NOP")
-        //Ok(())
+        //plainerr("NOP")
+        Ok(())
     }
     pub (crate) fn sim_PUSHFLT(&mut self) -> OpResult
     {
@@ -113,7 +114,7 @@ impl Interpreter
         let index = self.read_usize()?;
         let var = match index
         {
-            1 => Variable::Global,
+            1 => return Err("internal error: encountered `global` via pushname".to_string()),
             2 => Variable::Selfref,
             3 => Variable::Other,
             _ => Variable::Direct(index)
@@ -124,7 +125,7 @@ impl Interpreter
     pub (crate) fn sim_PUSHGLOBAL(&mut self) -> OpResult
     {
         let index = self.read_usize()?;
-        self.stack_push_var(IndirectVar::from_global(index));
+        self.stack_push_var(Variable::from_global(index));
         Ok(())
     }
     pub (crate) fn sim_PUSHGLOBALVAL(&mut self) -> OpResult
@@ -139,7 +140,7 @@ impl Interpreter
         let index = self.read_usize()?;
         self.stack_push_val(match index
         {
-            1 => self.evaluate_global()?,
+            1 => return Err("internal error: encountered `global` via pushvar".to_string()),
             2 => self.evaluate_self()?,
             3 => self.evaluate_other()?,
             _ => self.evaluate_of_direct(index)?
@@ -212,14 +213,14 @@ impl Interpreter
         match source
         {
             StackValue::Val(Value::Instance(ident)) =>
-                self.stack_push_var(IndirectVar::from_ident(ident, name)),
-            StackValue::Val(Value::Special(Special::Global)) =>
-                self.stack_push_var(IndirectVar::from_global(name)),
-            
+                self.stack_push_var(Variable::from_indirection(ident, name)),
             StackValue::Var(var) =>
             {
-                let value = self.evaluate(var)?.to_val()?;
-                self.stack_push_var(IndirectSource::from_value(value)?.upgrade(name));
+                match self.evaluate(var)?.to_val()?
+                {
+                    Value::Instance(id) => self.stack_push_var(Variable::from_indirection(id, name)),
+                    _ => Err("error: tried to use indirection on a non-instance or non-global value".to_string())?
+                }
             }
             _ => return plainerr("error: tried to use indirection on a type that doesn't support it (only instances, dictionaries, and 'special' values are allowed)")
         }
@@ -417,7 +418,7 @@ impl Interpreter
         let list : ForEachValues = match val
         {
             Value::Array(ref mut list) => ForEachValues::List(list.drain(..).rev().collect()),
-            Value::Dict(ref mut dict)  => ForEachValues::List(dict.drain().map(|(k, v)| Value::Array(vec!(hashval_to_val(k), v))).collect()),
+            Value::Dict(ref mut dict)  => ForEachValues::List(dict.drain().map(|(k, v)| Value::Array(Box::new(vec!(hashval_to_val(k), v)))).collect()),
             Value::Set(ref mut set)    => ForEachValues::List(set.drain().map(hashval_to_val).collect()),
             Value::Generator(_) => ForEachValues::Gen(GeneratorState{frame : None}),
             _ => return plainerr("error: value fed to for-each loop must be an array, dictionary, set, or generatorstate")
@@ -667,8 +668,7 @@ impl Interpreter
         let right = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction BINOP (this error should be inaccessible!)"))?;
         let left = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction BINOP (this error should be inaccessible!)"))?;
         
-        let new_value = do_binop_function(immediate, &left, &right)?;
-        self.stack_push_val(new_value);
+        self.stack_push_val(do_binop_function(immediate, &left, &right)?);
         Ok(())
     }
     
@@ -763,13 +763,14 @@ impl Interpreter
         {
             return Err(format!("internal error: not enough values on stack for COLLECTARRAY instruction to build array (need {}, have {})", numvals, self.stack_len()));
         }
-        let mut myarray = Vec::new();
+        let mut myarray = Vec::with_capacity(numvals);
         for _ in 0..numvals
         {
             let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTARRAY instruction failed to collect values from stack (this error should be unreachable!)"))?;
-            myarray.insert(0, val);
+            myarray.push(val);
         }
-        self.stack_push_val(Value::Array(myarray));
+        myarray.reverse();
+        self.stack_push_val(Value::Array(Box::new(myarray)));
         Ok(())
     }
     pub (crate) fn sim_COLLECTDICT(&mut self) -> OpResult
@@ -792,7 +793,7 @@ impl Interpreter
                 mydict.insert(hashval, val);
             }
         }
-        self.stack_push_val(Value::Dict(mydict));
+        self.stack_push_val(Value::Dict(Box::new(mydict)));
         Ok(())
     }
     pub (crate) fn sim_COLLECTSET(&mut self) -> OpResult
@@ -809,7 +810,7 @@ impl Interpreter
             let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTSET instruction failed to collect values from stack"))?;
             myset.insert(val_to_hashval(val)?);
         }
-        self.stack_push_val(Value::Set(myset));
+        self.stack_push_val(Value::Set(Box::new(myset)));
         Ok(())
     }
     pub (crate) fn sim_ARRAYEXPR(&mut self) -> OpResult
@@ -829,15 +830,17 @@ impl Interpreter
                 self.stack_push_var(Variable::Array(arrayvar));
             }
             StackValue::Var(Variable::Direct(dirvar)) =>
-                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Direct(dirvar), indexes : vec!(index) } )),
+                self.stack_push_var(Variable::Array(ArrayVar::new(NonArrayVariable::Direct(dirvar), vec!(index)))),
             StackValue::Var(Variable::Indirect(indirvar)) =>
-                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::Indirect(indirvar), indexes : vec!(index) } )),
+                self.stack_push_var(Variable::Array(ArrayVar::new(NonArrayVariable::Indirect(indirvar), vec!(index)))),
+            StackValue::Var(Variable::Global(globalvar)) =>
+                self.stack_push_var(Variable::Array(ArrayVar::new(NonArrayVariable::Global(globalvar), vec!(index)))),
             StackValue::Val(Value::Array(array)) =>
-                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualArray(array), indexes : vec!(index) } )),
+                self.stack_push_var(Variable::Array(ArrayVar::new(NonArrayVariable::ActualArray(array), vec!(index)))),
             StackValue::Val(Value::Dict(dict)) =>
-                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualDict(dict), indexes : vec!(index) } )),
+                self.stack_push_var(Variable::Array(ArrayVar::new(NonArrayVariable::ActualDict(dict), vec!(index)))),
             StackValue::Val(Value::Text(string)) =>
-                self.stack_push_var(Variable::Array(ArrayVar { location : NonArrayVariable::ActualText(string), indexes : vec!(index) } )),
+                self.stack_push_var(Variable::Array(ArrayVar::new(NonArrayVariable::ActualText(Box::new(string)), vec!(index)))),
             _ =>
                 return plainerr("error: tried to use array indexing on a non-indexable value"),
         }
@@ -999,24 +1002,29 @@ impl Interpreter
     pub (crate) fn sim_RETURN(&mut self) -> OpResult
     {
         let was_generator = self.top_frame.generator;
-        let old_frame = self.frames.pop().ok_or_else(|| minierr("error: attempted to return from global code; use exit() instead"))?;
-        
-        let inner_frame_stack_last = self.stack_pop();
-        let frame_was_expr = self.top_frame.isexpr;
-        self.top_frame = old_frame;
-        
-        if frame_was_expr
+        if let Some(old_frame) = self.frames.pop()
         {
-            let val = inner_frame_stack_last.ok_or_else(|| minierr("error: RETURN instruction needed a value remaining on the inner frame's stack, but there were none"))?;
-            self.stack_push(val);
-        }
-        if was_generator
-        {
-            self.stack_push_val(Value::Generator(Box::new(GeneratorState{frame : None})));
-            if !frame_was_expr
+            let inner_frame_stack_last = self.stack_pop();
+            let frame_was_expr = self.top_frame.isexpr;
+            self.top_frame = old_frame;
+            
+            if frame_was_expr
             {
-                return plainerr("internal error: generators must always return into an expression");
+                let val = inner_frame_stack_last.ok_or_else(|| minierr("error: RETURN instruction needed a value remaining on the inner frame's stack, but there were none"))?;
+                self.stack_push(val);
             }
+            if was_generator
+            {
+                self.stack_push_val(Value::Generator(Box::new(GeneratorState{frame : None})));
+                if !frame_was_expr
+                {
+                    return plainerr("internal error: generators must always return into an expression");
+                }
+            }
+        }
+        else
+        {
+            self.doexit = true;
         }
         Ok(())
     }

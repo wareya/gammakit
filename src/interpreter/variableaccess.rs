@@ -23,7 +23,6 @@ fn assign_val(value : Value, var : &mut Value) -> Result<(), String>
 {
     match value
     {
-        Value::Special(_) => plainerr!("error: tried to assign a special value to a variable"),
         Value::SubFunc(_) => plainerr!("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)"),
         value =>
         {
@@ -177,40 +176,36 @@ impl Interpreter
         {
             NonArrayVariable::Indirect(indirvar) => Ok(ValRef::from_ref(self.evaluate_of_indirect(indirvar)?.extract_ref()?, arrayvar.indexes, false)),
             NonArrayVariable::Direct(dirvar) => Ok(ValRef::from_ref(self.evaluate_of_direct(dirvar)?.extract_ref()?, arrayvar.indexes, false)),
+            NonArrayVariable::Global(globalvar) => Ok(ValRef::from_ref(self.evaluate_of_global(globalvar)?.extract_ref()?, arrayvar.indexes, false)),
             NonArrayVariable::ActualArray(array) => Ok(ValRef::from_val_indexed_readonly(Value::Array(array), arrayvar.indexes)),
             NonArrayVariable::ActualDict(dict) => Ok(ValRef::from_val_indexed_readonly(Value::Dict(dict), arrayvar.indexes)),
-            NonArrayVariable::ActualText(string) => Ok(ValRef::from_val_indexed_readonly(Value::Text(string), arrayvar.indexes)),
+            NonArrayVariable::ActualText(string) => Ok(ValRef::from_val_indexed_readonly(Value::Text(*string), arrayvar.indexes)),
         }
     }
     fn evaluate_of_indirect(&self, indirvar : IndirectVar) -> Result<ValRef, String>
     {
-        match indirvar.source
+        let ident = indirvar.ident;
+        let instance = self.global.instances.get(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
+        
+        if let Some(var) = instance.variables.get(&indirvar.name)
         {
-            IndirectSource::Ident(ident) =>
-            {
-                let instance = self.global.instances.get(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
-                
-                if let Some(var) = instance.variables.get(&indirvar.name)
-                {
-                    Ok(var.refclone())
-                }
-                else
-                {
-                    let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
-                    
-                    let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
-                    
-                    let mut mydata = funcdat.clone();
-                    mydata.forcecontext = ident;
-                    return Ok(ValRef::from_val_readonly(Value::new_funcval(false, Some(indirvar.name), None, Some(mydata))));
-                }
-            }
-            IndirectSource::Global =>
-            {
-                let var = self.global.variables.get(&indirvar.name).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", self.get_indexed_string(indirvar.name)))?;
-                Ok(var.refclone())
-            }
+            Ok(var.refclone())
         }
+        else
+        {
+            let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
+            
+            let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
+            
+            let mut mydata = funcdat.clone();
+            mydata.forcecontext = ident;
+            Ok(ValRef::from_val_readonly(Value::new_funcval(false, Some(indirvar.name), None, Some(mydata))))
+        }
+    }
+    fn evaluate_of_global(&self, globalvar : usize) -> Result<ValRef, String>
+    {
+        let var = self.global.variables.get(&globalvar).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", self.get_indexed_string(globalvar)))?;
+        Ok(var.refclone())
     }
     pub(crate) fn evaluate_of_direct(&self, name : usize) -> Result<ValRef, String>
     {
@@ -246,15 +241,13 @@ impl Interpreter
         
         Err(format!("error: unknown identifier `{}`", self.get_indexed_string(name)))
     }
+    #[inline]
     pub (crate) fn evaluate_self(&self) -> Result<ValRef, String>
     {
         let id = self.top_frame.instancestack.last().ok_or_else(|| "error: tried to access `self` while not inside of instance scope".to_string())?;
         Ok(ValRef::from_val(Value::Instance(*id)))
     }
-    pub (crate) fn evaluate_global(&self) -> Result<ValRef, String>
-    {
-        Ok(ValRef::from_val(Value::Special(Special::Global)))
-    }
+    #[inline]
     pub (crate) fn evaluate_other(&self) -> Result<ValRef, String>
     {
         let id = self.top_frame.instancestack.get(self.top_frame.instancestack.len()-2).ok_or_else(|| "error: tried to access `other` while not inside of at least two instance scopes".to_string())?;
@@ -266,9 +259,9 @@ impl Interpreter
         {
             Variable::Array(arrayvar) => self.evaluate_of_array(arrayvar),
             Variable::Indirect(indirvar) => self.evaluate_of_indirect(indirvar),
+            Variable::Global(globalvar) => self.evaluate_of_global(globalvar),
             Variable::Direct(name) => self.evaluate_of_direct(name),
             Variable::Selfref => self.evaluate_self(),
-            Variable::Global => self.evaluate_global(),
             Variable::Other => self.evaluate_other(),
         }
     }

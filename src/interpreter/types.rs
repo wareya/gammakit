@@ -65,12 +65,12 @@ pub (crate) struct Frame {
     pub (super) startpc: usize,
     pub (super) pc: usize,
     pub (super) endpc: usize,
+    pub (super) currline: usize,
     pub (super) scopes: Vec<BTreeMap<usize, ValRef>>,
     pub (super) instancestack: Vec<usize>,
     pub (super) controlstack: Vec<Controller>,
     pub (super) stack: Vec<StackValue>,
     pub (super) isexpr: bool,
-    pub (super) currline: usize,
     pub (super) impassable: bool,
     pub (super) generator: bool,
 }
@@ -97,75 +97,63 @@ pub (crate) struct ObjSpec {
     pub (super) functions: BTreeMap<usize, FuncSpec>
 }
 pub (crate) struct Instance {
+    pub (super) variables: BTreeMap<usize, ValRef>,
     pub (super) objtype: usize,
     pub (super) ident: usize,
-    pub (super) variables: BTreeMap<usize, ValRef>
 }
 
 // variable types (i.e. how to access a variable as an lvalue)
 
 // internal to ArrayVar
 #[derive(Debug, Clone)]
-pub (super) enum NonArrayVariable {
-    Indirect(IndirectVar), // x.y.z evaluates x.y before storing it as the instance identity under which to find y
+pub (crate) enum NonArrayVariable {
+    Indirect(IndirectVar), // x.y.z evaluates x.y before storing it as the instance identity under which to find y, but then (x.y).z is held as-is
+    Global(usize),
     Direct(usize),
-    ActualArray(Vec<Value>),
-    ActualDict(HashMap<HashableValue, Value>),
-    ActualText(String)
+    ActualArray(Box<Vec<Value>>),
+    ActualDict(Box<HashMap<HashableValue, Value>>),
+    ActualText(Box<String>)
 }
 
 #[derive(Debug, Clone)]
 pub (crate) struct ArrayVar { // for x[y]
+    pub (super) indexes: Vec<HashableValue>,
     pub (super) location: NonArrayVariable,
-    pub (super) indexes: Vec<HashableValue>
 }
 
-#[derive(Debug, Clone)]
-pub (crate) enum IndirectSource {
-    Ident(usize), // id of an instance
-    Global,
-}
-impl IndirectSource {
-    pub (crate) fn upgrade(self, name : usize) -> Variable
+impl ArrayVar {
+    #[inline]
+    pub (crate) fn new(location : NonArrayVariable, indexes : Vec<HashableValue>) -> ArrayVar
     {
-        Variable::Indirect(IndirectVar{source: self, name})
-    }
-    pub (crate) fn from_value(value : Value) -> Result<IndirectSource, String>
-    {
-        match value
-        {
-            Value::Instance(id) => Ok(IndirectSource::Ident(id)),
-            Value::Special(Special::Global) => Ok(IndirectSource::Global),
-            _ => Err("error: tried to use indirection on a non-instance or non-global value".to_string())
-        }
+        ArrayVar{location, indexes}
     }
 }
 
 #[derive(Debug, Clone)]
 pub (crate) struct IndirectVar { // for x.y
-    pub (super) source: IndirectSource,
+    pub (super) ident: usize,
     pub (super) name: usize
-}
-
-impl IndirectVar {
-    pub (crate) fn from_ident(ident : usize, name : usize) -> Variable
-    {
-        Variable::Indirect(IndirectVar{source: IndirectSource::Ident(ident), name})
-    }
-    pub (crate) fn from_global(name : usize) -> Variable
-    {
-        Variable::Indirect(IndirectVar{source: IndirectSource::Global, name})
-    }
 }
 
 #[derive(Debug, Clone)]
 pub (crate) enum Variable {
     Array(ArrayVar),
     Indirect(IndirectVar),
+    Global(usize),
     Direct(usize),
     Selfref,
-    Global,
     Other,
+}
+
+impl Variable {
+    pub (crate) fn from_indirection(ident : usize, name : usize) -> Variable
+    {
+        Variable::Indirect(IndirectVar{ident, name})
+    }
+    pub (crate) fn from_global(name : usize) -> Variable
+    {
+        Variable::Global(name)
+    }
 }
 
 // value types
@@ -183,11 +171,6 @@ pub struct FuncVal {
 /// Intentionally opaque. Wrapped by Value.
 pub struct GeneratorState {
     pub (super) frame: Option<Frame>, // stores code, pc, and stacks; becomes None after the generator returns/finalizes or exits through its bottom
-}
-/// Used internally for expressions like "global",
-#[derive(Debug, Clone)]
-pub enum Special {
-    Global
 }
 /// For custom bindings dealing with manually-managed data that belongs to the application.
 #[derive(Debug, Clone)]
@@ -217,16 +200,15 @@ pub struct SubFuncVal {
 pub enum Value {
     Number(f64),
     Text(String),
-    Array(Vec<Value>),
-    Dict(HashMap<HashableValue, Value>),
-    Set(HashSet<HashableValue>),
+    Array(Box<Vec<Value>>),
+    Dict(Box<HashMap<HashableValue, Value>>),
+    Set(Box<HashSet<HashableValue>>),
     Func(Box<FuncVal>),
     Generator(Box<GeneratorState>),
     Instance(usize),
     Object(usize),
     Custom(Custom),
     // cannot be assigned
-    Special(Special),
     SubFunc(Box<SubFuncVal>),
 }
 
@@ -301,7 +283,6 @@ impl ValRef {
         }
         match val
         {
-            Value::Special(_) => Err("error: tried to assign a special value to a variable".to_string()),
             Value::SubFunc(_) => Err("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)".to_string()),
             val =>
             {
