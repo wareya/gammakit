@@ -99,7 +99,7 @@ impl Interpreter {
             opfunc_map : Interpreter::build_opfunc_table(),
             op_map_hits : BTreeMap::new(),
             op_map : BTreeMap::new(),
-            track_op_performance : false
+            track_op_performance : true
         }
     }
     /// Loads new code into the interpreter.

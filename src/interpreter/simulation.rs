@@ -141,9 +141,9 @@ impl Interpreter
         self.stack_push_val(match index
         {
             1 => return Err("internal error: encountered `global` via pushvar".to_string()),
-            2 => self.evaluate_self()?,
-            3 => self.evaluate_other()?,
-            _ => self.evaluate_of_direct_as_val(index)?
+            2 => self.evaluate_self(|x| Ok(x))?,
+            3 => self.evaluate_other(|x| Ok(x))?,
+            _ => self.evaluate_of_direct(index, |x| x.to_val(), |x| Ok(x))?
         });
         Ok(())
     }
@@ -216,7 +216,7 @@ impl Interpreter
                 self.stack_push_var(Variable::from_indirection(ident, name)),
             StackValue::Var(var) =>
             {
-                match self.evaluate(var)?.to_val()?
+                match self.evaluate_value(var)?
                 {
                     Value::Instance(id) => self.stack_push_var(Variable::from_indirection(id, name)),
                     _ => Err("error: tried to use indirection on a non-instance or non-global value".to_string())?
@@ -248,7 +248,7 @@ impl Interpreter
             return Err(format!("internal error: EVALUATION instruction requires 1 values on the stack but only found {}", self.stack_len()));
         }
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: failed to find a variable on the stack in EVALUATION"))?;
-        let value = self.evaluate(var)?.to_val()?;
+        let value = self.evaluate_value(var)?;
         self.stack_push_val(value);
         Ok(())
     }
@@ -263,7 +263,7 @@ impl Interpreter
     pub (crate) fn sim_INVOKE(&mut self) -> OpResult
     {
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: not enough variables on stack to run instruction INVOKE"))?;
-        let val = self.evaluate(var.clone())?.to_val()?;
+        let val = self.evaluate_value(var.clone())?;
         
         if let Value::Generator(generator_state) = val
         {
@@ -288,7 +288,7 @@ impl Interpreter
         let _yielded = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 2 to INVOKECALL must be a value"))?;
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: stack argument 3 to INVOKECALL must be a variable"))?;
         
-        self.evaluate(var)?.mutate(move |var|
+        self.evaluate_and_mutate(var, move |var|
         {
             *var = generator;
             Ok(())
@@ -306,7 +306,7 @@ impl Interpreter
         let yielded = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 2 to INVOKEEXPR must be a value"))?;
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: stack argument 3 to INVOKEEXPR must be a variable"))?;
         
-        self.evaluate(var)?.mutate(move |var|
+        self.evaluate_and_mutate(var, move |var|
         {
             *var = generator;
             Ok(())
@@ -638,8 +638,7 @@ impl Interpreter
         
         if immediate == 0x00
         {
-            let var = self.evaluate(var)?;
-            var.mutate(move |val| 
+            self.evaluate_and_mutate(var, move |val|
             {
                 *val = value;
                 Ok(())
@@ -647,8 +646,7 @@ impl Interpreter
         }
         else
         {
-            let var = self.evaluate(var)?;
-            var.mutate(move |val| 
+            self.evaluate_and_mutate(var, move |val|
             {
                 *val = do_binop_function(immediate, val, &value)?;
                 Ok(())
@@ -666,8 +664,7 @@ impl Interpreter
         let immediate = self.pull_single_from_code()?;
         
         let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: argument to UNSTATE could not be found or was not a variable"))?;
-        let var = self.evaluate(var)?;
-        var.mutate(move |val| 
+        self.evaluate_and_mutate(var, |val| 
         {
             *val = do_unstate_function(immediate, val)?;
             Ok(())

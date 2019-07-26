@@ -193,13 +193,13 @@ pub (crate) fn return_indexed(var : &Value, indexes : &[HashableValue]) -> Resul
     }
 }
 
-fn access_frame(global : &GlobalState, frame : &Frame, name : usize, seen_instance : &mut bool) -> Option<ValRef>
+fn access_frame<'a, 'b>(global : &'a GlobalState, frame : &'b Frame, name : usize, seen_instance : &mut bool) -> Option<Result<Result<&'b ValRef, &'a ValRef>, Value>>
 {
     for scope in frame.scopes.iter().rev().filter(|x| !x.is_empty())
     {
         if let Some(var) = scope.get(&name)
         {
-            return Some(var.refclone());
+            return Some(Ok(Ok(var)));
         }
     }
     if !*seen_instance
@@ -211,7 +211,7 @@ fn access_frame(global : &GlobalState, frame : &Frame, name : usize, seen_instan
             {
                 if let Some(var) = inst.variables.get(&name)
                 {
-                    return Some(var.refclone());
+                    return Some(Ok(Err(var)));
                 }
                 else if let Some(objspec) = global.objects.get(&inst.objtype)
                 {
@@ -219,42 +219,7 @@ fn access_frame(global : &GlobalState, frame : &Frame, name : usize, seen_instan
                     {
                         let mut mydata = funcdat.clone();
                         mydata.forcecontext = inst.ident;
-                        return Some(ValRef::from_val(Value::new_funcval(false, Some(name), None, Some(mydata))));
-                    }
-                }
-            }
-        }
-    }
-    None
-}
-
-fn access_frame_as_val(global : &GlobalState, frame : &Frame, name : usize, seen_instance : &mut bool) -> Option<Result<Value, String>>
-{
-    for scope in frame.scopes.iter().rev().filter(|x| !x.is_empty())
-    {
-        if let Some(var) = scope.get(&name)
-        {
-            return Some(var.to_val());
-        }
-    }
-    if !*seen_instance
-    {
-        if let Some(id) = frame.instancestack.last()
-        {
-            *seen_instance = true;
-            if let Some(inst) = global.instances.get(id)
-            {
-                if let Some(var) = inst.variables.get(&name)
-                {
-                    return Some(var.to_val());
-                }
-                else if let Some(objspec) = global.objects.get(&inst.objtype)
-                {
-                    if let Some(funcdat) = objspec.functions.get(&name)
-                    {
-                        let mut mydata = funcdat.clone();
-                        mydata.forcecontext = inst.ident;
-                        return Some(Ok(Value::new_funcval(false, Some(name), None, Some(mydata))));
+                        return Some(Err(Value::new_funcval(false, Some(name), None, Some(mydata))));
                     }
                 }
             }
@@ -265,26 +230,36 @@ fn access_frame_as_val(global : &GlobalState, frame : &Frame, name : usize, seen
 
 impl Interpreter
 {
-    fn evaluate_of_array(&self, arrayvar : ArrayVar) -> Result<ValRef, String>
+    fn evaluate_of_array
+        <T,
+         F : FnOnce(&ValRef) -> Result<T, String>,
+         F2 : FnOnce(Value) -> Result<T, String>
+        >
+        (&self, arrayvar : ArrayVar, varhandler : F, valhandler : F2) -> Result<T, String>
     {
         match arrayvar.location
         {
-            NonArrayVariable::Indirect(indirvar) => Ok(ValRef::from_ref(self.evaluate_of_indirect(indirvar)?.extract_ref()?, arrayvar.indexes, false)),
-            NonArrayVariable::Direct(dirvar) => Ok(ValRef::from_ref(self.evaluate_of_direct(dirvar)?.extract_ref()?, arrayvar.indexes, false)),
-            NonArrayVariable::Global(globalvar) => Ok(ValRef::from_ref(self.evaluate_of_global(globalvar)?.extract_ref()?, arrayvar.indexes, false)),
-            NonArrayVariable::ActualArray(array) => Ok(ValRef::from_val_indexed_readonly(Value::Array(array), arrayvar.indexes)),
-            NonArrayVariable::ActualDict(dict) => Ok(ValRef::from_val_indexed_readonly(Value::Dict(dict), arrayvar.indexes)),
-            NonArrayVariable::ActualText(string) => Ok(ValRef::from_val_indexed_readonly(Value::Text(*string), arrayvar.indexes)),
+            NonArrayVariable::Indirect(indirvar) => varhandler(&ValRef::from_ref(self.evaluate_of_indirect(indirvar, |x| Ok(x.refclone()), |x| Ok(ValRef::from_val(x)))?.extract_ref()?, arrayvar.indexes, false)),
+            NonArrayVariable::Direct(dirvar) => varhandler(&ValRef::from_ref(self.evaluate_of_direct(dirvar, |x| Ok(x.refclone()), |x| Ok(ValRef::from_val(x)))?.extract_ref()?, arrayvar.indexes, false)),
+            NonArrayVariable::Global(globalvar) => varhandler(&ValRef::from_ref(self.evaluate_of_global(globalvar, |x| Ok(x.refclone()))?.extract_ref()?, arrayvar.indexes, false)),
+            NonArrayVariable::ActualArray(array) => valhandler(return_indexed(&Value::Array(array), &arrayvar.indexes)?),
+            NonArrayVariable::ActualDict(dict) => valhandler(return_indexed(&Value::Dict(dict), &arrayvar.indexes)?),
+            NonArrayVariable::ActualText(string) => valhandler(return_indexed(&Value::Text(*string), &arrayvar.indexes)?),
         }
     }
-    fn evaluate_of_indirect(&self, indirvar : IndirectVar) -> Result<ValRef, String>
+    fn evaluate_of_indirect
+        <T,
+         F : FnOnce(&ValRef) -> Result<T, String>,
+         F2 : FnOnce(Value) -> Result<T, String>
+        >
+        (&self, indirvar : IndirectVar, varhandler : F, valhandler : F2) -> Result<T, String>
     {
         let ident = indirvar.ident;
         let instance = self.global.instances.get(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
         
         if let Some(var) = instance.variables.get(&indirvar.name)
         {
-            Ok(var.refclone())
+            varhandler(var)
         }
         else
         {
@@ -294,20 +269,34 @@ impl Interpreter
             
             let mut mydata = funcdat.clone();
             mydata.forcecontext = ident;
-            Ok(ValRef::from_val_readonly(Value::new_funcval(false, Some(indirvar.name), None, Some(mydata))))
+            valhandler(Value::new_funcval(false, Some(indirvar.name), None, Some(mydata)))
         }
     }
-    fn evaluate_of_global(&self, globalvar : usize) -> Result<ValRef, String>
+    fn evaluate_of_global
+        <T,
+         F : FnOnce(&ValRef) -> Result<T, String>
+        >
+        (&self, globalvar : usize, varhandler : F) -> Result<T, String>
     {
         let var = self.global.variables.get(&globalvar).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", self.get_indexed_string(globalvar)))?;
-        Ok(var.refclone())
+        varhandler(var)
     }
-    pub(crate) fn evaluate_of_direct(&self, name : usize) -> Result<ValRef, String>
+    pub(crate) fn evaluate_of_direct
+        <T,
+         F : FnOnce(&ValRef) -> Result<T, String>,
+         F2 : FnOnce(Value) -> Result<T, String>
+        >
+        (&self, name : usize, varhandler : F, valhandler : F2) -> Result<T, String>
     {
         let mut seen_instance = false;
         if let Some(my_ref) = access_frame(&self.global, &self.top_frame, name, &mut seen_instance)
         {
-            return Ok(my_ref.refclone());
+            return match my_ref
+            {
+                Ok(Ok(scopedvar)) => varhandler(scopedvar),
+                Ok(Err(globalvar)) => varhandler(globalvar),
+                Err(globalval) => valhandler(globalval),
+            };
         }
         if !self.top_frame.impassable
         {
@@ -315,7 +304,12 @@ impl Interpreter
             {
                 if let Some(my_ref) = access_frame(&self.global, &frame, name, &mut seen_instance)
                 {
-                    return Ok(my_ref.refclone());
+                    return match my_ref
+                    {
+                        Ok(Ok(scopedvar)) => varhandler(scopedvar),
+                        Ok(Err(globalvar)) => varhandler(globalvar),
+                        Err(globalval) => valhandler(globalval),
+                    };
                 }
                 if frame.impassable { break; }
             }
@@ -323,75 +317,62 @@ impl Interpreter
         
         if let Some(var) = self.global.objectnames.get(&name)
         {
-            return Ok(ValRef::from_val(Value::Object(*var)));
+            return valhandler(Value::Object(*var));
         }
         if let Some(var) = self.global.functions.get(&name)
         {
-            return Ok(ValRef::from_val(var.clone()));
+            return valhandler(var.clone());
         }
         if self.get_binding(name).is_some() || self.get_simple_binding(name).is_some()
         {
-            return Ok(ValRef::from_val(Value::new_funcval(true, Some(name), None, None)));
-        }
-        
-        Err(format!("error: unknown identifier `{}`", self.get_indexed_string(name)))
-    }
-    pub(crate) fn evaluate_of_direct_as_val(&self, name : usize) -> Result<Value, String>
-    {
-        let mut seen_instance = false;
-        if let Some(my_ref) = access_frame_as_val(&self.global, &self.top_frame, name, &mut seen_instance)
-        {
-            return my_ref;
-        }
-        if !self.top_frame.impassable
-        {
-            for frame in self.frames.iter().rev()
-            {
-                if let Some(my_ref) = access_frame_as_val(&self.global, &frame, name, &mut seen_instance)
-                {
-                    return my_ref;
-                }
-                if frame.impassable { break; }
-            }
-        }
-        
-        if let Some(var) = self.global.objectnames.get(&name)
-        {
-            return Ok(Value::Object(*var));
-        }
-        if let Some(var) = self.global.functions.get(&name)
-        {
-            return Ok(var.clone());
-        }
-        if self.get_binding(name).is_some() || self.get_simple_binding(name).is_some()
-        {
-            return Ok(Value::new_funcval(true, Some(name), None, None));
+            return valhandler(Value::new_funcval(true, Some(name), None, None));
         }
         
         Err(format!("error: unknown identifier `{}`", self.get_indexed_string(name)))
     }
     #[inline]
-    pub (crate) fn evaluate_self(&self) -> Result<Value, String>
+    pub (crate) fn evaluate_self
+        <T,
+         F2 : FnOnce(Value) -> Result<T, String>
+        >
+        (&self, valhandler : F2) -> Result<T, String>
     {
         let id = self.top_frame.instancestack.last().ok_or_else(|| "error: tried to access `self` while not inside of instance scope".to_string())?;
-        Ok(Value::Instance(*id))
+        valhandler(Value::Instance(*id))
     }
     #[inline]
-    pub (crate) fn evaluate_other(&self) -> Result<Value, String>
+    pub (crate) fn evaluate_other
+        <T,
+         F2 : FnOnce(Value) -> Result<T, String>
+        >
+        (&self, valhandler : F2) -> Result<T, String>
     {
         let id = self.top_frame.instancestack.get(self.top_frame.instancestack.len()-2).ok_or_else(|| "error: tried to access `other` while not inside of at least two instance scopes".to_string())?;
-        Ok(Value::Instance(*id))
+        valhandler(Value::Instance(*id))
     }
-    pub (crate) fn evaluate(&self, variable : Variable) -> Result<ValRef, String>
+    pub (crate) fn evaluate
+        <T,
+         F : FnOnce(&ValRef) -> Result<T, String>,
+         F2 : FnOnce(Value) -> Result<T, String>
+        >
+        (&self, variable : Variable, varhandler : F, valhandler : F2) -> Result<T, String>
     {
         match variable
         {
-            Variable::Array(arrayvar) => self.evaluate_of_array(arrayvar),
-            Variable::Indirect(indirvar) => self.evaluate_of_indirect(indirvar),
-            Variable::Global(globalvar) => self.evaluate_of_global(globalvar),
-            Variable::Direct(name) => self.evaluate_of_direct(name),
-            Variable::Selfref => self.evaluate_self().map(|x| ValRef::from_val(x)),
-            Variable::Other => self.evaluate_other().map(|x| ValRef::from_val(x)),
+            Variable::Array(arrayvar) => self.evaluate_of_array(arrayvar, varhandler, valhandler),
+            Variable::Indirect(indirvar) => self.evaluate_of_indirect(indirvar, varhandler, valhandler),
+            Variable::Global(globalvar) => self.evaluate_of_global(globalvar, varhandler),
+            Variable::Direct(name) => self.evaluate_of_direct(name, varhandler, valhandler),
+            Variable::Selfref => self.evaluate_self(valhandler),
+            Variable::Other => self.evaluate_other(valhandler),
         }
+    }
+    pub (crate) fn evaluate_value(&self, variable : Variable) -> Result<Value, String>
+    {
+        self.evaluate(variable, |x| x.to_val(), |x| Ok(x))
+    }
+    pub (crate) fn evaluate_and_mutate<F : FnOnce(&mut Value) -> Result<(), String>>(&self, variable : Variable, mutator : F) -> Result<(), String>
+    {
+        self.evaluate(variable, |x| x.mutate(mutator), |_| Err("error: tried to mutate a literal value".to_string()))
     }
 }
