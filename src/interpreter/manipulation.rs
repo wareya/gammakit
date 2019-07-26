@@ -54,7 +54,14 @@ impl Interpreter
     {
         if self.top_frame.pc+2 > self.top_frame.code.len()
         {
-            return plainerr("error: tried to access past end of code");
+            if cfg!(code_bounds_debugging)
+            {
+                return plainerr("error: tried to access past end of code");
+            }
+            else
+            {
+                panic!("error: tried to access past end of code; {:?}", self.top_frame);
+            }
         }
         self.round_up_pc_2();
         let pc = self.top_frame.pc;
@@ -70,7 +77,14 @@ impl Interpreter
     {
         if self.top_frame.pc+8 > self.top_frame.code.len()
         {
-            return plainerr("error: tried to access past end of code");
+            if cfg!(code_bounds_debugging)
+            {
+                return plainerr("error: tried to access past end of code");
+            }
+            else
+            {
+                panic!("error: tried to access past end of code; {:?}", self.top_frame);
+            }
         }
         self.round_up_pc_8();
         let pc = self.top_frame.pc;
@@ -86,7 +100,14 @@ impl Interpreter
     {
         if self.top_frame.pc+1 > self.top_frame.code.len()
         {
-            return plainerr("error: tried to access past end of code");
+            if cfg!(code_bounds_debugging)
+            {
+                return plainerr("error: tried to access past end of code");
+            }
+            else
+            {
+                panic!("error: tried to access past end of code; {:?}", self.top_frame);
+            }
         }
         let pc = self.top_frame.pc;
         self.top_frame.pc += 1;
@@ -145,7 +166,14 @@ impl Interpreter
         let start = self.get_pc();
         if start >= self.top_frame.code.len()
         {
-            return Err("error: tried to decode a string past the end of code".to_string());
+            if cfg!(code_bounds_debugging)
+            {
+                return Err("error: tried to decode a string past the end of code".to_string());
+            }
+            else
+            {
+                panic!("error: tried to decode a string past the end of code; {:?}", self.top_frame);
+            }
         }
         
         let mut end = start+1;

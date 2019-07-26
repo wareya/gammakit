@@ -69,7 +69,7 @@ impl Interpreter
         }
         else
         {
-            return Err(format!("internal error: no such arrow function `{}`", subfuncval.name))
+            return Err(format!("error: no such arrow function `{}`", subfuncval.name))
         }
         
         Ok(())
@@ -84,7 +84,7 @@ impl Interpreter
         
         //eprintln!("{} args", argcount);
         
-        if argcount+1 > self.stack_len()
+        if cfg!(stack_len_debugging) && argcount+1 > self.stack_len()
         {
             return plainerr("internal error: fewer values on stack than expected in FUNCEXPR/FUNCCALL");
         }

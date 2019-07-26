@@ -99,7 +99,7 @@ impl Interpreter {
             opfunc_map : Interpreter::build_opfunc_table(),
             op_map_hits : BTreeMap::new(),
             op_map : BTreeMap::new(),
-            track_op_performance : true
+            track_op_performance : false
         }
     }
     /// Loads new code into the interpreter.
@@ -139,7 +139,14 @@ impl Interpreter {
         use std::time::Instant;
         if self.get_pc() < self.top_frame.startpc || self.get_pc() >= self.top_frame.endpc
         {
-            return Err(minierr("internal error: simulation stepped while outside of the range of the frame it was in"));
+            if cfg!(code_bounds_debugging)
+            {
+                return Err(minierr("internal error: simulation stepped while outside of the range of the frame it was in"));
+            }
+            else
+            {
+                panic!("internal error: simulation stepped while outside of the range of the frame it was in");
+            }
         }
         
         if !self.track_op_performance

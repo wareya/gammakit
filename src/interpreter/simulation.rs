@@ -2,6 +2,43 @@
 
 use crate::interpreter::*;
 
+#[inline]
+fn stack_access_err<S : ToString>(text : S) -> String
+{
+    if cfg!(stack_access_debugging)
+    {
+        text.to_string()
+    }
+    else
+    {
+        panic!(text.to_string())
+    }
+}
+#[inline]
+fn strange_err_plain<T, S : ToString>(text : S) -> Result<T, String>
+{
+    if cfg!(broken_compiler_debugging)
+    {
+        Err(text.to_string())
+    }
+    else
+    {
+        panic!(text.to_string())
+    }
+}
+#[inline]
+fn strange_err<S : ToString>(text : S) -> String
+{
+    if cfg!(broken_compiler_debugging)
+    {
+        text.to_string()
+    }
+    else
+    {
+        panic!(text.to_string())
+    }
+}
+
 impl Interpreter
 {
     pub (crate) fn build_opfunc_table() -> Box<[OpFunc; 256]>
@@ -77,7 +114,8 @@ impl Interpreter
     #[inline]
     pub (crate) fn run_opfunc(&mut self, op : u8) -> OpResult
     {
-        self.opfunc_map[op as usize](self)
+        let ret = self.opfunc_map[op as usize](self);
+        ret
     }
     
     pub (crate) fn sim_INVALID(&mut self) -> OpResult
@@ -114,7 +152,7 @@ impl Interpreter
         let index = self.read_usize()?;
         let var = match index
         {
-            1 => return Err("internal error: encountered `global` via pushname".to_string()),
+            1 => return strange_err_plain("internal error: encountered `global` via pushname"),
             2 => Variable::Selfref,
             3 => Variable::Other,
             _ => Variable::Direct(index)
@@ -140,7 +178,7 @@ impl Interpreter
         let index = self.read_usize()?;
         self.stack_push_val(match index
         {
-            1 => return Err("internal error: encountered `global` via pushvar".to_string()),
+            1 => return strange_err_plain("internal error: encountered `global` via pushvar"),
             2 => self.evaluate_self(|x| Ok(x))?,
             3 => self.evaluate_other(|x| Ok(x))?,
             _ => self.evaluate_of_direct(index, |x| x.to_val(), |x| Ok(x))?
@@ -150,12 +188,12 @@ impl Interpreter
     
     pub (crate) fn sim_DECLVAR(&mut self) -> OpResult
     {
-        if self.stack_len() < 1
+        if cfg!(stack_len_debugging) && self.stack_len() < 1
         {
             return plainerr("internal error: DECLVAR instruction requires 1 values on the stack but only found 0");
         }
-        let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to declare a variable with a name of invalid type"))?;
-        let scope = self.top_frame.scopes.last_mut().ok_or_else(|| minierr("internal error: there are no scopes in the top frame"))?;
+        let name = self.stack_pop_name().ok_or_else(|| stack_access_err("internal error: tried to declare a variable with a name of invalid type"))?;
+        let scope = self.top_frame.scopes.last_mut().ok_or_else(|| stack_access_err("internal error: there are no scopes in the top frame"))?;
         
         if scope.contains_key(&name)
         {
@@ -168,11 +206,11 @@ impl Interpreter
     }
     pub (crate) fn sim_DECLFAR(&mut self) -> OpResult
     {
-        if self.stack_len() < 1
+        if cfg!(stack_len_debugging) && self.stack_len() < 1
         {
             return plainerr("internal error: DECLFAR instruction requires 1 values on the stack but only found 0");
         }
-        let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to declare instance variable with non-var-name type name"))?;
+        let name = self.stack_pop_name().ok_or_else(|| stack_access_err("internal error: tried to declare instance variable with non-var-name type name"))?;
         let instance_id = self.top_frame.instancestack.last().ok_or_else(|| minierr("error: tried to declare instance variable when not executing within instance scope"))?;
         let instance = self.global.instances.get_mut(instance_id).ok_or_else(|| format!("error: tried to declare instance variable but instance of current scope ({}) no longer exists", instance_id))?;
         if instance.variables.contains_key(&name)
@@ -184,11 +222,11 @@ impl Interpreter
     }
     pub (crate) fn sim_DECLGLOBALVAR(&mut self) -> OpResult
     {
-        if self.stack_len() < 1
+        if cfg!(stack_len_debugging) && self.stack_len() < 1
         {
             return plainerr("internal error: DECLGLOBALVAR instruction requires 1 values on the stack but only found 0");
         }
-        let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to declare a global variable with a name of invalid type"))?;
+        let name = self.stack_pop_name().ok_or_else(|| stack_access_err("internal error: tried to declare a global variable with a name of invalid type"))?;
         
         if self.global.variables.contains_key(&name)
         {
@@ -201,13 +239,13 @@ impl Interpreter
     
     pub (crate) fn sim_INDIRECTION(&mut self) -> OpResult
     {
-        if self.stack_len() < 2
+        if cfg!(stack_len_debugging) && self.stack_len() < 2
         {
             return Err(format!("internal error: INDIRECTION instruction requires 2 values on the stack but only found {}", self.stack_len()));
         }
-        let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to perform INDIRECTION operation with a right-hand side that wasn't a name"))?;
+        let name = self.stack_pop_name().ok_or_else(|| stack_access_err("internal error: tried to perform INDIRECTION operation with a right-hand side that wasn't a name"))?;
         
-        let source = self.stack_pop().ok_or_else(|| minierr("internal error: failed to get source from stack in INDIRECTION operation"))?;
+        let source = self.stack_pop().ok_or_else(|| stack_access_err("internal error: failed to get source from stack in INDIRECTION operation"))?;
         
         //eprintln!("performing indirection on {:?}", source);
         match source
@@ -229,13 +267,13 @@ impl Interpreter
     }
     pub (crate) fn sim_DISMEMBER(&mut self) -> OpResult
     {
-        if self.stack_len() < 2
+        if cfg!(stack_len_debugging) && self.stack_len() < 2
         {
             return Err(format!("internal error: DISMEMBER instruction requires 2 values on the stack but only found {}", self.stack_len()));
         }
-        let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: tried to perform DISMEMBER operation with a right-hand side that wasn't a name"))?;
+        let name = self.stack_pop_name().ok_or_else(|| stack_access_err("internal error: tried to perform DISMEMBER operation with a right-hand side that wasn't a name"))?;
         // FIXME support indirection into fake member functions
-        let source = self.stack_pop().ok_or_else(|| minierr("internal error: failed to get source from stack in DISMEMBER operation"))?;
+        let source = self.stack_pop().ok_or_else(|| stack_access_err("internal error: failed to get source from stack in DISMEMBER operation"))?;
         //eprintln!("dismembering into {:?}", source);
         
         self.stack_push_val(Value::SubFunc(Box::new(SubFuncVal{source, name})));
@@ -243,11 +281,11 @@ impl Interpreter
     }
     pub (crate) fn sim_EVALUATION(&mut self) -> OpResult
     {
-        if self.stack_len() < 1
+        if cfg!(stack_len_debugging) && self.stack_len() < 1
         {
             return Err(format!("internal error: EVALUATION instruction requires 1 values on the stack but only found {}", self.stack_len()));
         }
-        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: failed to find a variable on the stack in EVALUATION"))?;
+        let var = self.stack_pop_var().ok_or_else(|| stack_access_err("internal error: failed to find a variable on the stack in EVALUATION"))?;
         let value = self.evaluate_value(var)?;
         self.stack_push_val(value);
         Ok(())
@@ -262,7 +300,7 @@ impl Interpreter
     }
     pub (crate) fn sim_INVOKE(&mut self) -> OpResult
     {
-        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: not enough variables on stack to run instruction INVOKE"))?;
+        let var = self.stack_pop_var().ok_or_else(|| stack_access_err("internal error: not enough variables on stack to run instruction INVOKE"))?;
         let val = self.evaluate_value(var.clone())?;
         
         if let Value::Generator(generator_state) = val
@@ -280,13 +318,13 @@ impl Interpreter
     }
     pub (crate) fn sim_INVOKECALL(&mut self) -> OpResult
     {
-        if self.stack_len() < 3
+        if cfg!(stack_len_debugging) && self.stack_len() < 3
         {
             return Err(format!("internal error: INVOKECALL instruction requires 3 values on the stack but found {}", self.stack_len()));
         }
-        let generator = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 1 to INVOKECALL must be a value"))?;
-        let _yielded = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 2 to INVOKECALL must be a value"))?;
-        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: stack argument 3 to INVOKECALL must be a variable"))?;
+        let generator = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: stack argument 1 to INVOKECALL must be a value"))?;
+        let _yielded = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: stack argument 2 to INVOKECALL must be a value"))?;
+        let var = self.stack_pop_var().ok_or_else(|| stack_access_err("internal error: stack argument 3 to INVOKECALL must be a variable"))?;
         
         self.evaluate_and_mutate(var, move |var|
         {
@@ -298,13 +336,13 @@ impl Interpreter
     }
     pub (crate) fn sim_INVOKEEXPR(&mut self) -> OpResult
     {
-        if self.stack_len() < 3
+        if cfg!(stack_len_debugging) && self.stack_len() < 3
         {
             return Err(format!("internal error: INVOKEEXPR instruction requires 3 values on the stack but found {}", self.stack_len()));
         }
-        let generator = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 1 to INVOKEEXPR must be a value"))?;
-        let yielded = self.stack_pop_val().ok_or_else(|| minierr("internal error: stack argument 2 to INVOKEEXPR must be a value"))?;
-        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: stack argument 3 to INVOKEEXPR must be a variable"))?;
+        let generator = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: stack argument 1 to INVOKEEXPR must be a value"))?;
+        let yielded = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: stack argument 2 to INVOKEEXPR must be a value"))?;
+        let var = self.stack_pop_var().ok_or_else(|| stack_access_err("internal error: stack argument 3 to INVOKEEXPR must be a variable"))?;
         
         self.evaluate_and_mutate(var, move |var|
         {
@@ -322,7 +360,14 @@ impl Interpreter
         self.top_frame.scopes.push(BTreeMap::new());
         if self.top_frame.scopes.len() >= 0x10000
         {
-            return Err(format!("error: scope recursion limit of 0x10000 reached at line {}\n(note: use more functions!)", self.top_frame.currline));
+            if cfg!(scope_overflow_debugging)
+            {
+                return Err(format!("error: scope recursion limit of 0x10000 reached at line {}\n(note: use more functions!)", self.top_frame.currline));
+            }
+            else
+            {
+                return Err(format!("error: scope recursion limit of 0x10000 reached at line {}\n(note: use more functions!)", self.top_frame.currline));
+            }
         }
         Ok(())
     }
@@ -372,11 +417,11 @@ impl Interpreter
     }
     pub (crate) fn sim_IF(&mut self) -> OpResult
     {
-        if self.stack_len() < 1
+        if cfg!(stack_len_debugging) && self.stack_len() < 1
         {
             return plainerr("internal error: IF instruction requires 1 values on the stack but found 0");
         }
-        let testval = self.stack_pop_val().ok_or_else(|| minierr("internal error: failed to find value on stack while handling IF controller"))?;
+        let testval = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: failed to find value on stack while handling IF controller"))?;
         let codelen = self.read_usize()?;
         if !value_truthy(&testval)
         {
@@ -415,13 +460,13 @@ impl Interpreter
     }
     pub (crate) fn sim_FOREACH(&mut self) -> OpResult
     {
-        if self.stack_len() < 2
+        if cfg!(stack_len_debugging) && self.stack_len() < 2
         {
             return Err(format!("internal error: FOREACH instruction requires 2 values on the stack but found {}", self.stack_len()));
         }
         
-        let mut val = self.stack_pop_val().ok_or_else(|| minierr("internal error: foreach loop was fed a variable of some sort, instead of a value, for what to loop over"))?;
-        let name = self.stack_pop_name().ok_or_else(|| minierr("internal error: foreach loop was fed a non-name stack value"))?;
+        let mut val = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: foreach loop was fed a variable of some sort, instead of a value, for what to loop over"))?;
+        let name = self.stack_pop_name().ok_or_else(|| stack_access_err("internal error: foreach loop was fed a non-name stack value"))?;
         
         let list : ForEachValues = match val
         {
@@ -458,7 +503,7 @@ impl Interpreter
     }
     pub (crate) fn sim_WITH(&mut self) -> OpResult
     {
-        if self.stack_len() < 1
+        if cfg!(stack_len_debugging) && self.stack_len() < 1
         {
             return plainerr("internal error: WITH instruction requires 1 values on the stack but found 0");
         }
@@ -479,7 +524,7 @@ impl Interpreter
                     scopes : self.top_frame.scopes.len() as u16,
                     loop_start : current_pc,
                     loop_end : current_pc + codelen,
-                    instances : instance_id_list.get(1..).ok_or_else(|| minierr("internal error: inaccessible error in sim_WITH"))?.iter().rev().map(|id| Value::Number(*id as f64)).collect()
+                    instances : instance_id_list.get(1..).unwrap().iter().rev().map(|id| Value::Number(*id as f64)).collect()
                 }));
             }
             else
@@ -510,11 +555,11 @@ impl Interpreter
     pub (crate) fn sim_SWITCH(&mut self) -> OpResult
     {
         //eprintln!("hit sim_switch");
-        if self.stack_len() < 1
+        if cfg!(stack_len_debugging) && self.stack_len() < 1
         {
             return plainerr("internal error: SWITCH instruction requires 1 values on the stack but found 0");
         }
-        let value = self.stack_pop_val().ok_or_else(|| minierr("internal error: switch expression was a variable instead of a value"))?;
+        let value = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: switch expression was a variable instead of a value"))?;
         
         let num_cases = self.read_u16()?;
         let current_pc = self.get_pc();
@@ -540,16 +585,16 @@ impl Interpreter
     }
     pub (crate) fn sim_SWITCHCASE(&mut self) -> OpResult
     {
-        if self.stack_len() < 1
+        if cfg!(stack_len_debugging) && self.stack_len() < 1
         {
             return plainerr("internal error: SWITCHCASE instruction requires 1 values on the stack but found 0");
         }
-        let value = self.stack_pop_val().ok_or_else(|| minierr("internal error: switch case expression was a variable instead of a value"))?;
+        let value = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: switch case expression was a variable instead of a value"))?;
         
         let which_case = self.read_u16()?;
         
-        let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref x)) => x, minierr("internal error: SWITCHCASE instruction outside of switch statement"))?;
-        let dest = *switchdata.blocks.get(which_case as usize).ok_or_else(|| minierr("internal error: which_case in SWITCHCASE was too large"))?;
+        let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref x)) => x, strange_err("internal error: SWITCHCASE instruction outside of switch statement"))?;
+        let dest = *switchdata.blocks.get(which_case as usize).ok_or_else(|| strange_err("internal error: which_case in SWITCHCASE was too large"))?;
         
         if ops::value_equal(&value, &switchdata.value)?
         {
@@ -562,15 +607,15 @@ impl Interpreter
     pub (crate) fn sim_SWITCHDEFAULT(&mut self) -> OpResult
     {
         let which_case = self.read_u16()?;
-        let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref x)) => x, minierr("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
-        let dest = *switchdata.blocks.get(which_case as usize).ok_or_else(|| minierr("internal error: which_case in SWITCHDEFAULT was too large"))?;
+        let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref x)) => x, strange_err("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
+        let dest = *switchdata.blocks.get(which_case as usize).ok_or_else(|| strange_err("internal error: which_case in SWITCHDEFAULT was too large"))?;
         self.set_pc(dest);
         
         Ok(())
     }
     pub (crate) fn sim_SWITCHEXIT(&mut self) -> OpResult
     {
-        let switchdata = match_or_err!(self.top_frame.controlstack.pop(), Some(Controller::Switch(x)) => x, minierr("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
+        let switchdata = match_or_err!(self.top_frame.controlstack.pop(), Some(Controller::Switch(x)) => x, strange_err("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
         self.set_pc(switchdata.exit);
         
         Ok(())
@@ -625,16 +670,16 @@ impl Interpreter
     
     pub (crate) fn sim_BINSTATE(&mut self) -> OpResult
     {
-        if self.stack_len() < 2
+        if cfg!(stack_len_debugging) && self.stack_len() < 2
         {
             return Err(format!("internal error: BINSTATE instruction requires 2 values on the stack but found {}", self.stack_len()));
         }
         
         let immediate = self.pull_single_from_code()?;
         
-        let value = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction BINSTATE (this error should be inaccessible)"))?;
+        let value = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: not enough values on stack to run instruction BINSTATE (this error should be inaccessible)"))?;
         
-        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: primary argument to BINSTATE could not be found or was not a variable"))?;
+        let var = self.stack_pop_var().ok_or_else(|| stack_access_err("internal error: primary argument to BINSTATE could not be found or was not a variable"))?;
         
         if immediate == 0x00
         {
@@ -656,14 +701,14 @@ impl Interpreter
     }
     pub (crate) fn sim_UNSTATE(&mut self) -> OpResult
     {
-        if self.stack_len() < 1
+        if cfg!(stack_len_debugging) && self.stack_len() < 1
         {
             return Err(format!("internal error: UNSTATE instruction requires 2 values on the stack but found {}", self.stack_len()));
         }
         
         let immediate = self.pull_single_from_code()?;
         
-        let var = self.stack_pop_var().ok_or_else(|| minierr("internal error: argument to UNSTATE could not be found or was not a variable"))?;
+        let var = self.stack_pop_var().ok_or_else(|| stack_access_err("internal error: argument to UNSTATE could not be found or was not a variable"))?;
         self.evaluate_and_mutate(var, |val| 
         {
             *val = do_unstate_function(immediate, val)?;
@@ -674,15 +719,15 @@ impl Interpreter
     
     pub (crate) fn sim_BINOP(&mut self) -> OpResult
     {
-        if self.stack_len() < 2
+        if cfg!(stack_len_debugging) && self.stack_len() < 2
         {
             return Err(format!("internal error: BINOP instruction requires 2 values on the stack but found {}", self.stack_len()));
         }
         
         let immediate = self.pull_single_from_code()?;
         
-        let right = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction BINOP (this error should be inaccessible!)"))?;
-        let left = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction BINOP (this error should be inaccessible!)"))?;
+        let right = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: not enough values on stack to run instruction BINOP (this error should be inaccessible!)"))?;
+        let left = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: not enough values on stack to run instruction BINOP (this error should be inaccessible!)"))?;
         
         self.stack_push_val(do_binop_function(immediate, &left, &right)?);
         Ok(())
@@ -690,11 +735,11 @@ impl Interpreter
     
     fn handle_short_circuit(&mut self, truthiness : bool) -> OpResult
     {
-        if self.stack_len() < 1
+        if cfg!(stack_len_debugging) && self.stack_len() < 1
         {
             return Err(format!("internal error: short circuit instruction requires 1 values on the stack but found {}", self.stack_len()))
         }
-        let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: left operand of binary logical operator was a variable instead of a value"))?;
+        let val = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: left operand of binary logical operator was a variable instead of a value"))?;
         
         let rel = self.read_usize()?;
         
@@ -723,14 +768,14 @@ impl Interpreter
     
     pub (crate) fn sim_UNOP(&mut self) -> OpResult
     {
-        if self.stack_len() < 1
+        if cfg!(stack_len_debugging) && self.stack_len() < 1
         {
             return Err(format!("internal error: UNOP instruction requires 1 values on the stack but found {}", self.stack_len()))
         }
         
         let immediate = self.pull_single_from_code()?;
         
-        let value = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction UNOP (this error should be inaccessible!)"))?;
+        let value = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: not enough values on stack to run instruction UNOP (this error should be inaccessible!)"))?;
         let new_value = do_unop_function(immediate, &value)?;
         self.stack_push_val(new_value);
         Ok(())
@@ -782,7 +827,7 @@ impl Interpreter
         let mut myarray = Vec::with_capacity(numvals);
         for _ in 0..numvals
         {
-            let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTARRAY instruction failed to collect values from stack (this error should be unreachable!)"))?;
+            let val = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: COLLECTARRAY instruction failed to collect values from stack (this error should be unreachable!)"))?;
             myarray.push(val);
         }
         myarray.reverse();
@@ -792,7 +837,7 @@ impl Interpreter
     pub (crate) fn sim_COLLECTDICT(&mut self) -> OpResult
     {
         let numvals = self.read_u16()? as usize;
-        if self.stack_len() < numvals*2
+        if cfg!(stack_len_debugging) && self.stack_len() < numvals*2
         {
             return Err(format!("internal error: not enough values on stack for COLLECTDICT instruction to build dict (need {}, have {})", numvals*2, self.stack_len()));
         }
@@ -800,8 +845,8 @@ impl Interpreter
         let mut mydict = HashMap::<HashableValue, Value>::new();
         for _ in 0..numvals
         {
-            let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTDICT instruction failed to collect values from stack"))?;
-            let key = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTDICT instruction failed to collect values from stack"))?;
+            let val = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: COLLECTDICT instruction failed to collect values from stack"))?;
+            let key = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: COLLECTDICT instruction failed to collect values from stack"))?;
             let hashval = val_to_hashval(key)?;
             // stack popping goes in reverse order (most-recently added items first) so we just don't insert items that are already there
             if !mydict.contains_key(&hashval)
@@ -815,7 +860,7 @@ impl Interpreter
     pub (crate) fn sim_COLLECTSET(&mut self) -> OpResult
     {
         let numvals = self.read_u16()? as usize;
-        if self.stack_len() < numvals
+        if cfg!(stack_len_debugging) && self.stack_len() < numvals
         {
             return Err(format!("internal error: not enough values on stack for COLLECTSET instruction to build dict (need {}, have {})", numvals, self.stack_len()));
         }
@@ -823,7 +868,7 @@ impl Interpreter
         let mut myset = HashSet::<HashableValue>::new();
         for _ in 0..numvals
         {
-            let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: COLLECTSET instruction failed to collect values from stack"))?;
+            let val = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: COLLECTSET instruction failed to collect values from stack"))?;
             myset.insert(val_to_hashval(val)?);
         }
         self.stack_push_val(Value::Set(Box::new(myset)));
@@ -831,13 +876,13 @@ impl Interpreter
     }
     pub (crate) fn sim_ARRAYEXPR(&mut self) -> OpResult
     {
-        if self.stack_len() < 2
+        if cfg!(stack_len_debugging) && self.stack_len() < 2
         {
             return Err(format!("internal error: ARRAYEXPR instruction requires 2 values on the stack but found {}", self.stack_len()));
         }
-        let index = self.stack_pop_val().ok_or_else(|| minierr("internal error: TODO write error askdgfauiowef"))?;
+        let index = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: TODO write error askdgfauiowef"))?;
         let index = val_to_hashval(index)?;
-        let array = self.stack_pop().ok_or_else(|| minierr("internal error: TODO write error cvbhsrtgaerffd"))?;
+        let array = self.stack_pop().ok_or_else(|| stack_access_err("internal error: TODO write error cvbhsrtgaerffd"))?;
         match array
         {
             StackValue::Var(Variable::Array(mut arrayvar)) =>
@@ -868,7 +913,7 @@ impl Interpreter
         {
             let dest = data.loop_end;
             let todrain = data.scopes;
-            let testval = self.stack_pop_val().ok_or_else(|| minierr("internal error: failed to find value on stack while handling WHILE controller"))?;
+            let testval = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: failed to find value on stack while handling WHILE controller"))?;
             if !value_truthy(&testval)
             {
                 self.set_pc(dest);
@@ -907,7 +952,7 @@ impl Interpreter
                 }
                 else
                 {
-                    return plainerr("internal error: values fed to with controller's 'other' data must be a list of only numbers");
+                    return strange_err_plain("internal error: values fed to with controller's 'other' data must be a list of only numbers");
                 }
             }
             else
@@ -916,7 +961,7 @@ impl Interpreter
             }
             return Ok(());
         }
-        plainerr("internal error: WITHLOOP instruction when immediate controller is not a with controller")
+        strange_err_plain("internal error: WITHLOOP instruction when immediate controller is not a with controller")
     }
     pub (crate) fn sim_FOREACHLOOP(&mut self) -> OpResult
     {
@@ -944,7 +989,7 @@ impl Interpreter
             self.drain_scopes(todrain);
             return Ok(());
         }
-        plainerr("internal error: FOREACHLOOP instruction when immediate controller is not a foreach controller")
+        strange_err_plain("internal error: FOREACHLOOP instruction when immediate controller is not a foreach controller")
     }
     pub (crate) fn sim_FOREACHHEAD(&mut self) -> OpResult
     {
@@ -963,7 +1008,7 @@ impl Interpreter
                         }
                         else
                         {
-                            return plainerr("internal error: failed to recover generator state in foreach loop over generator");
+                            return strange_err_plain("internal error: failed to recover generator state in foreach loop over generator");
                         }
                         self.stack_pop_val()
                     }
@@ -980,7 +1025,7 @@ impl Interpreter
             }
             return Ok(());
         }
-        plainerr("internal error: FOREACHHEAD instruction when immediate controller is not a foreach controller")
+        strange_err_plain("internal error: FOREACHHEAD instruction when immediate controller is not a foreach controller")
     }
     pub (crate) fn sim_JUMPRELATIVE(&mut self) -> OpResult
     {
@@ -1005,7 +1050,7 @@ impl Interpreter
                 self.stack_push_val(Value::Generator(Box::new(GeneratorState{frame : None})));
                 if !frame_was_expr
                 {
-                    return plainerr("internal error: generators must always return into an expression");
+                    return strange_err_plain("internal error: generators must always return into an expression");
                 }
             }
         }
@@ -1023,7 +1068,7 @@ impl Interpreter
             let inner_frame_stack_last = self.stack_pop();
             let frame_was_expr = self.top_frame.isexpr;
             self.top_frame = old_frame;
-            
+
             if frame_was_expr
             {
                 let val = inner_frame_stack_last.ok_or_else(|| minierr("error: RETURN instruction needed a value remaining on the inner frame's stack, but there were none"))?;
@@ -1034,7 +1079,7 @@ impl Interpreter
                 self.stack_push_val(Value::Generator(Box::new(GeneratorState{frame : None})));
                 if !frame_was_expr
                 {
-                    return plainerr("internal error: generators must always return into an expression");
+                    return strange_err_plain("internal error: generators must always return into an expression");
                 }
             }
         }
@@ -1066,7 +1111,7 @@ impl Interpreter
         }
         else
         {
-            return plainerr("internal error: generators must always return into an expression");
+            return strange_err_plain("internal error: generators must always return into an expression");
         }
         Ok(())
     }

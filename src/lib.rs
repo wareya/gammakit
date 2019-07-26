@@ -78,8 +78,7 @@ mod tests {
         let mut interpreter = Interpreter::new(&code, Some(parser));
         interpreter.insert_default_bindings();
         
-        while interpreter.step().is_ok(){}
-        
+        interpreter.step_until_error_or_exit().ok();
         if let Some(err) = &interpreter.last_error
         {
             panic!("{}", err);
