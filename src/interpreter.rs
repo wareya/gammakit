@@ -139,7 +139,7 @@ impl Interpreter {
         use std::time::Instant;
         if self.get_pc() < self.top_frame.startpc || self.get_pc() >= self.top_frame.endpc
         {
-            if cfg!(code_bounds_debugging)
+            if true || cfg!(code_bounds_debugging)
             {
                 return Err(minierr("internal error: simulation stepped while outside of the range of the frame it was in"));
             }

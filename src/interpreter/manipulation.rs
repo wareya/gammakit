@@ -135,15 +135,15 @@ impl Interpreter
     }
     pub (crate) fn read_u16(&mut self) -> Result<u16, String>
     {
-        Ok(unpack_u16(self.pull_2_from_code()?)?)
+        Ok(unpack_u16(self.pull_2_from_code()?))
     }
     pub (crate) fn read_usize(&mut self) -> Result<usize, String>
     {
-        Ok(unpack_u64(self.pull_8_from_code()?)? as usize)
+        Ok(unpack_u64(self.pull_8_from_code()?) as usize)
     }
     pub (crate) fn read_float(&mut self) -> Result<f64, String>
     {
-        Ok(unpack_f64(self.pull_8_from_code()?)?)
+        Ok(unpack_f64(self.pull_8_from_code()?))
     }
     pub (crate) fn read_string_index(&mut self) -> Result<usize, String>
     {
