@@ -46,6 +46,7 @@ pub (crate) const INVOKEEXPR : u8 = 0x28;
 pub (crate) const DECLVAR : u8 = 0x30;
 pub (crate) const DECLFAR : u8 = 0x31;
 pub (crate) const DECLGLOBALVAR : u8 = 0x32;
+pub (crate) const DECLBAREGLOBALVAR : u8 = 0x33;
 
 pub (crate) const BINSTATE : u8 = 0x40;
 pub (crate) const UNSTATE : u8 = 0x41;

@@ -184,6 +184,7 @@ impl CompilerState {
         self.add_hook(&"funcdef", &CompilerState::compile_funcdef);
         self.add_hook(&"withstatement", &CompilerState::compile_with);
         self.add_hook(&"declaration", &CompilerState::compile_declaration);
+        self.add_hook(&"bareglobaldec", &CompilerState::compile_bareglobaldec);
         self.add_hook(&"binstate", &CompilerState::compile_binstate);
         self.add_hook(&"unstate", &CompilerState::compile_unstate);
         self.add_hook(&"lvar", &CompilerState::compile_lvar);
@@ -794,6 +795,13 @@ impl CompilerState {
                 self.code.push(0x00);
             }
         }
+        Ok(())
+    }
+    fn compile_bareglobaldec(&mut self, ast : &ASTNode) -> Result<(), String>
+    {
+        self.compile_pushname(&ast.child(2)?.child(0)?.text)?;
+        self.compile_nth_child(ast, 4)?;
+        self.code.push(DECLBAREGLOBALVAR);
         Ok(())
     }
     fn compile_binstate(&mut self, ast : &ASTNode) -> Result<(), String>

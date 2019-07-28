@@ -43,6 +43,7 @@ struct GlobalState {
     objects: BTreeMap<usize, ObjSpec>,
     parser: Option<Parser>,
     variables: BTreeMap<usize, ValRef>, // accessed as global.varname
+    barevariables: BTreeMap<usize, ValRef>, // accessed as varname
     functions: BTreeMap<usize, Value>, // accessed as funcname
 }
 
@@ -58,6 +59,7 @@ impl GlobalState {
             objects : BTreeMap::new(),
             parser,
             variables : BTreeMap::new(),
+            barevariables : BTreeMap::new(),
             functions : BTreeMap::new(),
         }
     }

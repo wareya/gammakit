@@ -12,6 +12,9 @@ string: TOKEN
 name: TOKEN
 %[a-zA-Z_][0-9a-zA-Z_]*%
 
+capsname: TOKEN
+%[A-Z][0-9a-zA-Z_]*%
+
 arglist:
 $expr$...,
 
@@ -169,6 +172,7 @@ statement:
 $blankstatement$
 $statementlist$
 $declaration$ ;
+$bareglobaldec$ ;
 $condition$
 $foreach$
 $withstatement$
@@ -206,6 +210,7 @@ while $parenexpr$ $block$
 barestatement:
 $statementlist$
 $declaration$
+$bareglobaldec$
 $binstate$
 $unstate$
 $funccall$
@@ -236,6 +241,9 @@ declaration:
 var $declname$...,
 far $declname$...,
 globalvar $declname$...,
+
+bareglobaldec:
+bare globalvar $capsname$ = $expr$
 
 declname:
 $name$ >>? = $expr$

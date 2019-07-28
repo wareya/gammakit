@@ -693,7 +693,7 @@ impl Parser {
                         }
                         if let Some(line) = lines.get(linenum-1)
                         {
-                            println!("context on line {}:\n{}\n{}^", linenum, line, " ".repeat(position));
+                            println!("context on line {}:\n{}\n{}^", linenum, line, " ".repeat(position-1));
                         }
                         else
                         {

@@ -58,6 +58,7 @@ impl Interpreter
         set!(DECLVAR, sim_DECLVAR);
         set!(DECLFAR, sim_DECLFAR);
         set!(DECLGLOBALVAR, sim_DECLGLOBALVAR);
+        set!(DECLBAREGLOBALVAR, sim_DECLBAREGLOBALVAR);
         set!(BINSTATE, sim_BINSTATE);
         set!(UNSTATE, sim_UNSTATE);
         set!(BINOP, sim_BINOP);
@@ -233,6 +234,23 @@ impl Interpreter
             return Err(format!("error: redeclared global variable {}", self.get_indexed_string(name)))
         }
         self.global.variables.insert(name, ValRef::from_val(Value::Number(0.0)));
+        
+        Ok(())
+    }
+    pub (crate) fn sim_DECLBAREGLOBALVAR(&mut self) -> OpResult
+    {
+        if cfg!(stack_len_debugging) && self.stack_len() < 2
+        {
+            return Err(format!("internal error: DECLBAREGLOBALVAR instruction requires 2 values on the stack but only found {}", self.stack_len()));
+        }
+        let value = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: tried to assign a bare global variable with an invalid value"))?;
+        let name = self.stack_pop_name().ok_or_else(|| stack_access_err("internal error: tried to declare a bare global variable with a name of invalid type"))?;
+        
+        if self.global.barevariables.contains_key(&name)
+        {
+            return Err(format!("error: redeclared bare global variable {}", self.get_indexed_string(name)))
+        }
+        self.global.barevariables.insert(name, ValRef::from_val_readonly(value));
         
         Ok(())
     }

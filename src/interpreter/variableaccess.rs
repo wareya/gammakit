@@ -315,6 +315,10 @@ impl Interpreter
             }
         }
         
+        if let Some(var) = self.global.barevariables.get(&name)
+        {
+            return varhandler(var);
+        }
         if let Some(var) = self.global.objectnames.get(&name)
         {
             return valhandler(Value::Object(*var));

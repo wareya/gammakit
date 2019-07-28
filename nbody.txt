@@ -1,5 +1,5 @@
 var PI = 3.141592653589793;
-var SOLAR_MASS = PI*PI*4;
+bare globalvar SOLAR_MASS = PI*PI*4;
 var DAYS_PER_YEAR = 365.24;
 
 var bodies = [];
@@ -55,9 +55,9 @@ bodies->push({
     "mass": 5.15138902046611451e-05 * SOLAR_MASS
 });
 
-globalvar NUM_BODIES = bodies->len();
+bare globalvar NUM_BODIES = bodies->len();
 print("num bodies:");
-print(global.NUM_BODIES);
+print(NUM_BODIES);
 
 globalvar x = [];
 globalvar y = [];
@@ -66,7 +66,7 @@ globalvar xv = [];
 globalvar yv = [];
 globalvar zv = [];
 globalvar mass = [];
-for(var i = 0; i < global.NUM_BODIES; i++)
+for(var i = 0; i < NUM_BODIES; i++)
 {
     global.x->push(bodies[i]{x});
     global.y->push(bodies[i]{y});
@@ -81,9 +81,9 @@ bodies = [];
 
 def advance(delta)
 {
-    for(var i = 0; i < global.NUM_BODIES; i++)
+    for(var i = 0; i < NUM_BODIES; i++)
     {
-        for(var j = i+1; j < global.NUM_BODIES; j++)
+        for(var j = i+1; j < NUM_BODIES; j++)
         {
             var dx = global.x[i] - global.x[j];
             var dy = global.y[i] - global.y[j];
@@ -101,7 +101,7 @@ def advance(delta)
             global.zv[j] += pi * dz;
         }
     }
-    for(var i = 0; i < global.NUM_BODIES; i++)
+    for(var i = 0; i < NUM_BODIES; i++)
     {
         global.x[i] += global.xv[i] * delta;
         global.y[i] += global.yv[i] * delta;
@@ -111,7 +111,7 @@ def advance(delta)
 def energy()
 {
     var e = 0;
-    for(var i = 0; i < global.NUM_BODIES; i++)
+    for(var i = 0; i < NUM_BODIES; i++)
     {
         e += ( global.mass[i]
              * ( global.xv[i] * global.xv[i]
@@ -119,7 +119,7 @@ def energy()
                + global.zv[i] * global.zv[i]
                )
              ) / 2;
-        for(var j = i+1; j < global.NUM_BODIES; j++)
+        for(var j = i+1; j < NUM_BODIES; j++)
         {
             var dx = global.x[i] - global.x[j];
             var dy = global.y[i] - global.y[j];
@@ -130,10 +130,10 @@ def energy()
     }
     return e;
 }
-subdef offset_momentum()
+def offset_momentum()
 {
     var px = 0, py = 0, pz = 0;
-    for(var i = 0; i < global.NUM_BODIES; i++)
+    for(var i = 0; i < NUM_BODIES; i++)
     {
         px += global.xv[i] * global.mass[i];
         py += global.yv[i] * global.mass[i];
