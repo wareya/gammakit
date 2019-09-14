@@ -151,14 +151,14 @@ impl Interpreter
     }
     
     #[inline]
-    pub (crate) fn get_string_index(&self, string : &String) -> usize
+    pub (crate) fn get_string_index(&mut self, string : &String) -> usize
     {
-        self.top_frame.code.get_string_index(string)
+        self.global.get_string_index(string)
     }
     #[inline]
     pub (crate) fn get_indexed_string(&self, index : usize) -> String
     {
-        self.top_frame.code.get_string(index)
+        self.global.get_string(index)
     }
     
     pub (crate) fn read_string(&mut self) -> Result<String, String>
@@ -185,25 +185,29 @@ impl Interpreter
         self.set_pc(end+1);
         Ok(String::from_utf8_lossy(&self.top_frame.code[start..end]).to_string())
     }
-    pub (crate) fn read_function(&mut self, subroutine : bool, generator : bool) -> Result<(usize, FuncSpec), String>
+    pub (crate) fn read_function(&mut self, generator : bool) -> Result<FuncSpec, String>
+    {
+        let argcount = self.read_u16()? as usize;
+        let bodylen = self.read_usize()?;
+        
+        let startaddr = self.get_pc();
+        self.add_pc(bodylen);
+        
+        Ok(FuncSpec { argcount, code : self.top_frame.code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, generator })
+    }
+    pub (crate) fn read_named_function(&mut self, generator : bool) -> Result<(usize, FuncSpec), String>
     {
         let name = self.read_string_index()?;
         let argcount = self.read_u16()? as usize;
         let bodylen = self.read_usize()?;
         
-        let mut args = Vec::with_capacity(argcount);
-        for _ in 0..argcount
-        {
-            args.push(self.read_string_index()?);
-        }
-        
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        Ok((name, FuncSpec { varnames : args, code : self.top_frame.code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : !subroutine, generator }))
+        Ok((name, FuncSpec { argcount, code : self.top_frame.code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, generator }))
     }
     
-    pub (crate) fn read_lambda(&mut self) -> Result<(BTreeMap<usize, ValRef>, FuncSpec), String>
+    pub (crate) fn read_lambda(&mut self) -> Result<(Vec<Value>, FuncSpec), String>
     {
         let capturecount = self.read_usize()?;
         
@@ -212,32 +216,20 @@ impl Interpreter
             return Err(format!("internal error: not enough values on stack to satisfy requirements of read_lambda (need {}, have {})", capturecount, self.top_frame.stack.len()));
         }
         
-        let mut captures = BTreeMap::new();
+        let mut captures = Vec::new();
         for _i in 0..capturecount
         {
             let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: read_lambda failed to collect capture value from stack"))?;
-            let name = self.read_usize()?;
-            
-            if captures.contains_key(&name)
-            {
-                return Err(format!("error: duplicate capture variable name `{}` in lambda capture expression", name));
-            }
-            captures.insert(name, ValRef::from_val(val));
+            captures.push(val);
         }
         
         let argcount = self.read_u16()? as usize;
         let bodylen = self.read_usize()?;
         
-        let mut args = Vec::with_capacity(argcount);
-        for _ in 0..argcount
-        {
-            args.push(self.read_string_index()?);
-        }
-        
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        Ok((captures, FuncSpec { varnames : args, code : self.top_frame.code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, impassable : true, generator : false }))
+        Ok((captures, FuncSpec { argcount, code : self.top_frame.code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, generator : false }))
     }
     
     #[inline]
@@ -247,12 +239,9 @@ impl Interpreter
     }
     
     #[inline]
-    pub (crate) fn drain_scopes(&mut self, desired_depth : u16)
+    pub (crate) fn drain_vars(&mut self, desired_count : u64)
     {
-        while self.top_frame.scopes.len() > desired_depth as usize
-        {
-            self.top_frame.scopes.pop();
-        }
+        self.top_frame.variables.truncate(desired_count as usize);
     }
     #[inline]
     pub (crate) fn pop_controlstack_until_loop(&mut self)

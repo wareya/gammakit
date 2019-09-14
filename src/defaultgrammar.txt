@@ -176,8 +176,10 @@ $bareglobaldec$ ;
 $condition$
 $foreach$
 $withstatement$
+$withasstatement$
 $switch$
 $funcdef$
+$globalfuncdef$
 $objdef$
 $binstate$ ;
 $unstate$ ;
@@ -185,8 +187,21 @@ $instruction$ ;
 $funccall$ ;
 $invocation_call$ ;
 
+objvardef:
+var $name$..., ;
+
+objfuncdef:
+def $name$ ( $funcdefargs$ ) { $funcdefstatements$ }
+
+objpart:
+$objvardef$
+$objfuncdef$
+
+objparts:
+$objpart$*
+
 objdef:
-obj $name$ { $funcdef$* }
+obj $name$ { $objparts$ }
 
 instruction:
 break
@@ -202,7 +217,10 @@ $whilecondition$
 $forcondition$
 
 withstatement:
-with $parenexpr$ $block$
+with ( $name$ ) $block$
+
+withasstatement:
+with ( $expr$ as $name$ ) $block$
 
 whilecondition:
 while $parenexpr$ $block$
@@ -239,7 +257,6 @@ $statement$
 
 declaration:
 var $declname$...,
-far $declname$...,
 globalvar $declname$...,
 
 bareglobaldec:
@@ -250,8 +267,6 @@ $name$ >>? = $expr$
 
 funcdeftoken:
 def
-subdef
-globaldef
 generator
 
 funcdefargs:
@@ -262,6 +277,9 @@ $statement$*
 
 funcdef:
 $funcdeftoken$ $name$ ( $funcdefargs$ ) { $funcdefstatements$ }
+
+globalfuncdef:
+globaldef $name$ ( $funcdefargs$ ) { $funcdefstatements$ }
 
 binstateop:
 =

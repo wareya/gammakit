@@ -31,27 +31,36 @@ pub (crate) fn unpack_f64(vec : [u8; 8]) ->  f64
 pub (crate) const NOP : u8 = 0x00;
 
 pub (crate) const PUSHFLT : u8 = 0x10;
-pub (crate) const PUSHSHORT : u8 = 0x11;
-pub (crate) const PUSHSTR : u8 = 0x12;
-pub (crate) const PUSHVAR : u8 = 0x13;
-pub (crate) const PUSHNAME : u8 = 0x14;
-pub (crate) const PUSHGLOBAL : u8 = 0x15;
-pub (crate) const PUSHGLOBALVAL : u8 = 0x16;
+pub (crate) const PUSHSTR : u8 = 0x11;
+
+pub (crate) const PUSHVAR : u8 = 0x15;
+pub (crate) const PUSHGLOBAL : u8 = 0x16;
+pub (crate) const PUSHGLOBALVAL : u8 = 0x17;
+pub (crate) const PUSHGLOBALFUNC : u8 = 0x18;
+pub (crate) const PUSHBAREGLOBAL : u8 = 0x19;
+pub (crate) const PUSHINSTVAR : u8 = 0x1A;
+pub (crate) const PUSHINSTFUNC : u8 = 0x1B;
+pub (crate) const PUSHBIND : u8 = 0x1C;
+pub (crate) const PUSHOBJ : u8 = 0x1D;
+pub (crate) const PUSHSELF : u8 = 0x1E;
+pub (crate) const PUSHOTHER : u8 = 0x1F;
 
 pub (crate) const BINOP : u8 = 0x20;
 pub (crate) const UNOP : u8 = 0x21;
 pub (crate) const FUNCEXPR : u8 = 0x22;
 pub (crate) const INVOKEEXPR : u8 = 0x28;
 
-pub (crate) const DECLVAR : u8 = 0x30;
-pub (crate) const DECLFAR : u8 = 0x31;
-pub (crate) const DECLGLOBALVAR : u8 = 0x32;
-pub (crate) const DECLBAREGLOBALVAR : u8 = 0x33;
+pub (crate) const NEWVAR : u8 = 0x30;
+
+pub (crate) const EVALUATEVAR : u8 = 0x35;
+pub (crate) const EVALUATEBAREGLOBAL : u8 = 0x39;
+pub (crate) const EVALUATEINSTVAR : u8 = 0x3A;
 
 pub (crate) const BINSTATE : u8 = 0x40;
 pub (crate) const UNSTATE : u8 = 0x41;
-pub (crate) const FUNCCALL : u8 = 0x42;
-pub (crate) const INVOKECALL : u8 = 0x48;
+pub (crate) const SETBAREGLOBAL : u8 = 0x42;
+pub (crate) const FUNCCALL : u8 = 0x48;
+pub (crate) const INVOKECALL : u8 = 0x4F;
 
 pub (crate) const INVOKE : u8 = 0x50;
 
@@ -78,16 +87,15 @@ pub (crate) const SHORTCIRCUITIFTRUE : u8 = 0x98;
 pub (crate) const SHORTCIRCUITIFFALSE : u8 = 0x99;
 
 pub (crate) const INDIRECTION : u8 = 0xA0;
-pub (crate) const EVALUATION : u8 = 0xA1;
 pub (crate) const ARRAYEXPR : u8 = 0xA2;
 pub (crate) const DISMEMBER : u8 = 0xA3;
 
+pub (crate) const EVALUATEINDIRECTION : u8 = 0xAE;
+pub (crate) const EVALUATEARRAYEXPR : u8 = 0xAF;
+
 pub (crate) const FUNCDEF : u8 = 0xB0;
 pub (crate) const LAMBDA : u8 = 0xB1;
-pub (crate) const OBJDEF : u8 = 0xB2;
-pub (crate) const GLOBALFUNCDEF : u8 = 0xB3;
-pub (crate) const SUBFUNCDEF : u8 = 0xB4;
-pub (crate) const GENERATORDEF : u8 = 0xB5;
+pub (crate) const GENERATORDEF : u8 = 0xB4;
 
 pub (crate) const WHILETEST : u8 = 0xC0;
 pub (crate) const WHILELOOP : u8 = 0xC1;

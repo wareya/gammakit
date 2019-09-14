@@ -40,7 +40,7 @@ impl Interpreter
         self.top_frame.push(stackvalue)
     }
     
-    fn call_arrow_function(&mut self, subfuncval : SubFuncVal, args : Vec<Value>, isexpr : bool) -> OpResult
+    fn call_arrow_function<'a>(&'a mut self, subfuncval : Box<SubFuncVal>, args : Vec<Value>, isexpr : bool) -> OpResult
     {
         if let Some(binding_wrapper) = self.get_arrow_binding(subfuncval.name)
         {
@@ -50,7 +50,7 @@ impl Interpreter
             {
                 StackValue::Val(val) =>
                 {
-                    let ret = binding(ValRef::from_val_readonly(val), args)?;
+                    let ret = binding(ValueLoc::Static(val), args)?;
                     if isexpr
                     {
                         self.stack_push_val(ret);
@@ -58,7 +58,7 @@ impl Interpreter
                 }
                 StackValue::Var(source) =>
                 {
-                    let val = self.evaluate(source, |x| Ok(x.refclone()), |x| Ok(ValRef::from_val_readonly(x)))?;
+                    let val = self.evaluate(source)?;
                     let ret = binding(val, args)?;
                     if isexpr
                     {
@@ -77,10 +77,7 @@ impl Interpreter
     
     pub (super) fn handle_func_call_or_expr(&mut self, isexpr : bool) -> OpResult
     {
-        let argcount_val = self.stack_pop_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR/FUNCCALL"))?;
-        
-        let argcount = match_or_err!(argcount_val, Value::Number(argcount) => argcount, minierr("internal error: number on stack of arguments to function was not a number"))?;
-        let argcount = argcount.round() as usize;
+        let argcount = self.read_usize()?;
         
         //eprintln!("{} args", argcount);
         
@@ -101,9 +98,10 @@ impl Interpreter
         
         match funcdata
         {
-            Value::Func(funcdata) => self.call_function(*funcdata, args, isexpr)?,
-            Value::SubFunc(subfuncval) => self.call_arrow_function(*subfuncval, args, isexpr)?,
-            _ => return plainerr("internal error: value meant to hold function data in FUNCEXPR/FUNCCALL was not holding function data")
+            Value::Func(funcdata) => self.call_function(funcdata, args, isexpr)?,
+            Value::InternalFunc(funcdata) => self.call_internal_function(funcdata, args, isexpr)?,
+            Value::SubFunc(subfuncval) => self.call_arrow_function(subfuncval, args, isexpr)?,
+            _ => return Err(format!("internal error: value meant to hold function data in FUNCEXPR/FUNCCALL was not holding function data; {:?}", funcdata))
         }
         
         Ok(())

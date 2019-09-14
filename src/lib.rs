@@ -27,33 +27,8 @@ mod bytecode;
 mod grammar;
 mod compiler;
 mod interpreter;
-mod bookkeeping;
 
 pub use crate::{parser::*, compiler::*, interpreter::*};
-
-impl Parser {
-    /// optional helper function to simplify the process of compiling from text to bytecode
-    pub fn give_me_bytecode(&mut self, text: &str) -> Result<Code, String>
-    {
-        let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
-        
-        let tokens = self.tokenize(&program_lines, false)?;
-        
-        let ast = self.parse_program(&tokens, &program_lines, false)?.ok_or_else(|| "failed to parse program".to_string())?;
-        
-        Ok(compile_bytecode(&ast)?)
-    }
-    pub fn give_me_bytecode_share_bookkeeping(&mut self, text: &str, code : &Code) -> Result<Code, String>
-    {
-        let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
-        
-        let tokens = self.tokenize(&program_lines, false)?;
-        
-        let ast = self.parse_program(&tokens, &program_lines, false)?.ok_or_else(|| "failed to parse program".to_string())?;
-        
-        Ok(compile_bytecode_share_bookkeeping(code, &ast)?)
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -67,16 +42,15 @@ mod tests {
     fn test_everything() -> Result<(), String>
     {
         let mut parser = Parser::new_from_default()?;
+        let mut interpreter = Interpreter::new(parser);
+        interpreter.insert_default_bindings();
 
         let mut program = String::new();
         File::open("program.txt").or_else(|_| Err("failed to open program".to_string()))?.read_to_string(&mut program).or_else(|_| Err("failed to read program into memory".to_string()))?;
         
-        let code = parser.give_me_bytecode(&program)?;
+        interpreter.restart_into_string(&program)?;
         
-        File::create("bytecode_dump_main.bin").unwrap().write_all(code.get(..).unwrap()).unwrap();
-        
-        let mut interpreter = Interpreter::new(&code, Some(parser));
-        interpreter.insert_default_bindings();
+        File::create("bytecode_dump_main.bin").unwrap().write_all(&interpreter.dump_code()).unwrap();
         
         interpreter.step_until_error_or_exit().ok();
         if let Some(err) = &interpreter.last_error
@@ -85,9 +59,9 @@ mod tests {
         }
         
         // test clearing interpreter state and restarting
-        
+        /*
         interpreter.clear_global_state();
-        interpreter.restart(&code);
+        interpreter.restart_in_place();
         
         while interpreter.step() == Ok(true){}
         
@@ -95,6 +69,7 @@ mod tests {
         {
             panic!("{}", err);
         }
+        */
         
         Ok(())
     }
@@ -105,7 +80,6 @@ mod tests {
         use std::collections::HashMap;
         println!("size of StackValue is {}", std::mem::size_of::<StackValue>());
         println!("size of Value is {}", std::mem::size_of::<Value>());
-        println!("size of ValRef is {}", std::mem::size_of::<ValRef>());
         println!("size of String is {}", std::mem::size_of::<String>());
         println!("size of Variable is {}", std::mem::size_of::<Variable>());
         println!("size of ArrayVar is {}", std::mem::size_of::<ArrayVar>());
@@ -119,16 +93,15 @@ mod tests {
         
         use std::time::Instant;
         let mut parser = Parser::new_from_default()?;
+        let mut interpreter = Interpreter::new(parser);
+        interpreter.insert_default_bindings();
 
         let mut program = String::new();
         File::open("nbody.txt").or_else(|_| Err("failed to open program".to_string()))?.read_to_string(&mut program).or_else(|_| Err("failed to read program into memory".to_string()))?;
         
-        let code = parser.give_me_bytecode(&program)?;
+        interpreter.restart_into_string(&program)?;
         
-        File::create("bytecode_dump_nbodies.bin").unwrap().write_all(code.get(..).unwrap()).unwrap();
-        
-        let mut interpreter = Interpreter::new(&code, Some(parser));
-        interpreter.insert_default_bindings();
+        File::create("bytecode_dump_nbodies.bin").unwrap().write_all(&interpreter.dump_code()).unwrap();
         
         let start_time = Instant::now();
         
@@ -142,7 +115,7 @@ mod tests {
         println!("simulation took {:?}", duration);
         println!("steps {:?}", steps);
         println!("{:?} steps per second", steps as f64 / (duration.as_millis() as f64 / 1000.0));
-        println!("{:?} seconds per step", duration.as_millis() as f64 / 1000.0 / steps as f64);
+        println!("{:?} nanooseconds per step", duration.as_millis() as f64 * 1000_000.0 / steps as f64);
         //let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / 1_000_000.0 / (*interpreter.op_map_hits.get(k).unwrap() as f64).sqrt())).collect::<Vec<_>>();
         //let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / *interpreter.op_map_hits.get(k).unwrap() as f64)).collect::<Vec<_>>();
         let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / 1_000_000_000.0)).collect::<Vec<_>>();
@@ -160,13 +133,13 @@ mod tests {
         Ok(())
     }
     
+    /*
     #[test]
     fn test_nopspeed() -> Result<(), String>
     {
         use std::time::Instant;
         use std::collections::BTreeMap;
         use std::rc::Rc;
-        use bookkeeping::*;
         
         println!("size of StackValue is {}", std::mem::size_of::<StackValue>());
 
@@ -209,4 +182,5 @@ mod tests {
         
         Ok(())
     }
+    */
 }

@@ -1,0 +1,53 @@
+var x;
+var y;
+y = 0;
+print("help!");
+print(x);
+x = "test";
+print(x);
+{
+    var x = 5;
+    print(x);
+}
+def ax()
+{
+
+}
+ax();
+{
+    def fy(asdf)
+    {
+        var x = 964416;
+        print("agkdfk");
+        print(asdf);
+        if(asdf == fy)
+            fy(x);
+    }
+    fy("gr");
+    fy(fy);
+}
+
+print(x);
+var fy;
+
+obj Test
+{
+    var x, y;
+    def create()
+    {
+        print("create event ran");
+        x = 0;
+        y = 10;
+        print(y);
+    }
+    def asdf()
+    {
+        y += 2;
+        print(y);
+    }
+}
+
+print(Test);
+var asd = instance_create(Test);
+print(asd.y);
+asd.asdf();

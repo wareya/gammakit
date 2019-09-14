@@ -1,9 +1,10 @@
 #![allow(clippy::len_zero)]
 
-use super::{strings::*, ast::*, bytecode::*, bookkeeping::*};
+use super::{strings::*, ast::*, bytecode::*};
 use std::rc::Rc;
-use std::cell::RefCell;
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{HashMap, BTreeMap, BTreeSet};
+use super::interpreter::GlobalState;
+use super::interpreter::types::{FuncSpec, ObjSpec};
 
 #[derive(Debug)]
 pub (crate) struct DebugInfo
@@ -17,15 +18,14 @@ pub (crate) struct DebugInfo
 pub struct Code
 {
     pub (crate) code : Rc<Vec<u8>>,
-    pub (crate) debug : Rc<BTreeMap<usize, DebugInfo>>,
-    pub (crate) bookkeeping : Bookkeeping,
+    pub (crate) debug : Rc<BTreeMap<usize, DebugInfo>>
 }
 
 impl std::clone::Clone for Code
 {
     fn clone(&self) -> Code
     {
-        Code{code : Rc::clone(&self.code), debug : Rc::clone(&self.debug), bookkeeping : self.bookkeeping.refclone()}
+        Code{code : Rc::clone(&self.code), debug : Rc::clone(&self.debug)}
     }
 }
 
@@ -33,7 +33,7 @@ impl std::cmp::PartialEq for Code
 {
     fn eq(&self, other : &Code) -> bool
     {
-        self.code == other.code
+        Rc::ptr_eq(&self.code, &other.code)
     }
 }
 impl Eq for Code {}
@@ -42,11 +42,7 @@ impl Code
 {
     pub (crate) fn new() -> Code
     {
-        Code{code : Rc::new(Vec::new()), debug : Rc::new(BTreeMap::new()), bookkeeping : Bookkeeping::new()}
-    }
-    pub (crate) fn new_share_bookkeeping(other : &Code) -> Code
-    {
-        Code{code : Rc::new(Vec::new()), debug : Rc::new(BTreeMap::new()), bookkeeping : other.bookkeeping.refclone()}
+        Code{code : Rc::new(Vec::new()), debug : Rc::new(BTreeMap::new())}
     }
     fn compile_raw_string(&mut self, text : &str)
     {
@@ -61,14 +57,6 @@ impl Code
     fn push(&mut self, byte : u8)
     {
         Rc::get_mut(&mut self.code).unwrap().push(byte);
-    }
-    pub (crate) fn get_string_index(&self, string : &String) -> usize
-    {
-        self.bookkeeping.get_string_index(string)
-    }
-    pub (crate) fn get_string(&self, index : usize) -> String
-    {
-        self.bookkeeping.get_string(index)
     }
     pub (crate) fn len(&self) -> usize
     {
@@ -109,8 +97,6 @@ impl<I: std::slice::SliceIndex<[u8]>> std::ops::IndexMut<I> for Code
     }
 }
 
-type CompilerBinding = Fn(&mut CompilerState, &ASTNode) -> Result<(), String>;
-
 fn minierr(mystr : &str) -> String
 {
     mystr.to_string()
@@ -125,92 +111,283 @@ fn plainerr<T>(mystr : &str) -> Result<T, String>
 enum Context {
     Unknown,
     Statement,
-    Expr,
+    Lvar,
     Objdef,
 }
 
-struct CompilerState {
+struct Scope {
+    parent_size : usize,
+    size : usize,
+    identifiers : HashMap<usize, (usize, bool)>,
+}
+
+enum IdenLocation {
+    Lexical(usize), // lexical scoped variable
+    Function(usize), // user-defined function, declarations of which are subject to lexical scoping
+    InstanceVar(usize), // instance variable as found from within method body or with() body
+    BareGlobal(usize), // bare global variable
+    GlobalFunc(usize), // global function
+    Binding(usize), // binding
+    Object(usize), // object name
+    Selfref, // "self"
+    Other, // "other"
+}
+
+impl Scope {
+    fn new(parent_size : usize) -> Scope
+    {
+        Scope { parent_size, size : 0, identifiers : HashMap::new() }
+    }
+    fn add_identifier(&mut self, name : usize, isfunction : bool) -> Option<usize>
+    {
+        if self.identifiers.get(&name).is_some()
+        {
+            None
+        }
+        else
+        {
+            let new_index = self.parent_size + self.size;
+            self.identifiers.insert(name, (new_index, isfunction));
+            self.size += 1;
+            Some(new_index)
+        }
+    }
+    fn find_identifier(&self, name : usize) -> Option<IdenLocation>
+    {
+        if let Some((var, false)) = self.identifiers.get(&name)
+        {
+            Some(IdenLocation::Lexical(*var))
+        }
+        else if let Some((func, true)) = self.identifiers.get(&name)
+        {
+            Some(IdenLocation::Function(*func))
+        }
+        else
+        {
+            None
+        }
+    }
+}
+
+struct Frame {
+    scopes : Vec<Scope>,
+    object : Option<ObjSpec>,
+}
+
+impl Frame {
+    fn new() -> Frame
+    {
+        Frame { scopes : vec!(Scope::new(0)), object : None }
+    }
+    fn total_size(&self) -> usize
+    {
+        let asdf = self.scopes.last().unwrap();
+        asdf.parent_size + asdf.size
+    }
+    fn add_scope(&mut self)
+    {
+        self.scopes.push(Scope::new(self.total_size()));
+    }
+    fn pop_scope(&mut self) -> usize
+    {
+        self.scopes.pop();
+        self.total_size()
+    }
+    fn add_identifier(&mut self, name : usize, isfunction : bool) -> Option<usize>
+    {
+        self.scopes.last_mut().unwrap().add_identifier(name, isfunction)
+    }
+    fn find_identifier(&self, name : usize) -> Option<IdenLocation>
+    {
+        for scope in self.scopes.iter().rev()
+        {
+            if let Some(index) = scope.find_identifier(name)
+            {
+                return Some(index);
+            }
+        }
+        if let Some(myobj) = &self.object
+        {
+            if let Some(index) = myobj.variables.get(&name)
+            {
+                return Some(IdenLocation::InstanceVar(name)); // FIXME make this use exact index
+            }
+        }
+        None
+    }
+}
+
+type CompilerBinding<'a> = fn(&mut CompilerState<'a>, &ASTNode) -> Result<(), String>;
+
+struct CompilerState<'a> {
     code : Code,
-    hooks : HashMap<String, Rc<RefCell<CompilerBinding>>>,
-    scopedepth : usize,
+    hooks : HashMap<String, CompilerBinding<'a>>,
     context : Context,
     last_line : usize,
     last_index : usize,
     last_type : String,
+    
+    globalstate : &'a mut GlobalState,
+    
+    frames : Vec<Frame>,
 }
 
-impl CompilerState {
-    fn new() -> CompilerState
+
+impl<'a> CompilerState<'a> {
+    fn new(globalstate : &'a mut GlobalState) -> CompilerState<'a>
     {
-        let mut ret = CompilerState{hooks: HashMap::new(), code: Code::new(), scopedepth: 0, context: Context::Unknown, last_line: 0, last_index: 0, last_type: "".to_string()};
-        ret.insert_default_hooks();
-        ret
-    }
-    fn new_share_bookkeeping(code : &Code) -> CompilerState
-    {
-        let mut ret = CompilerState{hooks: HashMap::new(), code: Code::new_share_bookkeeping(code), scopedepth: 0, context: Context::Unknown, last_line: 0, last_index: 0, last_type: "".to_string()};
+        let mut ret = CompilerState {
+            hooks: HashMap::new(),
+            code: Code::new(),
+            context: Context::Unknown,
+            
+            last_line: 0,
+            last_index: 0,
+            last_type: "".to_string(),
+            
+            globalstate,
+            
+            frames : vec!(Frame::new()),
+        };
         ret.insert_default_hooks();
         ret
     }
     
-    fn add_hook<T : ToString>(&mut self, name: &T, fun : &'static CompilerBinding)
+    fn trap_error(&self, err : Result<(), String>) -> Result<(), String>
     {
-        self.hooks.insert(name.to_string(), Rc::new(RefCell::new(fun)));
+        if let Err(err) = err
+        {
+            eprintln!("compiler hit an error on line {}, position {}, node type `{}`:", self.last_line, self.last_index, self.last_type);
+            Err(err)
+        }
+        else
+        {
+            Ok(())
+        }
+    }
+    
+    pub (crate) fn get_string_index(&mut self, string : &String) -> usize
+    {
+        self.globalstate.get_string_index(string)
+    }
+    pub (crate) fn get_string(&mut self, index : usize) -> String
+    {
+        self.globalstate.get_string(index)
+    }
+    
+    fn add_scope(&mut self)
+    {
+        self.frames.last_mut().unwrap().add_scope()
+    }
+    fn pop_scope(&mut self) -> usize
+    {
+        self.frames.last_mut().unwrap().pop_scope()
+    }
+    fn add_variable(&mut self, name : &String) -> Option<usize>
+    {
+        let id = self.get_string_index(name);
+        self.frames.last_mut().unwrap().add_identifier(id, false)
+    }
+    fn add_function(&mut self, name : &String) -> Option<usize>
+    {
+        let id = self.get_string_index(name);
+        self.frames.last_mut().unwrap().add_identifier(id, true)
+    }
+    fn find_identifier(&mut self, name : &String) -> Option<IdenLocation>
+    {
+        let index = self.get_string_index(name);
+        if let Some(var) = self.frames.last().unwrap().find_identifier(index)
+        {
+            return Some(var);
+        }
+        if self.globalstate.bindings.contains_key(&index)
+        {
+            return Some(IdenLocation::Binding(index));
+        }
+        if self.globalstate.barevariables.contains_key(&index)
+        {
+            return Some(IdenLocation::BareGlobal(index));
+        }
+        if self.globalstate.objects.contains_key(&index)
+        {
+            return Some(IdenLocation::Object(index));
+        }
+        if self.globalstate.functions.contains_key(&index)
+        {
+            return Some(IdenLocation::GlobalFunc(index));
+        }
+        return None;
+    }
+    fn open_frame(&mut self)
+    {
+        assert!(self.frames.len() >= 1);
+        self.frames.push(Frame::new());
+    }
+    fn close_frame(&mut self)
+    {
+        self.frames.pop();
+        assert!(self.frames.len() >= 1);
+    }
+    
+    fn add_hook<T : ToString>(&mut self, name: &T, fun : CompilerBinding<'a>)
+    {
+        self.hooks.insert(name.to_string(), fun);
     }
     fn insert_default_hooks(&mut self)
     {
-        self.add_hook(&"program", &CompilerState::compile_program);
-        self.add_hook(&"blankstatement", &CompilerState::compile_nop);
-        self.add_hook(&"statement", &CompilerState::compile_statement);
-        self.add_hook(&"funccall", &CompilerState::compile_funccall);
-        self.add_hook(&"name", &CompilerState::compile_name);
-        self.add_hook(&"rhunexpr_right", &CompilerState::compile_children);
-        self.add_hook(&"funcargs", &CompilerState::compile_funcargs);
-        self.add_hook(&"expr", &CompilerState::compile_children);
-        self.add_hook(&"lhunop", &CompilerState::compile_children);
-        self.add_hook(&"simplexpr", &CompilerState::compile_children);
-        self.add_hook(&"supersimplexpr", &CompilerState::compile_children);
-        self.add_hook(&"string", &CompilerState::compile_push_string);
-        self.add_hook(&"condition", &CompilerState::compile_children);
-        self.add_hook(&"barestatement", &CompilerState::compile_children);
-        self.add_hook(&"block", &CompilerState::compile_block);
-        self.add_hook(&"nakedblock", &CompilerState::compile_nakedblock);
-        self.add_hook(&"whilecondition", &CompilerState::compile_whilecondition);
-        self.add_hook(&"parenexpr", &CompilerState::compile_parenexpr);
-        self.add_hook(&"number", &CompilerState::compile_number);
-        self.add_hook(&"statementlist", &CompilerState::compile_statementlist);
-        self.add_hook(&"instruction", &CompilerState::compile_instruction);
-        self.add_hook(&"objdef", &CompilerState::compile_objdef);
-        self.add_hook(&"funcdef", &CompilerState::compile_funcdef);
-        self.add_hook(&"withstatement", &CompilerState::compile_with);
-        self.add_hook(&"declaration", &CompilerState::compile_declaration);
-        self.add_hook(&"bareglobaldec", &CompilerState::compile_bareglobaldec);
-        self.add_hook(&"binstate", &CompilerState::compile_binstate);
-        self.add_hook(&"unstate", &CompilerState::compile_unstate);
-        self.add_hook(&"lvar", &CompilerState::compile_lvar);
-        self.add_hook(&"rvar", &CompilerState::compile_rvar);
-        self.add_hook(&"rhunexpr", &CompilerState::compile_rhunexpr);
-        self.add_hook(&"unary", &CompilerState::compile_unary);
-        self.add_hook(&"indirection", &CompilerState::compile_indirection);
-        self.add_hook(&"dictindex", &CompilerState::compile_dictindex);
-        self.add_hook(&"binexpr_0", &CompilerState::compile_binexpr);
-        self.add_hook(&"binexpr_1", &CompilerState::compile_binexpr);
-        self.add_hook(&"binexpr_2", &CompilerState::compile_binexpr);
-        self.add_hook(&"binexpr_3", &CompilerState::compile_binexpr);
-        self.add_hook(&"lambda", &CompilerState::compile_lambda);
-        self.add_hook(&"arraybody", &CompilerState::compile_arraybody);
-        self.add_hook(&"arrayindex", &CompilerState::compile_arrayindex);
-        self.add_hook(&"ifcondition", &CompilerState::compile_ifcondition);
-        self.add_hook(&"dismember", &CompilerState::compile_dismember);
-        self.add_hook(&"dictbody", &CompilerState::compile_dictbody);
-        self.add_hook(&"forcondition", &CompilerState::compile_forcondition);
-        self.add_hook(&"forheaderstatement", &CompilerState::compile_children);
-        self.add_hook(&"forheaderexpr", &CompilerState::compile_children);
-        self.add_hook(&"invocation_expr", &CompilerState::compile_invocation_expr);
-        self.add_hook(&"setbody", &CompilerState::compile_setbody);
-        self.add_hook(&"foreach", &CompilerState::compile_foreach);
-        self.add_hook(&"switch", &CompilerState::compile_switch);
-        self.add_hook(&"ternary", &CompilerState::compile_ternary);
+        self.add_hook(&"program", CompilerState::compile_program);
+        self.add_hook(&"blankstatement", CompilerState::compile_nop);
+        self.add_hook(&"statement", CompilerState::compile_statement);
+        self.add_hook(&"funccall", CompilerState::compile_funccall);
+        self.add_hook(&"name", CompilerState::compile_name);
+        self.add_hook(&"rhunexpr_right", CompilerState::compile_children);
+        self.add_hook(&"funcargs", CompilerState::compile_funcargs);
+        self.add_hook(&"expr", CompilerState::compile_children);
+        self.add_hook(&"lhunop", CompilerState::compile_children);
+        self.add_hook(&"simplexpr", CompilerState::compile_children);
+        self.add_hook(&"supersimplexpr", CompilerState::compile_children);
+        self.add_hook(&"string", CompilerState::compile_push_string);
+        self.add_hook(&"condition", CompilerState::compile_children);
+        self.add_hook(&"barestatement", CompilerState::compile_children);
+        self.add_hook(&"block", CompilerState::compile_block);
+        self.add_hook(&"nakedblock", CompilerState::compile_nakedblock);
+        self.add_hook(&"whilecondition", CompilerState::compile_whilecondition);
+        self.add_hook(&"parenexpr", CompilerState::compile_parenexpr);
+        self.add_hook(&"number", CompilerState::compile_number);
+        self.add_hook(&"statementlist", CompilerState::compile_statementlist);
+        self.add_hook(&"instruction", CompilerState::compile_instruction);
+        self.add_hook(&"objdef", CompilerState::compile_objdef);
+        self.add_hook(&"funcdef", CompilerState::compile_funcdef);
+        self.add_hook(&"globalfuncdef", CompilerState::compile_globalfuncdef);
+        self.add_hook(&"withstatement", CompilerState::compile_with);
+        self.add_hook(&"declaration", CompilerState::compile_declaration);
+        self.add_hook(&"bareglobaldec", CompilerState::compile_bareglobaldec);
+        self.add_hook(&"binstate", CompilerState::compile_binstate);
+        self.add_hook(&"unstate", CompilerState::compile_unstate);
+        self.add_hook(&"lvar", CompilerState::compile_lvar);
+        self.add_hook(&"rvar", CompilerState::compile_rvar);
+        self.add_hook(&"rhunexpr", CompilerState::compile_rhunexpr);
+        self.add_hook(&"unary", CompilerState::compile_unary);
+        self.add_hook(&"indirection", CompilerState::compile_indirection);
+        self.add_hook(&"dictindex", CompilerState::compile_dictindex);
+        self.add_hook(&"binexpr_0", CompilerState::compile_binexpr);
+        self.add_hook(&"binexpr_1", CompilerState::compile_binexpr);
+        self.add_hook(&"binexpr_2", CompilerState::compile_binexpr);
+        self.add_hook(&"binexpr_3", CompilerState::compile_binexpr);
+        self.add_hook(&"lambda", CompilerState::compile_lambda);
+        self.add_hook(&"arraybody", CompilerState::compile_arraybody);
+        self.add_hook(&"arrayindex", CompilerState::compile_arrayindex);
+        self.add_hook(&"ifcondition", CompilerState::compile_ifcondition);
+        self.add_hook(&"dismember", CompilerState::compile_dismember);
+        self.add_hook(&"dictbody", CompilerState::compile_dictbody);
+        self.add_hook(&"forcondition", CompilerState::compile_forcondition);
+        self.add_hook(&"forheaderstatement", CompilerState::compile_children);
+        self.add_hook(&"forheaderexpr", CompilerState::compile_children);
+        self.add_hook(&"invocation_expr", CompilerState::compile_invocation_expr);
+        self.add_hook(&"setbody", CompilerState::compile_setbody);
+        self.add_hook(&"foreach", CompilerState::compile_foreach);
+        self.add_hook(&"switch", CompilerState::compile_switch);
+        self.add_hook(&"ternary", CompilerState::compile_ternary);
     }
     fn compile_u16(&mut self, num : u16) -> usize
     {
@@ -256,7 +433,8 @@ impl CompilerState {
     }
     fn compile_string_index(&mut self, text : &String)
     {
-        self.compile_u64(self.code.get_string_index(text) as u64);
+        let index = self.get_string_index(text) as u64;
+        self.compile_u64(index);
     }
     fn compile_string_index_with_prefix(&mut self, prefix : u8, text : &String)
     {
@@ -264,14 +442,10 @@ impl CompilerState {
         self.compile_string_index(text);
     }
 
-    fn compile_unscope(&mut self) -> Result<(), String>
+    fn compile_unscope(&mut self, var_stack_length : usize) -> Result<(), String>
     {
-        if self.scopedepth >= 0xFFFF
-        {
-            return plainerr("error: internal scope depth limit of 0xFFFF reached; nest your code less.");
-        }
         self.code.push(UNSCOPE);
-        self.compile_u16(self.scopedepth as u16);
+        self.compile_u64(var_stack_length as u64);
         Ok(())
     }
     fn compile_context_wrapped(&mut self, context : Context, fun : &Fn(&mut CompilerState) -> Result<(), String>) -> Result<(), String>
@@ -287,13 +461,12 @@ impl CompilerState {
     }
     fn compile_scope_wrapped(&mut self, fun : &Fn(&mut CompilerState) -> Result<(), String>) -> Result<(), String>
     {
-        self.code.push(SCOPE);
-        self.scopedepth += 1;
+        self.frames.last_mut().unwrap().add_scope();
         
         fun(self)?;
         
-        self.scopedepth -= 1;
-        self.compile_unscope()
+        let var_stack_length = self.frames.last_mut().unwrap().pop_scope();
+        self.compile_unscope(var_stack_length)
     }
     fn compile_any(&mut self, ast : &ASTNode) -> Result<(), String>
     {
@@ -303,8 +476,7 @@ impl CompilerState {
         
         self.code.add_debug_info(self.code.len(), self.last_line, self.last_index, &self.last_type);
         
-        let hook = Rc::clone(self.hooks.get(&ast.text).ok_or_else(|| minierr(&format!("internal error: no handler for AST node with name `{}`", ast.text)))?);
-        let hook = hook.try_borrow().or_else(|_| Err(format!("internal error: hook for AST node type `{}` is already in use", ast.text)))?;
+        let hook = self.hooks.get(&ast.text).ok_or_else(|| minierr(&format!("internal error: no handler for AST node with name `{}`", ast.text)))?;
         hook(self, ast)
     }
     fn compile_nop(&mut self, _ast : &ASTNode) -> Result<(), String>
@@ -342,27 +514,34 @@ impl CompilerState {
     {
         if ast.child(0)?.text == "name" && ast.child(0)?.child(0)?.text == "global" && ast.child(1)?.child(0)?.text == "indirection"
         {
-            if matches!(self.context, Context::Expr)
+            let mut need_mutable_context = matches!(self.context, Context::Lvar);
+            if ast.children.len() >= 3 && !matches!(ast.child(2)?.child(0)?.text.as_str(), "funcargs" | "indirection")
             {
-                self.compile_pushglobalval(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
+                need_mutable_context = true;
+            }
+            if need_mutable_context
+            {
+                self.compile_pushglobal(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
             }
             else
             {
-                self.compile_pushglobal(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
+                self.compile_pushglobalval(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
             }
             if ast.children.len() > 2
             {
                 for child in ast.child_slice(2, -1)?
                 {
-                    //eprintln!("{:?}", child);
-                    if child.text == "name"
+                    self.compile_context_wrapped(Context::Lvar, &|x|
                     {
-                        self.compile_pushname(&child.child(0)?.text)?;
-                    }
-                    else
-                    {
-                        self.compile_any(child)?;
-                    }
+                        if child.text == "name"
+                        {
+                            x.compile_pushname(&child.child(0)?.text)
+                        }
+                        else
+                        {
+                            x.compile_any(child)
+                        }
+                    })?;
                 }
                 self.compile_last_child(ast)?;
             }
@@ -372,15 +551,17 @@ impl CompilerState {
         {
             for child in ast.child_slice(0, -1)?
             {
-                //eprintln!("{:?}", child);
-                if child.text == "name"
+                self.compile_context_wrapped(Context::Lvar, &|x|
                 {
-                    self.compile_pushname(&child.child(0)?.text)?;
-                }
-                else
-                {
-                    self.compile_any(child)?;
-                }
+                    if child.text == "name"
+                    {
+                        x.compile_pushname(&child.child(0)?.text)
+                    }
+                    else
+                    {
+                        x.compile_any(child)
+                    }
+                })?;
             }
             self.compile_last_child(ast)
         }
@@ -394,32 +575,40 @@ impl CompilerState {
                 "dismember" => plainerr("error: tried to use a -> expression as a statement"),
                 "arrayindex" => plainerr("error: tried to use a [] expression as a statement"),
                 "indirection" => plainerr("error: tried to use a . expression as a statement"),
-                _ => plainerr("error: tried to use an unknown form of expression as a statement")
+                _ => plainerr("internal error: tried to use an unknown form of expression as a statement")
             };
         }
         
         if ast.child(0)?.text == "name" && ast.child(0)?.child(0)?.text == "global" && ast.child(1)?.child(0)?.text == "indirection"
         {
-            if matches!(self.context, Context::Expr)
+            let mut need_mutable_context = matches!(self.context, Context::Lvar);
+            if ast.children.len() >= 3 && !matches!(ast.child(2)?.child(0)?.text.as_str(), "funcargs" | "indirection")
             {
-                self.compile_pushglobalval(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
+                need_mutable_context = true;
+            }
+            if need_mutable_context
+            {
+                self.compile_pushglobal(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
             }
             else
             {
-                self.compile_pushglobal(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
+                self.compile_pushglobalval(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
             }
             if ast.children.len() > 2
             {
                 for child in ast.child_slice(2, -1)?
                 {
-                    if child.text == "name"
+                    self.compile_context_wrapped(Context::Lvar, &|x|
                     {
-                        self.compile_pushname(&child.child(0)?.text)?;
-                    }
-                    else
-                    {
-                        self.compile_any(child)?;
-                    }
+                        if child.text == "name"
+                        {
+                            x.compile_pushname(&child.child(0)?.text)
+                        }
+                        else
+                        {
+                            x.compile_any(child)
+                        }
+                    })?;
                 }
                 self.compile_context_wrapped(Context::Statement, &|x| x.compile_last_child(ast))?;
             }
@@ -429,26 +618,88 @@ impl CompilerState {
         {
             for child in ast.child_slice(0, -1)?
             {
-                if child.text == "name"
+                self.compile_context_wrapped(Context::Lvar, &|x|
                 {
-                    self.compile_pushname(&child.child(0)?.text)?;
-                }
-                else
-                {
-                    self.compile_any(child)?;
-                }
+                    if child.text == "name"
+                    {
+                        x.compile_pushname(&child.child(0)?.text)
+                    }
+                    else
+                    {
+                        x.compile_any(child)
+                    }
+                })?;
             }
             self.compile_context_wrapped(Context::Statement, &|x| x.compile_last_child(ast))
         }
         
     }
-    fn compile_pushvar(&mut self, string : &String) -> Result<(), String>
+    fn compile_indirection(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        if string.as_str() == "global"
+        if !matches!(self.context, Context::Lvar)
         {
-            return Err(format!("internal error: attempted to compile `global` with PUSHVAR ({:?})", (self.last_line, self.last_index, &self.last_type)))
+            self.code.push(EVALUATEINDIRECTION);
         }
-        self.compile_string_index_with_prefix(PUSHVAR, string);
+        else
+        {
+            self.code.push(INDIRECTION);
+        }
+        self.compile_string_index(&ast.child(1)?.child(0)?.text);
+        
+        Ok(())
+    }
+    fn compile_dismember(&mut self, ast : &ASTNode) -> Result<(), String>
+    {
+        self.code.push(DISMEMBER);
+        self.compile_string_index(&ast.child(1)?.child(0)?.text);
+        Ok(())
+    }
+    fn compile_dictindex(&mut self, ast : &ASTNode) -> Result<(), String>
+    {
+        self.compile_pushstr(&ast.child(1)?.child(0)?.text)?;
+        if !matches!(self.context, Context::Lvar)
+        {
+            self.code.push(EVALUATEARRAYEXPR);
+        }
+        else
+        {
+            self.code.push(ARRAYEXPR);
+        }
+        
+        Ok(())
+    }
+    fn compile_arrayindex(&mut self, ast : &ASTNode) -> Result<(), String>
+    {
+        self.compile_context_wrapped(Context::Unknown, &|x| x.compile_nth_child(ast, 1))?;
+        if !matches!(self.context, Context::Lvar)
+        {
+            self.code.push(EVALUATEARRAYEXPR);
+        }
+        else
+        {
+            self.code.push(ARRAYEXPR);
+        }
+        
+        Ok(())
+    }
+    fn compile_funcargs(&mut self, ast : &ASTNode) -> Result<(), String>
+    {
+        let args = &ast.child(1)?.children;
+        self.compile_context_wrapped(Context::Unknown, &|x|
+        {
+            for child in args
+            {
+                x.compile_any(child)?;
+            }
+            Ok(())
+        })?;
+        match self.context
+        {
+            Context::Statement => self.code.push(FUNCCALL),
+            _ => self.code.push(FUNCEXPR)
+        }
+        self.compile_u64(args.len() as u64);
+        
         Ok(())
     }
     fn compile_pushname(&mut self, string : &String) -> Result<(), String>
@@ -457,7 +708,72 @@ impl CompilerState {
         {
             return Err(format!("internal error: attempted to compile `global` with PUSHNAME ({:?})", (self.last_line, self.last_index, &self.last_type)))
         }
-        self.compile_string_index_with_prefix(PUSHNAME, string);
+        if let Some(var) = self.find_identifier(string)
+        {
+            match var
+            {
+                IdenLocation::Lexical(index) |
+                IdenLocation::Function(index) => // FIXME always evaluate function?
+                {
+                    if !matches!(self.context, Context::Lvar)
+                    {
+                        self.code.push(EVALUATEVAR);
+                        self.compile_u64(index as u64);
+                    }
+                    else
+                    {
+                        self.code.push(PUSHVAR);
+                        self.compile_u64(index as u64);
+                    }
+                }
+                IdenLocation::InstanceVar(index) =>
+                {
+                    if !matches!(self.context, Context::Lvar)
+                    {
+                        self.code.push(EVALUATEINSTVAR);
+                        self.compile_u64(index as u64);
+                    }
+                    else
+                    {
+                        self.code.push(PUSHINSTVAR);
+                        self.compile_u64(index as u64);
+                    }
+                }
+                IdenLocation::Binding(index) =>
+                {
+                    self.code.push(PUSHBIND);
+                    self.compile_u64(index as u64);
+                }
+                IdenLocation::BareGlobal(index) =>
+                {
+                    if !matches!(self.context, Context::Lvar)
+                    {
+                        self.code.push(EVALUATEBAREGLOBAL);
+                        self.compile_u64(index as u64);
+                    }
+                    else
+                    {
+                        self.code.push(PUSHBAREGLOBAL);
+                        self.compile_u64(index as u64);
+                    }
+                }
+                IdenLocation::GlobalFunc(index) =>
+                {
+                    self.code.push(PUSHGLOBALFUNC);
+                    self.compile_u64(index as u64);
+                }
+                IdenLocation::Object(index) =>
+                {
+                    self.code.push(PUSHOBJ);
+                    self.compile_u64(index as u64);
+                }
+                _ => return Err(format!("not implemented yet kjawefawlefs"))
+            }
+        }
+        else
+        {
+            return Err(format!("error: unknown identifier `{}`", string))
+        }
         Ok(())
     }
     fn compile_pushglobal(&mut self, string : &String) -> Result<(), String>
@@ -477,33 +793,7 @@ impl CompilerState {
     }
     fn compile_name(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.compile_pushvar(&ast.child(0)?.text)?;
-        Ok(())
-    }
-    fn compile_funcargs(&mut self, ast : &ASTNode) -> Result<(), String>
-    {
-        self.compile_context_wrapped(Context::Unknown, &|x|
-        {
-            let args = &ast.child(1)?.children;
-            if args.len() > 0xFFFF
-            {
-                return plainerr("internal error: more than 0xFFFF (around 65000) arguments to single function");
-            }
-            for child in args
-            {
-                x.compile_any(child)?;
-            }
-            x.code.push(PUSHSHORT);
-            x.compile_u16(args.len() as u16);
-            Ok(())
-        })?;
-        match self.context
-        {
-            Context::Statement => self.code.push(FUNCCALL),
-            _ => self.code.push(FUNCEXPR)
-        }
-        
-        Ok(())
+        self.compile_pushname(&ast.child(0)?.text)
     }
     fn rewrite_code(&mut self, location : usize, subcode : Vec<u8>) -> Result<(), String>
     {
@@ -610,7 +900,7 @@ impl CompilerState {
         {
             return plainerr("internal error: unhandled form of statement list");
         }
-        self.compile_scope_wrapped(&|x| 
+        self.compile_scope_wrapped(&|x|
         {
             for child in ast.child_slice(1, -1)?
             {
@@ -672,76 +962,200 @@ impl CompilerState {
     }
     fn compile_objdef(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.compile_string_index_with_prefix(OBJDEF, &ast.child(1)?.child(0)?.text);
-        let funcs = ast.child_slice(3, -1)?;
-        if funcs.len() > 0xFFFF
-        {
-            return plainerr("error: can only have 0xFFFF (around 65000) functions to a single object");
-        }
-        self.compile_u16(funcs.len() as u16);
+        let nameindex = self.get_string_index(&ast.child(1)?.child(0)?.text);
         
-        self.compile_context_wrapped(Context::Objdef, &|x|
+        let parts = &ast.child(3)?;
+        
+        let mut var_index = 0;
+        let mut variables = BTreeMap::new();
+        
+        variables.insert(self.get_string_index(&"id".to_string()), var_index);
+        var_index += 1;
+        
+        let mut incomplete_object = ObjSpec { ident : nameindex, variables, functions : BTreeMap::new() };
+        
+        for part in &parts.children
         {
-            for child in funcs.iter()
+            if part.child(0)?.text == "objvardef"
             {
-                x.compile_any(child)?;
+                for varname in part.child(0)?.child_slice(1, -1)?
+                {
+                    let varname = &varname.child(0)?.text;
+                    let varnameindex = self.get_string_index(&varname);
+                    if !incomplete_object.variables.contains_key(&varnameindex)
+                    {
+                        incomplete_object.variables.insert(varnameindex, var_index);
+                    }
+                    else
+                    {
+                        return Err(format!("error: redeclared identifier `{}`", varname))?;
+                    }
+                    var_index += 1;
+                }
             }
-            Ok(())
-        })
+        }
+        
+        self.globalstate.objects.insert(nameindex, incomplete_object.clone());
+        self.globalstate.instances_by_type.insert(nameindex, BTreeSet::new());
+        
+        let mut functions = BTreeMap::new();
+        for part in &parts.children
+        {
+            if part.child(0)?.text == "objfuncdef"
+            {
+                let def = &part.child(0)?;
+                let funcname = &def.child(1)?.child(0)?.text;
+                
+                let oldcode = self.code.clone();
+                self.code = Code::new();
+                self.open_frame();
+                self.frames.last_mut().unwrap().object = Some(incomplete_object.clone());
+                
+                let mut argcount = 0;
+                for arg in &def.child(3)?.children
+                {
+                    let name = &arg.child(0)?.text;
+                    self.add_variable(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
+                    argcount += 1;
+                }
+                if funcname == "create" && argcount != 0
+                {
+                    return Err("error: create event must have 0 arguments".to_string());
+                }
+                for statement in &def.child(6)?.children
+                {
+                    self.compile_any(&statement)?;
+                }
+                self.code.push(EXIT);
+                
+                self.close_frame();
+                let funccode = self.code.clone();
+                self.code = oldcode;
+                
+                let func = FuncSpec {
+                    startaddr : 0,
+                    endaddr : funccode.code.len(),
+                    code : funccode,
+                    argcount,
+                    parentobj : nameindex,
+                    forcecontext : 0,
+                    fromobj : true,
+                    generator : false,
+                };
+                
+                functions.insert(self.get_string_index(funcname), func);
+            }
+        }
+        
+        incomplete_object.functions = functions;
+        let complete_object = incomplete_object;
+        self.globalstate.objects.insert(nameindex, complete_object);
+        
+        Ok(())
     }
     fn compile_funcdef(&mut self, ast : &ASTNode) -> Result<(), String>
     {
         let kind = &ast.child(0)?.child(0)?.text;
         let name = &ast.child(1)?.child(0)?.text;
         
-        if !matches!(self.context, Context::Objdef)
+        let prefix;
+        match kind.as_str()
         {
-            match kind.as_str()
+            "def" =>
             {
-                "def" => self.code.push(FUNCDEF),
-                "globaldef" => self.code.push(GLOBALFUNCDEF),
-                "subdef" => self.code.push(SUBFUNCDEF),
-                "generator" => self.code.push(GENERATORDEF),
-                _ => return plainerr("error: first token of funcdef must be \"def\" | \"globaldef\" | \"subdef\" | \"generator\"")
+                prefix = FUNCDEF;
+                self.add_function(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
             }
+            "generator" =>
+            {
+                prefix = GENERATORDEF;
+                self.add_function(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
+            }
+            _ => return plainerr("error: first token of funcdef must be \"def\" | \"generator\"")
         }
         
-        self.compile_context_wrapped(Context::Unknown, &|x|
+        self.code.push(prefix);
+        
+        self.compile_u16(ast.child(3)?.children.len() as u16);
+        
+        let body_len_position = self.compile_u64(0 as u64);
+        
+        let position_1 = self.code.len();
+        
+        self.open_frame();
+        self.add_function(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
+        for child in &ast.child(3)?.children
         {
-            x.compile_string_index(&name);
-            x.compile_u16(ast.child(3)?.children.len() as u16);
-            
-            let body_len_position = x.compile_u64(0 as u64);
-            
-            for arg in &ast.child(3)?.children
-            {
-                x.compile_string_index(&arg.child(0)?.text);
-            }
-            
-            let position_1 = x.code.len();
-            
-            for statement in &ast.child(6)?.children
-            {
-                let oldscopedepth = x.scopedepth;
-                x.scopedepth = 0;
-                x.compile_any(&statement)?;
-                x.scopedepth = oldscopedepth;
-            }
-            x.code.push(EXIT);
-            
-            let position_2 = x.code.len();
-            
-            let body_len = position_2 - position_1;
-            
-            x.rewrite_code(body_len_position, pack_u64(body_len as u64))?;
-            
-            Ok(())
-        })?;
+            let name = &child.child(0)?.text;
+            self.add_variable(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
+        }
+        
+        for statement in &ast.child(6)?.children
+        {
+            self.compile_any(&statement)?;
+        }
+        self.code.push(EXIT);
+        
+        self.close_frame();
+        
+        let position_2 = self.code.len();
+        
+        let body_len = position_2 - position_1;
+        
+        self.rewrite_code(body_len_position, pack_u64(body_len as u64))?;
+        
+        Ok(())
+    }
+    fn compile_globalfuncdef(&mut self, ast : &ASTNode) -> Result<(), String>
+    {
+        let name = &ast.child(1)?.child(0)?.text;
+        let nameindex = self.get_string_index(name);
+        
+        if self.globalstate.functions.contains_key(&nameindex)
+        {
+            return Err(format!("error: redeclared global function `{}`", name));
+        }
+        
+        let oldcode = self.code.clone();
+        self.code = Code::new();
+        self.open_frame();
+        self.add_function(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
+        let mut argcount = 0;
+        for arg in &ast.child(3)?.children
+        {
+            let name = &arg.child(0)?.text;
+            self.add_variable(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
+            argcount += 1;
+        }
+        for statement in &ast.child(6)?.children
+        {
+            self.compile_any(&statement)?;
+        }
+        self.code.push(EXIT);
+        
+        self.close_frame();
+        let funccode = self.code.clone();
+        self.code = oldcode;
+        
+        let func = FuncSpec {
+            startaddr : 0,
+            endaddr : funccode.code.len(),
+            code : funccode,
+            argcount,
+            parentobj : 0,
+            forcecontext : 0,
+            fromobj : false,
+            generator : false,
+        };
+        
+        self.globalstate.insert_globalfunc(nameindex, func);
+        
         Ok(())
     }
     
     fn compile_with(&mut self, ast : &ASTNode) -> Result<(), String>
     {
+        panic!("FIXME need to reimplement with");
         
         self.compile_nth_child(ast, 1)?;
         self.code.push(WITH);
@@ -767,41 +1181,77 @@ impl CompilerState {
         {
             let name = &child.child(0)?.child(0)?.text;
             
-            // evaluate right hand side of assignment, if there is one, BEFORE declaring the variable
             if child.children.len() == 3
             {
                 match decl_type
                 {
-                    "globalvar" => self.compile_pushglobal(&name)?,
-                    _ => self.compile_pushname(&name)?
+                    "var" =>
+                    {
+                        self.compile_nth_child(child, 2)?;
+                        
+                        self.add_variable(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
+                        self.code.push(NEWVAR);
+                        
+                        self.compile_context_wrapped(Context::Lvar, &|x| x.compile_pushname(&child.child(0)?.child(0)?.text))?;
+                        self.code.push(BINSTATE);
+                        self.code.push(0x00);
+                    }
+                    "globalvar" =>
+                    {
+                        let nameindex = self.get_string_index(name);
+                        if self.globalstate.variables.contains_key(&nameindex)
+                        {
+                            return Err(format!("error: redeclared bare global variable `{}`", name))?;;
+                        }
+                        self.globalstate.insert_global(nameindex);
+                        
+                        self.compile_nth_child(child, 2)?;
+                        self.compile_pushglobal(&child.child(0)?.child(0)?.text)?;
+                        self.code.push(BINSTATE);
+                        self.code.push(0x00);
+                    }
+                    _ => return plainerr("internal error: unknown prefix to compound variable declaration")
                 }
-                self.compile_nth_child(child, 2)?;
             }
-            
-            // declare the variable
-            self.compile_pushname(&name)?;
-            match decl_type
+            else
             {
-                "var" => self.code.push(DECLVAR),
-                "far" => self.code.push(DECLFAR),
-                "globalvar" => self.code.push(DECLGLOBALVAR),
-                _ => return plainerr("internal error: non-var/far prefix to declaration")
-            }
-            
-            // perform the assignment to the newly-declared variable
-            if child.children.len() == 3
-            {
-                self.code.push(BINSTATE);
-                self.code.push(0x00);
+                // declare the variable
+                match decl_type
+                {
+                    "var" =>
+                    {
+                        self.add_variable(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
+                        self.code.push(NEWVAR);
+                    }
+                    "globalvar" =>
+                    {
+                        let nameindex = self.get_string_index(name);
+                        if self.globalstate.variables.contains_key(&nameindex)
+                        {
+                            return Err(format!("error: redeclared bare global variable `{}`", name))?;;
+                        }
+                        self.globalstate.insert_global(nameindex);
+                    }
+                    _ => return plainerr("internal error: unknown prefix to variable declaration")
+                }
             }
         }
         Ok(())
     }
     fn compile_bareglobaldec(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.compile_pushname(&ast.child(2)?.child(0)?.text)?;
+        // does not allow reassignment, so there's only one syntax, and it requires an expression
+        let name = &ast.child(2)?.child(0)?.text;
+        let nameindex = self.get_string_index(name);
+        if self.globalstate.barevariables.contains_key(&nameindex)
+        {
+            return Err(format!("error: redeclared bare global variable `{}`", name))?;;
+        }
+        self.globalstate.insert_bare_global(nameindex);
+        
         self.compile_nth_child(ast, 4)?;
-        self.code.push(DECLBAREGLOBALVAR);
+        self.code.push(SETBAREGLOBAL);
+        self.compile_string_index(&ast.child(2)?.child(0)?.text);
         Ok(())
     }
     fn compile_binstate(&mut self, ast : &ASTNode) -> Result<(), String>
@@ -809,8 +1259,8 @@ impl CompilerState {
         let operator = &ast.child(1)?.child(0)?.text;
         let op = get_assignment_type(operator).ok_or_else(|| minierr(&format!("internal error: unhandled or unsupported type of binary statement {}", operator)))?;
         
-        self.compile_nth_child(ast, 0)?;
         self.compile_nth_child(ast, 2)?;
+        self.compile_nth_child(ast, 0)?;
         self.code.push(BINSTATE);
         self.code.push(op);
         
@@ -833,20 +1283,15 @@ impl CompilerState {
     }
     fn compile_lvar(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        if ast.child(0)?.text == "name"
+        self.compile_context_wrapped(Context::Lvar, &|x|
         {
-            self.compile_pushname(&ast.child(0)?.child(0)?.text)?;
-        }
-        else
-        {
-            self.compile_nth_child(ast, 0)?;
-        }
-        Ok(())
+            x.compile_nth_child(ast, 0)
+        })
     }
 
     fn compile_rvar(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.compile_context_wrapped(Context::Expr, &|x| x.compile_nth_child(ast, 0))
+        self.compile_nth_child(ast, 0)
     }
     fn compile_unary(&mut self, ast : &ASTNode) -> Result<(), String>
     {
@@ -860,67 +1305,28 @@ impl CompilerState {
         
         Ok(())
     }
-    fn compile_indirection(&mut self, ast : &ASTNode) -> Result<(), String>
-    {
-        self.compile_pushname(&ast.child(1)?.child(0)?.text)?;
-        self.code.push(INDIRECTION);
-        
-        if matches!(self.context, Context::Expr)
-        {
-            self.code.push(EVALUATION);
-        }
-        
-        Ok(())
-    }
-    fn compile_dismember(&mut self, ast : &ASTNode) -> Result<(), String>
-    {
-        self.compile_pushname(&ast.child(1)?.child(0)?.text)?;
-        self.code.push(DISMEMBER);
-        Ok(())
-    }
-    fn compile_dictindex(&mut self, ast : &ASTNode) -> Result<(), String>
-    {
-        self.compile_pushstr(&ast.child(1)?.child(0)?.text)?;
-        self.code.push(ARRAYEXPR);
-        
-        if matches!(self.context, Context::Expr)
-        {
-            self.code.push(EVALUATION);
-        }
-        
-        Ok(())
-    }
-    fn compile_arrayindex(&mut self, ast : &ASTNode) -> Result<(), String>
-    {
-        self.compile_context_wrapped(Context::Unknown, &|x| x.compile_nth_child(ast, 1))?;
-        self.code.push(ARRAYEXPR);
-        
-        if matches!(self.context, Context::Expr)
-        {
-            self.code.push(EVALUATION);
-        }
-        
-        Ok(())
-    }
     fn compile_lambda(&mut self, ast : &ASTNode) -> Result<(), String>
     {
         let captures : &Vec<ASTNode> = &ast.child(1)?.children;
         let args : &Vec<ASTNode> = &ast.child(4)?.children;
         let statements : &Vec<ASTNode> = &ast.child(7)?.children;
         
-        let mut capturenames = Vec::new();
+        let mut capture_names = Vec::new();
         
         for capture in captures
         {
-            capturenames.push(self.code.get_string_index(&capture.child(0)?.child(0)?.text));
+            capture_names.push(capture.child(0)?.child(0)?.text.clone());
             self.compile_nth_child(capture, 2)?;
         }
         
+        self.open_frame();
+        self.add_function(&"lambda_self".to_string()).ok_or_else(|| format!("error: redeclared identifier `lambda_self`"))?;
+        
         self.code.push(LAMBDA);
         self.compile_u64(captures.len() as u64);
-        for capture_name_index in capturenames.iter().rev()
+        for capture_name in capture_names.iter().rev()
         {
-            self.compile_u64(*capture_name_index as u64);
+            self.add_variable(capture_name).ok_or_else(|| format!("error: redeclared identifier `{}`", capture_name))?;;
         }
         self.compile_u16(args.len() as u16);
         let len_position = self.compile_u64(0 as u64);
@@ -938,6 +1344,8 @@ impl CompilerState {
         }
                 
         self.code.push(EXIT);
+        
+        self.close_frame();
         
         let position_2 = self.code.len();
         let body_len = position_2 - position_1;
@@ -1050,8 +1458,7 @@ impl CompilerState {
         
         if init_exists
         {
-            self.code.push(SCOPE);
-            self.scopedepth += 1;
+            self.frames.last_mut().unwrap().add_scope();
             self.compile_nth_child(header, 0)?;
         }
         
@@ -1093,8 +1500,8 @@ impl CompilerState {
         // for loops need an extra layer of scope around them if they have an init statement
         if init_exists
         {
-            self.scopedepth -= 1;
-            self.compile_unscope()?;
+            let var_stack_length = self.frames.last_mut().unwrap().pop_scope();
+            self.compile_unscope(var_stack_length)?;
         }
         Ok(())
     }
@@ -1238,31 +1645,10 @@ impl CompilerState {
     }
 }
 
-/// Compiles an AST into bytes.
-pub fn compile_bytecode(ast : &ASTNode) -> Result<Code, String>
+pub fn compile_bytecode<'a>(ast : &ASTNode, global : &'a mut GlobalState) -> Result<Code, String>
 {
-    let mut state = CompilerState::new();
-    if let Err(err) = state.compile_any(ast)
-    {
-        eprintln!("compiler hit an error on line {}, position {}, node type {}:", state.last_line, state.last_index, state.last_type);
-        Err(err)
-    }
-    else
-    {
-        Ok(state.code)
-    }
-}
-/// Same as compile_bytecode, but shares bookkeeping with an existing compilation result. Necessary for dynamically compiling subroutines and executing them from other code.
-pub fn compile_bytecode_share_bookkeeping(code : &Code, ast : &ASTNode) -> Result<Code, String>
-{
-    let mut state = CompilerState::new_share_bookkeeping(code);
-    if let Err(err) = state.compile_any(ast)
-    {
-        eprintln!("compiler hit an error on line {}, position {}, node type {}:", state.last_line, state.last_index, state.last_type);
-        Err(err)
-    }
-    else
-    {
-        Ok(state.code)
-    }
+    let mut state = CompilerState::new(global);
+    let signal = state.compile_any(ast);
+    state.trap_error(signal)?;
+    Ok(state.code)
 }

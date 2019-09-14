@@ -35,10 +35,12 @@ print("basic language features:");
 
 obj Character
 {
+    var localvar, x, y;
     def create()
     {
-        far localvar = 1;
-        far x = 0, y = 0;
+        localvar = 1;
+        x = 0;
+        y = 0;
     }
     def printthing(arg)
     {
@@ -97,9 +99,6 @@ with(Character)
 
 with(Character)
     var asdfe4 = 10;
-
-with(i)
-    far holder = i2;
 
 i2.localvar = 5672453;
 
@@ -293,16 +292,6 @@ def call_testfunc()
 }
 
 call_testfunc();
-
-print("subroutine-like function tests:");
-
-subdef getarray()
-{
-    print(myarray);
-    return myarray;
-}
-
-print(getarray()[0]);
 
 print("generator tests:");
 

@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
 pub (crate) struct WhileData {
-    pub (super) scopes: u16,
+    pub (super) variables: u64,
     pub (super) expr_start: usize, // continue destination
     pub (super) loop_start: usize,
     pub (super) loop_end: usize, // continue from here
@@ -22,7 +22,7 @@ pub (crate) struct WhileData {
 
 #[derive(Debug, Clone)]
 pub (crate) struct WithData {
-    pub (super) scopes: u16,
+    pub (super) variables: u64,
     pub (super) loop_start: usize,
     pub (super) loop_end: usize,
     pub (super) instances: Vec<Value>,
@@ -36,7 +36,7 @@ pub (crate) enum ForEachValues {
 
 #[derive(Debug, Clone)]
 pub (crate) struct ForEachData {
-    pub (super) scopes: u16,
+    pub (super) variables: u64,
     pub (super) loop_start: usize,
     pub (super) loop_end: usize,
     pub (super) name: usize,
@@ -45,7 +45,7 @@ pub (crate) struct ForEachData {
 
 #[derive(Debug, Clone)]
 pub (crate) struct SwitchData {
-    pub (super) scopes: u16,
+    pub (super) variables: u64,
     pub (super) blocks: Vec<usize>,
     pub (super) exit: usize,
     pub (super) value: Value,
@@ -66,12 +66,11 @@ pub (crate) struct Frame {
     pub (super) pc: usize,
     pub (super) endpc: usize,
     pub (super) currline: usize,
-    pub (super) scopes: Vec<BTreeMap<usize, ValRef>>,
+    pub (super) variables: Vec<Value>,
     pub (super) instancestack: Vec<usize>,
     pub (super) controlstack: Vec<Controller>,
     pub (super) stack: Vec<StackValue>,
     pub (super) isexpr: bool,
-    pub (super) impassable: bool,
     pub (super) generator: bool,
 }
 
@@ -79,25 +78,24 @@ pub (crate) struct Frame {
 
 #[derive(PartialEq, Eq, Debug, Clone)]
 pub (crate) struct FuncSpec {
-    pub (super) varnames: Vec<usize>,
-    pub (super) code: Code,
-    pub (super) startaddr: usize,
-    pub (super) endaddr: usize,
-    pub (super) fromobj: bool, // function is associated with an object type and must be placed in the context of an instance to be used
-    pub (super) parentobj: usize,
-    pub (super) forcecontext: usize, // the instance to use as context when executing an object function
-    pub (super) impassable: bool, // blocks visibility of scopes outside the called function
-    pub (super) generator: bool,
+    pub (crate) code: Code,
+    pub (crate) startaddr: usize,
+    pub (crate) endaddr: usize,
+    pub (crate) argcount: usize,
+    pub (crate) parentobj: usize,
+    pub (crate) forcecontext: usize, // the instance to use as context when executing an object function
+    pub (crate) fromobj: bool, // function is associated with an object type and must be placed in the context of an instance to be used
+    pub (crate) generator: bool,
 }
+#[derive(Debug, Clone)]
 pub (crate) struct ObjSpec {
-    #[allow(unused)]
-    pub (super) ident: usize,
-    #[allow(unused)]
-    pub (super) name: usize,
-    pub (super) functions: BTreeMap<usize, FuncSpec>
+    pub (crate) ident: usize,
+    pub (crate) variables: BTreeMap<usize, usize>, // mapping of name to index, zeroth index is always "id" (instance id)
+    pub (crate) functions: BTreeMap<usize, FuncSpec>
 }
+#[derive(Debug, Clone)]
 pub (crate) struct Instance {
-    pub (super) variables: BTreeMap<usize, ValRef>,
+    pub (super) variables: BTreeMap<usize, Value>,
     pub (super) objtype: usize,
     pub (super) ident: usize,
 }
@@ -108,6 +106,7 @@ pub (crate) struct Instance {
 #[derive(Debug, Clone)]
 pub (crate) enum NonArrayVariable {
     Indirect(IndirectVar), // x.y.z evaluates x.y before storing it as the instance identity under which to find y, but then (x.y).z is held as-is
+    BareGlobal(usize),
     Global(usize),
     Direct(usize),
     ActualArray(Box<Vec<Value>>),
@@ -139,6 +138,7 @@ pub (crate) struct IndirectVar { // for x.y
 pub (crate) enum Variable {
     Array(ArrayVar),
     Indirect(IndirectVar),
+    BareGlobal(usize),
     Global(usize),
     Direct(usize),
     Selfref,
@@ -150,21 +150,18 @@ impl Variable {
     {
         Variable::Indirect(IndirectVar{ident, name})
     }
-    pub (crate) fn from_global(name : usize) -> Variable
-    {
-        Variable::Global(name)
-    }
 }
 
 // value types
 #[derive(Debug, Clone)]
-// TODO split into InternalFuncVal and FuncVal
-/// Intentionally opaque. Wrapped by Value.
 pub struct FuncVal {
-    pub (super) internal: bool,
-    pub (super) name: Option<usize>,
-    pub (super) predefined: Option<BTreeMap<usize, ValRef>>,
-    pub (super) userdefdata: Option<FuncSpec>
+    pub (super) predefined: Option<Vec<Value>>,
+    pub (super) userdefdata: FuncSpec
+}
+
+#[derive(Debug, Clone)]
+pub struct InternalFuncVal {
+    pub (super) nameindex : usize
 }
 
 #[derive(Debug, Clone)]
@@ -181,13 +178,6 @@ pub struct Custom {
     pub storage: u64,
 }
 
-/*
-pub (crate) enum Reference {
-    Mut(ValRef),
-    Immut(StackValue)
-}
-*/
-
 #[derive(Debug, Clone)]
 /// Intentionally opaque. Wrapped by Value.
 pub struct SubFuncVal {
@@ -203,6 +193,7 @@ pub enum Value {
     Array(Box<Vec<Value>>),
     Dict(Box<HashMap<HashableValue, Value>>),
     Set(Box<HashSet<HashableValue>>),
+    InternalFunc(InternalFuncVal),
     Func(Box<FuncVal>),
     Generator(Box<GeneratorState>),
     Instance(usize),
@@ -210,131 +201,6 @@ pub enum Value {
     Custom(Custom),
     // cannot be assigned
     SubFunc(Box<SubFuncVal>),
-}
-
-#[derive(Debug)]
-pub struct ValRef {
-    reference: Rc<RefCell<Value>>,
-    indexes: Option<Vec<HashableValue>>,
-    readonly: bool,
-}
-impl ValRef {
-    pub fn from_val(val : Value) -> ValRef
-    {
-        ValRef{reference : Rc::new(RefCell::new(val)), indexes : None, readonly : false}
-    }
-    pub fn from_val_readonly(val : Value) -> ValRef
-    {
-        ValRef{reference : Rc::new(RefCell::new(val)), indexes : None, readonly : true}
-    }
-    pub fn from_val_indexed(val : Value, indexes : Vec<HashableValue>) -> ValRef
-    {
-        ValRef{reference : Rc::new(RefCell::new(val)), indexes : Some(indexes), readonly : false}
-    }
-    pub fn from_val_indexed_readonly(val : Value, indexes : Vec<HashableValue>) -> ValRef
-    {
-        ValRef{reference : Rc::new(RefCell::new(val)), indexes : Some(indexes), readonly : true}
-    }
-    pub (crate) fn from_ref(reference : Rc<RefCell<Value>>, indexes : Vec<HashableValue>, readonly : bool) -> ValRef
-    {
-        ValRef{reference, indexes : Some(indexes), readonly}
-    }
-    pub fn refclone(&self) -> ValRef
-    {
-        ValRef{reference : Rc::clone(&self.reference), indexes : self.indexes.clone(), readonly : self.readonly}
-    }
-    pub fn borrow(&self) -> Result<std::cell::Ref<Value>, String>
-    {
-        Ok(self.reference.borrow())
-    }
-    pub fn borrow_mut(&self) -> Result<std::cell::RefMut<Value>, String>
-    {
-        if self.readonly
-        {
-            return Err("error: tried to borrow to a read-only value".to_string());
-        }
-        Ok(self.reference.borrow_mut())
-    }
-    pub fn extract_ref(&self) -> Result<Rc<RefCell<Value>>, String>
-    {
-        if self.readonly
-        {
-            return Err("error: tried to borrow to a read-only value".to_string());
-        }
-        Ok(Rc::clone(&self.reference))
-    }
-    pub fn to_val(&self) -> Result<Value, String>
-    {
-        if let Some(indexes) = &self.indexes
-        {
-            use super::variableaccess::return_indexed;
-            return_indexed(&*self.borrow()?, indexes)
-        }
-        else
-        {
-            Ok((*self.reference).clone().into_inner())
-        }
-    }
-    pub fn mutate<F : FnOnce(&mut Value) -> Result<(), String>>(&self, mutator : F) -> Result<(), String>
-    {
-        if self.readonly
-        {
-            return Err("error: tried to assign to a read-only value".to_string());
-        }
-        if let Some(indexes) = &self.indexes
-        {
-            use super::variableaccess::mutate_indexed;
-            let mut myref = self.reference.borrow_mut();
-            mutate_indexed(mutator, &mut myref, indexes)?;
-            if matches!(*myref, Value::SubFunc(_))
-            {
-                return Err("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)".to_string());
-            }
-            Ok(())
-        }
-        else
-        {
-            let mut var = self.reference.borrow_mut();
-            mutator(&mut var)?;
-            if matches!(*var, Value::SubFunc(_))
-            {
-                return Err("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)".to_string());
-            }
-            Ok(())
-        }
-    }
-    pub fn assign(&self, val : Value) -> Result<(), String>
-    {
-        if self.readonly
-        {
-            return Err("error: tried to assign to a read-only value".to_string());
-        }
-        match val
-        {
-            Value::SubFunc(_) => Err("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)".to_string()),
-            val =>
-            {
-                if let Some(indexes) = &self.indexes
-                {
-                    use super::variableaccess::assign_indexed;
-                    assign_indexed(val, &mut self.reference.borrow_mut(), indexes)
-                }
-                else
-                {
-                    let mut var = self.reference.borrow_mut();
-                    *var = val;
-                    Ok(())
-                }
-            }
-        }
-    }
-}
-
-impl Clone for ValRef {
-    fn clone(&self) -> ValRef
-    {
-        ValRef{reference: Rc::new(RefCell::new(self.to_val().unwrap())), indexes: self.indexes.clone(), readonly: self.readonly}
-    }
 }
 
 #[derive(Debug, Clone)]
@@ -356,12 +222,11 @@ impl Frame {
     pub (super) fn new_root(code : &Code) -> Frame
     {
         let codelen = code.len();
-        Frame { code : code.clone(), startpc : 0, pc : 0, endpc : codelen, scopes : vec!(BTreeMap::new()), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0, impassable: true, generator: false }
+        Frame { code : code.clone(), startpc : 0, pc : 0, endpc : codelen, variables : vec!(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0, generator: false }
     }
-    pub (super) fn new_from_call(code : &Code, startpc : usize, endpc : usize, isexpr : bool, outer : Option<&Frame>, generator : bool) -> Frame
+    pub (super) fn new_from_call(code : &Code, startpc : usize, endpc : usize, isexpr : bool, generator : bool) -> Frame
     {
-        let instancestack = if let Some(outer) = outer { outer.instancestack.clone() } else { Vec::new() };
-        Frame { code : code.clone(), startpc, pc : startpc, endpc, scopes : vec!(BTreeMap::new()), instancestack, controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, impassable : outer.is_none(), generator }
+        Frame { code : code.clone(), startpc, pc : startpc, endpc, variables : vec!(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, generator }
     }
     pub (super) fn len(&mut self) -> usize
     {
@@ -395,9 +260,9 @@ impl Frame {
 
 impl Value
 {
-    pub (crate) fn new_funcval(internal : bool, name : Option<usize>, predefined : Option<BTreeMap<usize, ValRef>>, userdefdata : Option<FuncSpec>) -> Value
+    pub (crate) fn new_funcval(predefined : Option<Vec<Value>>, userdefdata : FuncSpec) -> Value
     {
-        Value::Func(Box::new(FuncVal{internal, name, predefined, userdefdata}))
+        Value::Func(Box::new(FuncVal{predefined, userdefdata}))
     }
 }
 

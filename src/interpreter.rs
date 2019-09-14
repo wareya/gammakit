@@ -9,10 +9,11 @@ mod internal;
 mod simulation;
 mod manipulation;
 mod jumping;
-mod types;
+pub (crate) mod types;
 mod variableaccess;
 
 pub use self::types::*;
+use variableaccess::ValueLoc;
 
 /// Returned by the step() method of an interpreter.
 pub type StepResult = Result<bool, String>;
@@ -22,7 +23,7 @@ pub type Binding = FnMut(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
 /// Type signature of functions to be registered as simple bindings.
 pub type SimpleBinding = FnMut(Vec<Value>) -> Result<Value, String>;
 /// Type signature of functions to be registered as arrow function bindings.
-pub type ArrowBinding = FnMut(ValRef, Vec<Value>) -> Result<Value, String>;
+pub type ArrowBinding = FnMut(ValueLoc, Vec<Value>) -> Result<Value, String>;
 
 fn minierr(mystr : &'static str) -> String
 {
@@ -34,34 +35,85 @@ fn plainerr<T>(mystr : &'static str) -> Result<T, String>
 }
 
 // global interpreter data
-struct GlobalState {
+pub struct GlobalState {
+    string_index: usize,
+    string_table : HashMap<String, usize>,
+    string_table_reverse : BTreeMap<usize, String>,
+    
     instance_id: usize,
-    object_id: usize,
     instances: BTreeMap<usize, Instance>,
-    instances_by_type: BTreeMap<usize, BTreeSet<usize>>,
-    objectnames: BTreeMap<usize, usize>,
-    objects: BTreeMap<usize, ObjSpec>,
-    parser: Option<Parser>,
-    variables: BTreeMap<usize, ValRef>, // accessed as global.varname
-    barevariables: BTreeMap<usize, ValRef>, // accessed as varname
-    functions: BTreeMap<usize, Value>, // accessed as funcname
+    pub (crate) instances_by_type: BTreeMap<usize, BTreeSet<usize>>,
+    
+    pub (crate) objects: BTreeMap<usize, ObjSpec>,
+    pub (crate) variables: BTreeMap<usize, Value>, // accessed as global.varname
+    pub (crate) barevariables: BTreeMap<usize, Value>, // accessed as varname
+    pub (crate) functions: BTreeMap<usize, Value>, // accessed as funcname
+    
+    pub (crate) bindings: BTreeMap<usize, Rc<RefCell<Binding>>>,
+    pub (crate) simple_bindings: BTreeMap<usize, Rc<RefCell<SimpleBinding>>>,
+    pub (crate) arrow_bindings: BTreeMap<usize, Rc<RefCell<ArrowBinding>>>,
+    
+    parser: Parser,
 }
 
 impl GlobalState {
-    fn new(parser : Option<Parser>) -> GlobalState
+    fn new(parser : Parser) -> GlobalState
     {
         GlobalState {
+            string_index : 1,
+            string_table : HashMap::new(),
+            string_table_reverse : BTreeMap::new(),
+            
             instance_id : 1,
-            object_id : 1,
             instances : BTreeMap::new(),
             instances_by_type : BTreeMap::new(),
-            objectnames : BTreeMap::new(),
+            
             objects : BTreeMap::new(),
-            parser,
             variables : BTreeMap::new(),
             barevariables : BTreeMap::new(),
             functions : BTreeMap::new(),
+            
+            bindings : BTreeMap::new(),
+            simple_bindings : BTreeMap::new(),
+            arrow_bindings : BTreeMap::new(),
+            
+            parser,
         }
+    }
+    pub (crate) fn get_string_index(&mut self, string : &String) -> usize
+    {
+        if let Some(index) = self.string_table.get(string)
+        {
+            *index
+        }
+        else
+        {
+            let index = self.string_index;
+            self.string_index += 1;
+            self.string_table.insert(string.clone(), index);
+            self.string_table_reverse.insert(index, string.clone());
+            index
+        }
+    }
+    pub (crate) fn get_string(&self, index : usize) -> String
+    {
+        if let Some(string) = self.string_table_reverse.get(&index)
+        {
+            return string.clone();
+        }
+        format!("<index {} with no associated string>", index)
+    }
+    pub (crate) fn insert_bare_global(&mut self, index : usize)
+    {
+        self.barevariables.insert(index, Value::Number(0.0));
+    }
+    pub (crate) fn insert_global(&mut self, index : usize)
+    {
+        self.variables.insert(index, Value::Number(0.0));
+    }
+    pub (crate) fn insert_globalfunc(&mut self, index : usize, func : FuncSpec)
+    {
+        self.functions.insert(index, Value::new_funcval(None, func));
     }
 }
 
@@ -72,33 +124,27 @@ type OpFunc = fn(&mut Interpreter) -> OpResult;
 pub struct Interpreter {
     top_frame: Frame,
     frames: Vec<Frame>,
-    pub (crate) bindings: BTreeMap<usize, Rc<RefCell<Binding>>>,
-    pub (crate) simple_bindings: BTreeMap<usize, Rc<RefCell<SimpleBinding>>>,
-    pub (crate) arrow_bindings: BTreeMap<usize, Rc<RefCell<ArrowBinding>>>,
     global: GlobalState,
     /// Last error returned by step(). Gets cleared (reset to None) when step() runs without returning an error.
     pub last_error: Option<String>,
-    pub (crate) opfunc_map: Box<[OpFunc; 256]>,
     pub (crate) op_map_hits: BTreeMap<u8, u128>,
     pub (crate) op_map: BTreeMap<u8, u128>,
     doexit: bool,
     pub (crate) track_op_performance: bool,
 }
 
+
 impl Interpreter {
     /// Creates a new interpreter 
-    pub fn new(code : &Code, parser : Option<Parser>) -> Interpreter
+    pub fn new(parser : Parser) -> Interpreter
     {
+        Interpreter::build_opfunc_table();
         Interpreter {
-            top_frame : Frame::new_root(code),
+            top_frame : Frame::new_root(&Code::new()),
             frames : vec!(),
             doexit : false,
-            bindings : BTreeMap::new(),
-            simple_bindings : BTreeMap::new(),
-            arrow_bindings : BTreeMap::new(),
             global : GlobalState::new(parser),
             last_error : None,
-            opfunc_map : Interpreter::build_opfunc_table(),
             op_map_hits : BTreeMap::new(),
             op_map : BTreeMap::new(),
             track_op_performance : false
@@ -120,6 +166,24 @@ impl Interpreter {
         self.doexit = false;
         self.last_error = None;
     }
+    
+    pub fn restart_in_place(&mut self)
+    {
+        self.restart(&self.top_frame.code.clone());
+    }
+    
+    pub fn restart_into_string(&mut self, text: &str) -> Result<(), String>
+    {
+        let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
+        
+        let tokens = self.global.parser.tokenize(&program_lines, false)?;
+        
+        let ast = self.global.parser.parse_program(&tokens, &program_lines, false)?.ok_or_else(|| "failed to parse program".to_string())?;
+        
+        let code = compile_bytecode(&ast, &mut self.global)?;
+        self.restart(&code);
+        Ok(())
+    }
     /// Clears global state (objects/instances).
     /// 
     /// This GRACELESSLY deletes all objects and instances, even if they contained code that has not yet finished running or needs special destruction.
@@ -131,7 +195,7 @@ impl Interpreter {
     /// Does not reset global state (objects/instances).
     pub fn clear_global_state(&mut self)
     {
-        let mut parser : Option<Parser> = None;
+        let mut parser = Parser::default();
         std::mem::swap(&mut parser, &mut self.global.parser);
         self.global = GlobalState::new(parser);
     }
@@ -139,28 +203,15 @@ impl Interpreter {
     fn step_internal(&mut self) -> OpResult
     {
         use std::time::Instant;
-        if self.get_pc() < self.top_frame.startpc || self.get_pc() >= self.top_frame.endpc
-        {
-            if true || cfg!(code_bounds_debugging)
-            {
-                return Err(minierr("internal error: simulation stepped while outside of the range of the frame it was in"));
-            }
-            else
-            {
-                panic!("internal error: simulation stepped while outside of the range of the frame it was in");
-            }
-        }
         
         if !self.track_op_performance
         {
-            let op = self.pull_single_from_code().unwrap();
-            self.run_opfunc(op)?;
+            self.run_next_op()?;
         }
         else
         {
             let start_time = Instant::now();
-            let op = self.pull_single_from_code().unwrap();
-            self.run_opfunc(op)?;
+            let op = self.run_next_op()?;
             *self.op_map_hits.entry(op).or_insert(0) += 1;
             *self.op_map.entry(op).or_insert(0) += Instant::now().duration_since(start_time).as_nanos();
         }
@@ -230,5 +281,9 @@ impl Interpreter {
                 return Err(err);
             }
         }
+    }
+    pub fn dump_code(&self) -> Vec<u8>
+    {
+        self.top_frame.code.get(..).unwrap().iter().cloned().collect()
     }
 }

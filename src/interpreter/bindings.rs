@@ -1,8 +1,9 @@
 #![allow(clippy::type_complexity)]
 #![allow(clippy::cast_lossless)]
 
-use crate::interpreter::*;
-use crate::interpreter::types::ops::{float_booly, bool_floaty};
+use super::*;
+use super::variableaccess::ValueLoc;
+use super::types::ops::{float_booly, bool_floaty};
 
 pub trait VecHelpers<Value> {
     /// Slow; use extract() instead
@@ -111,21 +112,21 @@ impl Interpreter
     pub fn insert_binding(&mut self, funcname : String, func : Rc<RefCell<Binding>>)
     {
         let index = self.get_string_index(&funcname);
-        self.simple_bindings.remove(&index);
-        self.bindings.insert(index, func);
+        self.global.simple_bindings.remove(&index);
+        self.global.bindings.insert(index, func);
     }
     /// Insert a normal binding that does not need access to the interpreter.
     pub fn insert_simple_binding(&mut self, funcname : String, func : Rc<RefCell<SimpleBinding>>)
     {
         let index = self.get_string_index(&funcname);
-        self.bindings.remove(&index);
-        self.simple_bindings.insert(index, func);
+        self.global.bindings.remove(&index);
+        self.global.simple_bindings.insert(index, func);
     }
     /// Insert an associated function ("arrow" function) binding.
     pub fn insert_arrow_binding(&mut self, funcname : String, func : Rc<RefCell<ArrowBinding>>)
     {
         let index = self.get_string_index(&funcname);
-        self.arrow_bindings.insert(index, func);
+        self.global.arrow_bindings.insert(index, func);
     }
     /// Inserts or reinserts the default bindings. These SHOULD be safe, but if you're paranoid or you're making a very restrictive implementation of gammakit, you can feel free not to call this after initializing the interpreter.
     pub fn insert_default_bindings(&mut self)
@@ -167,15 +168,15 @@ impl Interpreter
     }
     pub (crate) fn get_binding(&self, name : usize) -> Option<Rc<RefCell<Binding>>>
     {
-        match_or_none!(self.bindings.get(&name), Some(f) => Rc::clone(f))
+        match_or_none!(self.global.bindings.get(&name), Some(f) => Rc::clone(f))
     }
     pub (crate) fn get_simple_binding(&self, name : usize) -> Option<Rc<RefCell<SimpleBinding>>>
     {
-        match_or_none!(self.simple_bindings.get(&name), Some(f) => Rc::clone(f))
+        match_or_none!(self.global.simple_bindings.get(&name), Some(f) => Rc::clone(f))
     }
     pub (crate) fn get_arrow_binding(&self, name : usize) -> Option<Rc<RefCell<ArrowBinding>>>
     {
-        match_or_none!(self.arrow_bindings.get(&name), Some(f) => Rc::clone(f))
+        match_or_none!(self.global.arrow_bindings.get(&name), Some(f) => Rc::clone(f))
     }
     pub (crate) fn sim_func_print(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
@@ -244,6 +245,8 @@ impl Interpreter
         {
             return Err(format!("error: wrong number of arguments to instance_create(); expected 1, got {}", args.len()));
         }
+        let create_index = self.get_string_index(&"create".to_string());
+        let id_index = self.get_string_index(&"id".to_string());
         
         let object_id = self.vec_pop_front_object(&mut args).ok_or_else(|| minierr("error: first argument to instance_create() must be an object"))?;
         
@@ -255,7 +258,11 @@ impl Interpreter
         let object = self.global.objects.get(&object_id).ok_or_else(|| format!("error: tried to create instance of non-extant object type {}", object_id))?;
         
         let mut variables = BTreeMap::new();
-        variables.insert(self.get_string_index(&"id".to_string()), ValRef::from_val(Value::Instance(instance_id)));
+        variables.insert(id_index, Value::Instance(instance_id));
+        for var in object.variables.keys() // FIXME make this stuff use exact index somehow
+        {
+            variables.insert(*var, Value::Number(0.0));
+        }
         self.global.instances.insert(instance_id, Instance { objtype : object_id, ident : instance_id, variables });
         
         if let Some(ref mut instance_list) = self.global.instances_by_type.get_mut(&object_id)
@@ -269,11 +276,11 @@ impl Interpreter
             self.global.instances_by_type.insert(object_id, instance_list);
         }
         
-        if let Some(function) = object.functions.get(&self.get_string_index(&"create".to_string()))
+        if let Some(function) = object.functions.get(&create_index)
         {
             let mut mydata = function.clone();
             mydata.forcecontext = instance_id;
-            let pseudo_funcvar = FuncVal{internal : false, name : Some(5), predefined : None, userdefdata : Some(mydata)};
+            let pseudo_funcvar = Box::new(FuncVal{predefined : None, userdefdata : mydata});
             self.call_function(pseudo_funcvar, Vec::new(), false)?;
         }
         
@@ -322,7 +329,7 @@ impl Interpreter
         }
         
         let text = self.vec_pop_front_text(&mut args).ok_or_else(|| minierr("error: first argument to parse_text() must be a string"))?;
-        let parser = self.global.parser.as_mut().ok_or_else(|| minierr("error: parser was not loaded into interpreter"))?;
+        let parser = &mut self.global.parser;
         
         let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
         let tokens = parser.tokenize(&program_lines, true)?;
@@ -341,25 +348,22 @@ impl Interpreter
         
         let dict = self.vec_pop_front_dict(&mut args).ok_or_else(|| minierr("error: first argument to compile_ast() must be a dictionary"))?;
         let ast = dict_to_ast(&dict)?;
-        let code = compile_bytecode_share_bookkeeping(&self.top_frame.code, &ast)?;
+        let code = compile_bytecode(&ast, &mut self.global)?;
         
         // endaddr at the start because Rc::new() moves `code`
         Ok
         ( Value::new_funcval
-          ( false,
-            None,
-            None,
-            Some(FuncSpec
+          ( None,
+            FuncSpec
             { endaddr : code.len(), // must be before code : Rc::new(code)
-              varnames : Vec::new(),
+              argcount : 0,
               code,
               startaddr : 0,
               fromobj : false,
               parentobj : 0,
               forcecontext : 0,
-              impassable : true,
               generator : false,
-            })
+            }
         ) )
     }
 
@@ -372,41 +376,38 @@ impl Interpreter
         let text = self.vec_pop_front_text(&mut args).ok_or_else(|| minierr("error: first argument to compile_text() must be a string"))?;
         
         let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
-        let parser = self.global.parser.as_mut().ok_or_else(|| minierr("error: parser was not loaded into interpreter"))?;
+        let parser = &mut self.global.parser;
         
         let tokens = parser.tokenize(&program_lines, true)?;
         let ast = parser.parse_program(&tokens, &program_lines, true)?.ok_or_else(|| minierr("error: string failed to parse"))?;
         
-        let code = compile_bytecode_share_bookkeeping(&self.top_frame.code, &ast)?;
+        let code = compile_bytecode(&ast, &mut self.global)?;
         
         // endaddr at the start because Rc::new() moves `code`
         Ok
         ( Value::new_funcval
-          ( false,
-            None,
-            None,
-            Some(FuncSpec
+          ( None,
+            FuncSpec
             { endaddr : code.len(), // must be before code : Rc::new(code)
-              varnames : Vec::new(),
+              argcount : 0,
               code,
               startaddr : 0,
               fromobj : false,
               parentobj : 0,
               forcecontext : 0,
-              impassable : true,
               generator : false,
-            })
+            }
         ) )
     }
     
-    pub (crate) fn sim_subfunc_len(myself : ValRef, args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_len(myself : ValueLoc, args : Vec<Value>) -> Result<Value, String>
     {
         if !args.is_empty()
         {
             return Err(format!("error: wrong number of arguments to len(); expected 0, got {}", args.len()));
         }
         
-        Ok(match *myself.borrow()?
+        Ok(match myself.as_ref()
         {
             Value::Text(ref string) => Value::Number(string.chars().count() as f64),
             Value::Array(ref array) => Value::Number(array.len() as f64),
@@ -415,21 +416,21 @@ impl Interpreter
             _ => return plainerr("error: tried to take length of lengthless type")
         })
     }
-    pub (crate) fn sim_subfunc_keys(myself : ValRef, args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_keys(myself : ValueLoc, args : Vec<Value>) -> Result<Value, String>
     {
         if !args.is_empty()
         {
             return Err(format!("error: wrong number of arguments to keys(); expected 0, got {}", args.len()));
         }
         
-        Ok(match *myself.borrow()?
+        Ok(match myself.as_ref()
         {
             Value::Array(ref array) => Value::Array(Box::new((0..array.len()).map(|i| Value::Number(i as f64)).collect())),
             Value::Dict(ref dict) => Value::Array(Box::new(dict.iter().map(|(key, _)| hashval_to_val(key.clone())).collect())),
             _ => return plainerr("error: tried to take length of lengthless type")
         })
     }
-    pub (crate) fn sim_subfunc_slice(myself : ValRef, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_slice(myself : ValueLoc, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 2
         {
@@ -440,30 +441,30 @@ impl Interpreter
         let start = match_or_err!(start, Value::Number(start) => start.round() as i64, minierr("error: start and end indexes passed to slice() must be numbers"))?;
         let end = match_or_err!(end, Value::Number(end) => end.round() as i64, minierr("error: start and end indexes passed to slice() must be numbers"))?;
         
-        Ok(match *myself.borrow()?
+        Ok(match myself.as_ref()
         {
             Value::Text(ref string) => slice_any(&string.chars().collect::<Vec<char>>(), start, end).map(|array| Value::Text(array.iter().cloned().collect())).ok_or_else(|| minierr("error: slice() on string went out of range"))?,
             Value::Array(ref array) => slice_any(&array, start, end).map(|array| Value::Array(Box::new(array.to_vec()))).ok_or_else(|| minierr("error: slice() on array went out of range"))?,
             _ => return plainerr("error: tried to slice lengthless type")
         })
     }
-    pub (crate) fn sim_subfunc_contains(myself : ValRef, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_contains(myself : ValueLoc, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
             return Err(format!("error: wrong number of arguments to contains(); expected 1, got {}", args.len()));
         }
         let key = args.expect_extract(0)?;
-        Ok(match *myself.borrow()?
+        Ok(match myself.as_ref()
         {
             Value::Dict(ref dict) => Value::Number(bool_floaty(dict.contains_key(&val_to_hashval(key)?))),
             Value::Set (ref set ) => Value::Number(bool_floaty(set .contains    (&val_to_hashval(key)?))),
             _ => return plainerr("error: remove() must be called with an array, dictionary, or set as its argument")
         })
     }
-    pub (crate) fn sim_subfunc_insert(myself : ValRef, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_insert(mut myself : ValueLoc, mut args : Vec<Value>) -> Result<Value, String>
     {
-        match *myself.borrow_mut()?
+        match myself.as_mut()?
         {
             Value::Text(ref mut string) =>
             {
@@ -530,14 +531,14 @@ impl Interpreter
             _ => plainerr("error: insert() must be called with an array, dictionary, set, or string as the first argument")
         }
     }
-    pub (crate) fn sim_subfunc_push(myself : ValRef, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_push(mut myself : ValueLoc, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
             return Err(format!("error: wrong number of arguments to push(); expected 1, got {}", args.len()));
         }
         let value = args.expect_extract(0)?;
-        match *myself.borrow_mut()?
+        match myself.as_mut()?
         {
             Value::Text(ref mut string) =>
             {
@@ -556,14 +557,14 @@ impl Interpreter
             _ => plainerr("error: push() must be called with an array or string as the first argument")
         }
     }
-    pub (crate) fn sim_subfunc_remove(myself : ValRef, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_remove(mut myself : ValueLoc, mut args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
             return Err(format!("error: wrong number of arguments to remove(); expected 1, got {}", args.len()));
         }
         let key = args.expect_extract(0)?;
-        match *myself.borrow_mut()?
+        match myself.as_mut()?
         {
             Value::Text(ref mut string) =>
             {
@@ -612,13 +613,13 @@ impl Interpreter
             _ => plainerr("error: remove() must be called with an array, dictionary, or set as its argument")
         }
     }
-    pub (crate) fn sim_subfunc_pop(myself : ValRef, args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_subfunc_pop(mut myself : ValueLoc, args : Vec<Value>) -> Result<Value, String>
     {
         if !args.is_empty()
         {
             return Err(format!("error: wrong number of arguments to pop(); expected 0, got {}", args.len()));
         }
-        match *myself.borrow_mut()?
+        match myself.as_mut()?
         {
             Value::Array(ref mut array) =>
             {

@@ -596,20 +596,7 @@ impl Parser {
             
             match ast.text.as_str()
             {
-                "objdef" =>
-                {
-                    if ast.children.len() < 3
-                    {
-                        return plainerr("internal error: objdef AST node does not have at least 3 children");
-                    }
-                    for child in ast.child_slice(3, -1)?
-                    {
-                        if matches!(child.child(1)?.child(0)?.text.as_str(), "create" | "destroy") && !child.child(3)?.children.is_empty()
-                        {
-                            return plainerr(&format!("error: `{}` function of object must not have any arguments", child.child(1)?.child(0)?.text));
-                        }
-                    }
-                }
+                // TODO move this to the compiler
                 "funccall" =>
                 {
                     if ast.last_child()?.child(0)?.text != "funcargs"

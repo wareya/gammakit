@@ -37,5 +37,7 @@ overflow-checks = false
 lto = true
 
 [profile.test]
-opt-level = 3
+opt-level = 1
+debug = true
+incremental = false
 overflow-checks = true

@@ -1,382 +1,232 @@
 use crate::interpreter::*;
 
-// "Indirect" variables store an instance id and a variable name.
-// mychar.player.inputs evaluates from left to right:
-// (characterid).player.inputs
-// (playerid).inputs
-// This is done because gammakit doesn't have any kind of concept of "references" in the sense of a binding to a variable somewhere else or in the GC.
-// The only "references" that exist anywhere in gammakit are instance ids, which are manually managed with instance_kill.
-// When you assign to an "indirect" variable, the language needs to hold on to what instance that variable belongs to.
-
-// Arrays and dictionaries are handled differently. Because they're moved by value, not id, they can't be partially evaluated.
-// Arrays-of-arrays are stored, literally, as arrays of arrays. Not as arrays of references or pointers.
-// So the entire list of indexes (e.g. myarray["stats"][35][23], for a dictionary of arrays of arrays) needs to be stored.
-// Each index can be evaluated individually. These are then stored in a list.
-// When the expression is accessed, the language searches for the variable name in the current scope,
-//  then uses assign_or_return_indexed to get at and work with the relevant value.
-
-// Before you ask: Things like x += y work by evaluating x and storing the evaluation temporarily, so variableaccess.rs only handles evaluation and storage.
-
 macro_rules! plainerr { ( $x:expr ) => { Err($x.to_string()) } }
 
-fn assign_val(value : Value, var : &mut Value) -> Result<(), String>
-{
-    if matches!(value, Value::SubFunc(_))
-    {
-        return plainerr!("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)");
-    }
-    *var = value;
-    Ok(())
+#[derive(Debug)]
+pub enum ValueLoc<'a> {
+    Static(Value),
+    Immut(&'a Value),
+    Mut(&'a mut Value)
 }
 
-pub (crate) fn assign_indexed(value : Value, var : &mut Value, indexes : &[HashableValue]) -> Result<(), String>
-{
-    if let (Some(index), Some(new_indexes)) = (indexes.get(0), indexes.get(1..))
+impl<'a> ValueLoc<'a> {
+    pub fn as_val(&self) -> Value
     {
-        match var
+        match self
         {
-            Value::Array(ref mut var) =>
-            {
-                let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an array index"))?;
-                
-                let mut newvar = var.get_mut(indexnum.round() as usize).ok_or_else(|| format!("error: tried to access non-extant index {} of an array", indexnum))?;
-                assign_indexed(value, &mut newvar, new_indexes)
-            }
-            Value::Dict(ref mut var) =>
-            {
-                let mut newvar = var.get_mut(index).ok_or_else(|| format!("error: tried to access non-extant index {:?} of a dict", index))?;
-                assign_indexed(value, &mut newvar, new_indexes)
-            }
-            Value::Text(ref mut text) =>
-            {
-                if !new_indexes.is_empty()
-                {
-                    return plainerr!("error: tried to index into the value at another index in a string (i.e. tried to do something like \"asdf\"[0][0])");
-                }
-                
-                let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an index into a string"))?;
-                
-                let realindex = ((indexnum.round() as i64) % text.len() as i64) as usize;
-                
-                let mychar = match_or_err!(value, Value::Text(mychar) => mychar, minierr("error: tried to assign non-string to an index into a string (assigning by codepoint is not supported yet)"))?;
-                
-                if mychar.chars().count() == 1
-                {
-                    let mychar = mychar.chars().next().ok_or_else(|| minierr("internal error: failed to get first character of a string of length 1"))?;
-                    // turn into array of codepoints, then modify
-                    let mut codepoints = text.chars().collect::<Vec<char>>();
-                    let codepoint = codepoints.get_mut(realindex).ok_or_else(|| minierr("error: tried to assign to a character index that was past the end of a string"))?;
-                    *codepoint = mychar;
-                    // turn array of codepoints back into string
-                    let newstr : String = codepoints.iter().collect();
-                    *text = newstr;
-                    Ok(())
-                }
-                else
-                {
-                    Err(format!("error: tried to assign to an index into a string with a string that was not exactly one character long (was {} characters long)", mychar.len()))
-                }
-            }
-            _ => Err(format!("error: tried to index into a non-array, non-dict, non-text value {:?} with index {:?}", var, index))
+            ValueLoc::Static(v) => v.clone(),
+            ValueLoc::Immut(v) => (*v).clone(),
+            ValueLoc::Mut(v) => (*v).clone(),
         }
     }
-    else
+    pub fn to_val(self) -> Value
     {
-        assign_val(value, var)
-    }
-}
-pub (crate) fn mutate_indexed<F : FnOnce(&mut Value) -> Result<(), String>>(mutator : F, var : &mut Value, indexes : &[HashableValue]) -> Result<(), String>
-{
-    if let (Some(index), Some(new_indexes)) = (indexes.get(0), indexes.get(1..))
-    {
-        match var
+        match self
         {
-            Value::Array(ref mut var) =>
-            {
-                let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an array index"))?;
-                
-                let mut newvar = var.get_mut(indexnum.round() as usize).ok_or_else(|| format!("error: tried to access non-extant index {} of an array", indexnum))?;
-                mutate_indexed(mutator, &mut newvar, new_indexes)
-            }
-            Value::Dict(ref mut var) =>
-            {
-                let mut newvar = var.get_mut(index).ok_or_else(|| format!("error: tried to access non-extant index {:?} of a dict", index))?;
-                mutate_indexed(mutator, &mut newvar, new_indexes)
-            }
-            Value::Text(ref mut text) =>
-            {
-                if !new_indexes.is_empty()
-                {
-                    return plainerr!("error: tried to index into the value at another index in a string (i.e. tried to do something like \"asdf\"[0][0])");
-                }
-                
-                let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an index into a string"))?;
-                
-                let realindex = ((indexnum.round() as i64) % text.len() as i64) as usize;
-                let mut codepoints = text.chars().collect::<Vec<char>>();
-                let codepoint = codepoints.get_mut(realindex).ok_or_else(|| minierr("error: tried to assign to a character index that was past the end of a string"))?;
-                let mut mutatee = Value::Text(vec!(*codepoint).iter().collect());
-                mutator(&mut mutatee)?;
-                
-                let mutatee = match_or_err!(mutatee, Value::Text(mychar) => mychar, minierr("error: tried to assign non-string to an index into a string (assigning by codepoint is not supported yet)"))?;
-                
-                if mutatee.chars().count() == 1
-                {
-                    let mutatee = mutatee.chars().next().ok_or_else(|| minierr("internal error: failed to get first character of a string of length 1"))?;
-                    // turn into array of codepoints, then modify
-                    *codepoint = mutatee;
-                    // turn array of codepoints back into string
-                    let newstr : String = codepoints.iter().collect();
-                    *text = newstr;
-                    Ok(())
-                }
-                else
-                {
-                    Err(format!("error: tried to assign to an index into a string with a string that was not exactly one character long (was {} characters long)", mutatee.len()))
-                }
-            }
-            _ => Err(format!("error: tried to index into a non-array, non-dict, non-text value {:?} with index {:?}", var, index))
+            ValueLoc::Static(v) => v,
+            ValueLoc::Immut(v) => (*v).clone(),
+            ValueLoc::Mut(v) => (*v).clone(),
         }
     }
-    else
+    pub fn as_ref(&'a self) -> &'a Value
     {
-        mutator(var)?;
-        if matches!(var, Value::SubFunc(_))
+        match self
         {
-            return plainerr!("error: tried to assign the result of the dismember operator (->) to a variable (you probably forgot the argument list)");
-        }
-        Ok(())
-    }
-}
-pub (crate) fn return_indexed(var : &Value, indexes : &[HashableValue]) -> Result<Value, String>
-{
-    if let (Some(index), Some(new_indexes)) = (indexes.get(0), indexes.get(1..))
-    {
-        match var
-        {
-            Value::Array(ref var) =>
-            {
-                let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an array index"))?;
-                
-                let newvar = var.get(indexnum.round() as usize).ok_or_else(|| format!("error: tried to access non-extant index {} of an array", indexnum))?;
-                return_indexed(&newvar, new_indexes)
-            }
-            Value::Dict(ref var) =>
-            {
-                let newvar = var.get(index).ok_or_else(|| format!("error: tried to access non-extant index {:?} of a dict", index))?;
-                return_indexed(&newvar, new_indexes)
-            }
-            Value::Text(ref text) =>
-            {
-                if !new_indexes.is_empty()
-                {
-                    return plainerr!("error: tried to index into the value at another index in a string (i.e. tried to do something like \"asdf\"[0][0])");
-                }
-                
-                let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an index into a string"))?;
-                
-                let realindex = ((indexnum.round() as i64) % text.len() as i64) as usize;
-                
-                let codepoints = text.chars().collect::<Vec<char>>();
-                let codepoint = codepoints.get(realindex).ok_or_else(|| minierr("error: tried to evaluate a character from an index that was past the end of a string"))?;
-                
-                let mut newstr = String::new();
-                newstr.push(*codepoint);
-                Ok(Value::Text(newstr))
-            }
-            _ => Err(format!("error: tried to index into a non-array, non-dict, non-text value {:?} with index {:?}", var, index))
+            ValueLoc::Static(v) => &v,
+            ValueLoc::Immut(v) => v,
+            ValueLoc::Mut(v) => v,
         }
     }
-    else
+    pub fn as_mut(&mut self) -> Result<&mut Value, String>
     {
-        Ok(var.clone())
+        match self
+        {
+            ValueLoc::Static(_) | ValueLoc::Immut(_) => Err("error: tried to assign to a read-only value".to_string()),
+            ValueLoc::Mut(v) => Ok(*v),
+        }
+    }
+    pub fn assign(&mut self, newval : Value) -> Result<(), String>
+    {
+        match self
+        {
+            ValueLoc::Static(_) | ValueLoc::Immut(_) => Err("error: tried to assign to a read-only value".to_string()),
+            ValueLoc::Mut(v) => Ok(**v = newval),
+        }
     }
 }
 
-fn access_frame<'a, 'b>(global : &'a GlobalState, frame : &'b Frame, name : usize, seen_instance : &mut bool) -> Option<Result<Result<&'b ValRef, &'a ValRef>, Value>>
+pub (crate) fn return_indexed<'a>(var : ValueLoc<'a>, indexes : &[HashableValue]) -> Result<ValueLoc<'a>, String>
 {
-    for scope in frame.scopes.iter().rev().filter(|x| !x.is_empty())
+    if indexes.is_empty()
     {
-        if let Some(var) = scope.get(&name)
-        {
-            return Some(Ok(Ok(var)));
-        }
+        return Ok(var);
     }
-    if !*seen_instance
+    let (index, new_indexes) = (indexes.get(0).unwrap(), indexes.get(1..).unwrap());
+    match var
     {
-        if let Some(id) = frame.instancestack.last()
+        ValueLoc::<'a>::Mut(Value::Array(var)) =>
         {
-            *seen_instance = true;
-            if let Some(inst) = global.instances.get(id)
+            let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an array index"))?.round() as usize;
+            
+            let newvar = ValueLoc::Mut(var.get_mut(indexnum).ok_or_else(|| format!("error: tried to access non-extant index {} of an array", indexnum))?);
+            return_indexed(newvar, new_indexes)
+        }
+        ValueLoc::<'a>::Immut(Value::Array(var)) =>
+        {
+            let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an array index"))?.round() as usize;
+            
+            let newvar = ValueLoc::Immut(var.get(indexnum).ok_or_else(|| format!("error: tried to access non-extant index {} of an array", indexnum))?);
+            return_indexed(newvar, new_indexes)
+        }
+        ValueLoc::Static(Value::Array(mut var)) =>
+        {
+            let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as an array index"))?.round() as usize;
+            
+            if indexnum >= var.len()
             {
-                if let Some(var) = inst.variables.get(&name)
-                {
-                    return Some(Ok(Err(var)));
-                }
-                else if let Some(objspec) = global.objects.get(&inst.objtype)
-                {
-                    if let Some(funcdat) = objspec.functions.get(&name)
-                    {
-                        let mut mydata = funcdat.clone();
-                        mydata.forcecontext = inst.ident;
-                        return Some(Err(Value::new_funcval(false, Some(name), None, Some(mydata))));
-                    }
-                }
+                return Err(format!("error: tried to access non-extant index {} of an array", indexnum));
             }
+            let newvar = ValueLoc::Static(var.swap_remove(indexnum));
+            return_indexed(newvar, new_indexes)
         }
+        ValueLoc::<'a>::Mut(Value::Dict(var)) =>
+        {
+            let newvar = ValueLoc::Mut(var.get_mut(index).ok_or_else(|| format!("error: tried to access non-extant index {:?} of a dict", index))?);
+            return_indexed(newvar, new_indexes)
+        }
+        ValueLoc::<'a>::Immut(Value::Dict(var)) =>
+        {
+            let newvar = ValueLoc::Immut(var.get(index).ok_or_else(|| format!("error: tried to access non-extant index {:?} of a dict", index))?);
+            return_indexed(newvar, new_indexes)
+        }
+        ValueLoc::Static(Value::Dict(mut var)) =>
+        {
+            let newvar = ValueLoc::Static(var.remove(index).ok_or_else(|| format!("error: tried to access non-extant index {:?} of a dict", index))?);
+            return_indexed(newvar, new_indexes)
+        }
+        // TODO reintroduce string support
+        _ => Err(format!("error: tried to index into a non-array, non-dict value {:?} with index {:?}", var, index))
     }
-    None
 }
 
 impl Interpreter
 {
-    fn evaluate_of_array
-        <T,
-         F : FnOnce(&ValRef) -> Result<T, String>,
-         F2 : FnOnce(Value) -> Result<T, String>
-        >
-        (&self, arrayvar : ArrayVar, varhandler : F, valhandler : F2) -> Result<T, String>
+    pub(crate) fn evaluate_of_array<'a>(&'a mut self, arrayvar : ArrayVar) -> Result<ValueLoc<'a>, String>
     {
         match arrayvar.location
         {
-            NonArrayVariable::Indirect(indirvar) => varhandler(&ValRef::from_ref(self.evaluate_of_indirect(indirvar, |x| Ok(x.refclone()), |x| Ok(ValRef::from_val(x)))?.extract_ref()?, arrayvar.indexes, false)),
-            NonArrayVariable::Direct(dirvar) => varhandler(&ValRef::from_ref(self.evaluate_of_direct(dirvar, |x| Ok(x.refclone()), |x| Ok(ValRef::from_val(x)))?.extract_ref()?, arrayvar.indexes, false)),
-            NonArrayVariable::Global(globalvar) => varhandler(&ValRef::from_ref(self.evaluate_of_global(globalvar, |x| Ok(x.refclone()))?.extract_ref()?, arrayvar.indexes, false)),
-            NonArrayVariable::ActualArray(array) => valhandler(return_indexed(&Value::Array(array), &arrayvar.indexes)?),
-            NonArrayVariable::ActualDict(dict) => valhandler(return_indexed(&Value::Dict(dict), &arrayvar.indexes)?),
-            NonArrayVariable::ActualText(string) => valhandler(return_indexed(&Value::Text(*string), &arrayvar.indexes)?),
+            // FIXME borrow readonlyness 
+            NonArrayVariable::Indirect(indirvar) =>
+                return_indexed(self.evaluate_of_indirect(indirvar)?, &arrayvar.indexes),
+            NonArrayVariable::Direct(dirvar) =>
+                return_indexed(self.evaluate_of_direct(dirvar)?, &arrayvar.indexes),
+            NonArrayVariable::Global(globalvar) =>
+                return_indexed(self.evaluate_of_global(globalvar)?, &arrayvar.indexes),
+            NonArrayVariable::BareGlobal(bareglobalvar) =>
+                return_indexed(self.evaluate_of_bareglobal(bareglobalvar)?, &arrayvar.indexes),
+            NonArrayVariable::ActualArray(array) =>
+                return_indexed(ValueLoc::Static(Value::Array(array)), &arrayvar.indexes),
+            NonArrayVariable::ActualDict(dict) =>
+                return_indexed(ValueLoc::Static(Value::Dict(dict)), &arrayvar.indexes),
+            NonArrayVariable::ActualText(string) =>
+                return_indexed(ValueLoc::Static(Value::Text(*string)), &arrayvar.indexes),
         }
     }
-    fn evaluate_of_indirect
-        <T,
-         F : FnOnce(&ValRef) -> Result<T, String>,
-         F2 : FnOnce(Value) -> Result<T, String>
-        >
-        (&self, indirvar : IndirectVar, varhandler : F, valhandler : F2) -> Result<T, String>
+    pub(crate) fn evaluate_of_indirect_simple(&self, ident : usize, name : usize) -> Result<Value, String>
     {
-        let ident = indirvar.ident;
-        let instance = self.global.instances.get(&ident).ok_or_else(|| format!("error: tried to access variable `{}` from non-extant instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
-        
-        if let Some(var) = instance.variables.get(&indirvar.name)
+        if !self.global.instances.contains_key(&ident)
         {
-            varhandler(var)
+            return Err(format!("error: tried to access variable `{}` from non-extant instance `{}`", self.get_indexed_string(name), ident));
+        }
+        let instance = self.global.instances.get(&ident).unwrap();
+        
+        if let Some(var) = instance.variables.get(&name)
+        {
+            Ok(var.clone())
         }
         else
         {
+            panic!("askldfaweif reimplement somehow");
+            // fallback to instance functions
+            /*
             let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
             
             let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
             
             let mut mydata = funcdat.clone();
             mydata.forcecontext = ident;
-            valhandler(Value::new_funcval(false, Some(indirvar.name), None, Some(mydata)))
+            valhandler(Value::new_funcval(None, mydata))
+            */
         }
     }
-    fn evaluate_of_global
-        <T,
-         F : FnOnce(&ValRef) -> Result<T, String>
-        >
-        (&self, globalvar : usize, varhandler : F) -> Result<T, String>
+    pub(crate) fn evaluate_of_indirect<'a>(&'a mut self, indirvar : IndirectVar) -> Result<ValueLoc<'a>, String>
     {
-        let var = self.global.variables.get(&globalvar).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", self.get_indexed_string(globalvar)))?;
-        varhandler(var)
-    }
-    pub(crate) fn evaluate_of_direct
-        <T,
-         F : FnOnce(&ValRef) -> Result<T, String>,
-         F2 : FnOnce(Value) -> Result<T, String>
-        >
-        (&self, name : usize, varhandler : F, valhandler : F2) -> Result<T, String>
-    {
-        let mut seen_instance = false;
-        if let Some(my_ref) = access_frame(&self.global, &self.top_frame, name, &mut seen_instance)
+        let ident = indirvar.ident;
+        if !self.global.instances.contains_key(&ident)
         {
-            return match my_ref
-            {
-                Ok(Ok(scopedvar)) => varhandler(scopedvar),
-                Ok(Err(globalvar)) => varhandler(globalvar),
-                Err(globalval) => valhandler(globalval),
-            };
+            return Err(format!("error: tried to access variable `{}` from non-extant instance `{}`", self.get_indexed_string(indirvar.name), ident));
         }
-        if !self.top_frame.impassable
-        {
-            for frame in self.frames.iter().rev()
-            {
-                if let Some(my_ref) = access_frame(&self.global, &frame, name, &mut seen_instance)
-                {
-                    return match my_ref
-                    {
-                        Ok(Ok(scopedvar)) => varhandler(scopedvar),
-                        Ok(Err(globalvar)) => varhandler(globalvar),
-                        Err(globalval) => valhandler(globalval),
-                    };
-                }
-                if frame.impassable { break; }
-            }
-        }
+        let instance = self.global.instances.get_mut(&ident).unwrap();
         
-        if let Some(var) = self.global.barevariables.get(&name)
+        if let Some(var) = instance.variables.get_mut(&indirvar.name)
         {
-            return varhandler(var);
+            Ok(ValueLoc::Mut(var))
         }
-        if let Some(var) = self.global.objectnames.get(&name)
+        else
         {
-            return valhandler(Value::Object(*var));
+            panic!("askldfaweif reimplement somehow");
+            // fallback to instance functions
+            /*
+            let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
+            
+            let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
+            
+            let mut mydata = funcdat.clone();
+            mydata.forcecontext = ident;
+            valhandler(Value::new_funcval(None, mydata))
+            */
         }
-        if let Some(var) = self.global.functions.get(&name)
-        {
-            return valhandler(var.clone());
-        }
-        if self.get_binding(name).is_some() || self.get_simple_binding(name).is_some()
-        {
-            return valhandler(Value::new_funcval(true, Some(name), None, None));
-        }
-        
-        Err(format!("error: unknown identifier `{}`", self.get_indexed_string(name)))
     }
-    #[inline]
-    pub (crate) fn evaluate_self
-        <T,
-         F2 : FnOnce(Value) -> Result<T, String>
-        >
-        (&self, valhandler : F2) -> Result<T, String>
+    pub(crate) fn evaluate_of_global<'a>(&'a mut self, globalvar : usize) -> Result<ValueLoc<'a>, String>
     {
-        let id = self.top_frame.instancestack.last().ok_or_else(|| "error: tried to access `self` while not inside of instance scope".to_string())?;
-        valhandler(Value::Instance(*id))
+        if !self.global.variables.contains_key(&globalvar)
+        {
+            return Err(format!("error: tried to access global variable `{}` that doesn't exist", self.get_indexed_string(globalvar)));
+        }
+        Ok(ValueLoc::Mut(self.global.variables.get_mut(&globalvar).unwrap()))
     }
-    #[inline]
-    pub (crate) fn evaluate_other
-        <T,
-         F2 : FnOnce(Value) -> Result<T, String>
-        >
-        (&self, valhandler : F2) -> Result<T, String>
+    pub(crate) fn evaluate_of_bareglobal<'a>(&'a mut self, bareglobalvar : usize) -> Result<ValueLoc<'a>, String>
     {
-        let id = self.top_frame.instancestack.get(self.top_frame.instancestack.len()-2).ok_or_else(|| "error: tried to access `other` while not inside of at least two instance scopes".to_string())?;
-        valhandler(Value::Instance(*id))
+        Ok(ValueLoc::Immut(self.global.barevariables.get(&bareglobalvar).ok_or_else(|| format!("internal error: tried to access bare global variable `{}` that doesn't exist", self.get_indexed_string(bareglobalvar)))?))
     }
-    pub (crate) fn evaluate
-        <T,
-         F : FnOnce(&ValRef) -> Result<T, String>,
-         F2 : FnOnce(Value) -> Result<T, String>
-        >
-        (&self, variable : Variable, varhandler : F, valhandler : F2) -> Result<T, String>
+    pub(crate) fn evaluate_of_direct<'a>(&'a mut self, index : usize) -> Result<ValueLoc<'a>, String>
+    {
+        Ok(ValueLoc::Mut(self.top_frame.variables.get_mut(index).ok_or_else(|| "internal error: variable stack out-of-bounds access".to_string())?))
+    }
+    pub (crate) fn evaluate_self<'a>(&'a mut self) -> Result<ValueLoc<'a>, String>
+    {
+        Ok(ValueLoc::Static(Value::Instance(*self.top_frame.instancestack.last_mut().ok_or_else(|| "error: tried to access `self` while not inside of instance scope".to_string())?)))
+    }
+    pub (crate) fn evaluate_other<'a>(&'a mut self) -> Result<ValueLoc<'a>, String>
+    {
+        let loc = self.top_frame.instancestack.len()-2;
+        Ok(ValueLoc::Static(Value::Instance(*self.top_frame.instancestack.get_mut(loc).ok_or_else(|| "error: tried to access `other` while not inside of at least two instance scopes".to_string())?)))
+    }
+    pub (crate) fn evaluate<'a>(&'a mut self, variable : Variable) -> Result<ValueLoc<'a>, String>
     {
         match variable
         {
-            Variable::Array(arrayvar) => self.evaluate_of_array(arrayvar, varhandler, valhandler),
-            Variable::Indirect(indirvar) => self.evaluate_of_indirect(indirvar, varhandler, valhandler),
-            Variable::Global(globalvar) => self.evaluate_of_global(globalvar, varhandler),
-            Variable::Direct(name) => self.evaluate_of_direct(name, varhandler, valhandler),
-            Variable::Selfref => self.evaluate_self(valhandler),
-            Variable::Other => self.evaluate_other(valhandler),
+            Variable::Array(arrayvar) => self.evaluate_of_array(arrayvar),
+            Variable::Indirect(indirvar) => self.evaluate_of_indirect(indirvar),
+            Variable::Global(globalvar) => self.evaluate_of_global(globalvar),
+            Variable::BareGlobal(bareglobalvar) => self.evaluate_of_bareglobal(bareglobalvar),
+            Variable::Direct(name) => self.evaluate_of_direct(name),
+            Variable::Selfref => self.evaluate_self(),
+            Variable::Other => self.evaluate_other(),
         }
     }
-    pub (crate) fn evaluate_value(&self, variable : Variable) -> Result<Value, String>
+    pub (crate) fn evaluate_value(&mut self, variable : Variable) -> Result<Value, String>
     {
-        self.evaluate(variable, |x| x.to_val(), |x| Ok(x))
-    }
-    pub (crate) fn evaluate_and_mutate<F : FnOnce(&mut Value) -> Result<(), String>>(&self, variable : Variable, mutator : F) -> Result<(), String>
-    {
-        self.evaluate(variable, |x| x.mutate(mutator), |_| Err("error: tried to mutate a literal value".to_string()))
+        self.evaluate(variable).map(|x| x.to_val())
     }
 }

@@ -1,4 +1,18 @@
 use super::*;
+use crate::interpreter::variableaccess::ValueLoc;
+
+#[inline]
+fn compiler_bytecode_desync_error<S : ToString>(text : S) -> String
+{
+    if cfg!(compiler_bytecode_desync_debugging)
+    {
+        text.to_string()
+    }
+    else
+    {
+        panic!(text.to_string())
+    }
+}
 
 pub (crate) fn format_val(val : &Value) -> Option<String>
 {
@@ -105,6 +119,7 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
         Value::Instance(id) => Some(format!("<instance {}>", id)), // TODO: include object name?
         Value::Object(id) => Some(format!("<object {}>", id)), // TODO: use name?
         Value::Func(_) => Some("<function>".to_string()),
+        Value::InternalFunc(_) => Some("<internal function>".to_string()),
         Value::Generator(_) => Some("<generator>".to_string()),
         Value::Custom(custom) => Some(format!("<custom type discrim:{} storage:{}>", custom.discrim, custom.storage)),
         Value::SubFunc(_) => Some("<subfunc reference>".to_string()),
@@ -216,32 +231,11 @@ pub (crate) fn value_equal(left : &Value, right : &Value) -> Result<bool, String
         }
         (Value::Func(left), Value::Func(right)) =>
         {
-            if_then_return_false!(
-                left.internal != right.internal ||
-                left.name != right.name ||
-                left.userdefdata != right.userdefdata ||
-                left.predefined.is_some() != right.predefined.is_some()
-            );
-            // only applies to lambdas
-            if let (Some(left), Some(right)) = (&left.predefined, &right.predefined)
-            {
-                if_then_return_false!(left.len() != right.len());
-                for (left_key, left_val) in left.iter()
-                {
-                    if let Some(right_val) = right.get(left_key)
-                    {
-                        let left_val = left_val.borrow()?;
-                        let right_val = right_val.borrow()?;
-                        if_then_return_false!(!value_equal(&left_val, &right_val)?);
-                    }
-                    else
-                    {
-                        return Ok(false)
-                    }
-                }
-            }
-            // if above block doesn't run then predefineds must be (None, None) because of left.predefined.is_some() != right.predefined.is_some()
-            Ok(true)
+            Ok(left.userdefdata == right.userdefdata)
+        }
+        (Value::InternalFunc(left), Value::InternalFunc(right)) =>
+        {
+            Ok(left.nameindex == right.nameindex)
         }
         // generators are never equal even in their default state
         (Value::Generator(_), Value::Generator(_)) => Ok(false),
@@ -251,6 +245,7 @@ pub (crate) fn value_equal(left : &Value, right : &Value) -> Result<bool, String
     }
 }
 // FIXME string/array/dict/generator/etc comparison
+
 fn value_op_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     Ok(Value::Number(bool_floaty(value_equal(left, right)?)))
@@ -313,6 +308,91 @@ fn value_op_or(left : &Value, right : &Value) -> Result<Value, String>
     }
 }
 
+fn inplace_value_op_add(mut left : ValueLoc, right : &Value) -> Result<(), String>
+{
+    // TODO: string and array.as_ref() concatenation
+    match (left.as_mut()?, right)
+    {
+        (Value::Number(ref mut left), Value::Number(right)) =>
+        {
+            let newval = *left+right;
+            *left = newval;
+            Ok(())
+        }
+        (Value::Text(left), Value::Text(right)) =>
+        {
+            let newval = format!("{}{}", left, right);
+            *left = newval;
+            Ok(())
+        }
+        _ => Err("types incompatible with addition".to_string())
+    }
+}
+fn inplace_value_op_subtract(mut left : ValueLoc, right : &Value) -> Result<(), String>
+{
+    match (left.as_mut()?, right)
+    {
+        (Value::Number(ref mut left), Value::Number(right)) =>
+        {
+            let newval = *left-right;
+            *left = newval;
+            Ok(())
+        }
+        _ => Err("types incompatible with subtraction".to_string())
+    }
+}
+fn inplace_value_op_multiply(mut left : ValueLoc, right : &Value) -> Result<(), String>
+{
+    match (left.as_mut()?, right)
+    {
+        (Value::Number(ref mut left), Value::Number(right)) =>
+        {
+            let newval = *left*right;
+            *left = newval;
+            Ok(())
+        }
+        (Value::Text(left), Value::Number(right)) =>
+        {
+            let newval = left.repeat(right.floor() as usize);
+            *left = newval;
+            Ok(())
+        }
+        _ => Err("types incompatible with multiplication".to_string())
+    }
+}
+fn inplace_value_op_divide(mut left : ValueLoc, right : &Value) -> Result<(), String>
+{
+    match (left.as_mut()?, right)
+    {
+        (Value::Number(ref mut left), Value::Number(right)) =>
+        {
+            let newval = *left/right;
+            *left = newval;
+            Ok(())
+        }
+        _ => Err("types incompatible with division".to_string())
+    }
+}
+fn inplace_value_op_modulo(mut left : ValueLoc, right : &Value) -> Result<(), String>
+{
+    match (left.as_mut()?, right)
+    {
+        (Value::Number(ref mut left), Value::Number(mut right)) =>
+        {
+            if right < 0.0
+            {
+                right = -right;
+                *left = -*left;
+            }
+            
+            let outval = ((*left%right)+right)%right;
+            *left = outval;
+            Ok(())
+        }
+        _ => Err("types incompatible with modulo".to_string())
+    }
+}
+
 /*
 BINOP_TYPES = \
 { 0x10: "&&" , # this is not an endorsement of using && instead of and in code
@@ -348,7 +428,19 @@ pub (crate) fn do_binop_function(op : u8, left : &Value, right : &Value) -> Resu
         0x40 => value_op_multiply(left, right),
         0x41 => value_op_divide(left, right),
         0x42 => value_op_modulo(left, right),
-        _ => Err(format!("internal error: unknown binary operation 0x{:02X}", op))
+        _ => Err(compiler_bytecode_desync_error(format!("internal error: unknown binary operation 0x{:02X}", op)))
+    }
+}
+pub (crate) fn do_binstate_function(op : u8, left : ValueLoc, right : &Value) -> Result<(), String>
+{
+    match op
+    {
+        0x30 => inplace_value_op_add(left, right),
+        0x31 => inplace_value_op_subtract(left, right),
+        0x40 => inplace_value_op_multiply(left, right),
+        0x41 => inplace_value_op_divide(left, right),
+        0x42 => inplace_value_op_modulo(left, right),
+        _ => Err(compiler_bytecode_desync_error(format!("internal error: unknown in-place binary operation 0x{:02X}", op)))
     }
 }
 
@@ -385,25 +477,41 @@ pub (crate) fn do_unop_function(op : u8, val : &Value) -> Result<Value, String>
         0x11 => value_op_positive(val),
         0x20 => value_op_not(val),
         // TODO: add "bitwise not"?
-        _ => Err(format!("internal error: unknown unary operation 0x{:02X}", op))
+        _ => Err(compiler_bytecode_desync_error(format!("internal error: unknown unary operation 0x{:02X}", op)))
     }
 }
 
-fn value_op_increment(value : &Value) -> Result<Value, String>
+fn inplace_value_op_increment(mut value : ValueLoc) -> Result<(), String>
 {
-    value_op_add(value, &Value::Number(1.0))
+    match value.as_mut()?
+    {
+        Value::Number(ref mut value) =>
+        {
+            *value += 1.0;
+            Ok(())
+        }
+        _ => Err("type incompatible with incrementation".to_string())
+    }
 }
-fn value_op_decrement(value : &Value) -> Result<Value, String>
+fn inplace_value_op_decrement(mut value : ValueLoc) -> Result<(), String>
 {
-    value_op_subtract(value, &Value::Number(1.0))
+    match value.as_mut()?
+    {
+        Value::Number(ref mut value) =>
+        {
+            *value -= 1.0;
+            Ok(())
+        }
+        _ => Err("type incompatible with decrementation".to_string())
+    }
 }
-pub (crate) fn do_unstate_function(op : u8,  val : &Value) -> Result<Value, String>
+pub (crate) fn do_unstate_function(op : u8,  val : ValueLoc) -> Result<(), String>
 {
     match op
     {
-        0x00 => value_op_increment(val),
-        0x01 => value_op_decrement(val),
-        _ => Err(format!("internal error: unknown unary state operator 0x{:02X}", op))
+        0x00 => inplace_value_op_increment(val),
+        0x01 => inplace_value_op_decrement(val),
+        _ => Err(compiler_bytecode_desync_error(format!("internal error: unknown unary state operator 0x{:02X}", op)))
     }
 }
 
