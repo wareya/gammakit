@@ -66,9 +66,9 @@ impl Code
     {
         self.code.get(index)
     }
-    pub (crate) unsafe fn get_unchecked<I : std::slice::SliceIndex<[u8]>>(&self, index : I) -> &I::Output
+    pub (crate) unsafe fn as_ptr(&self) -> *const u8
     {
-        self.code.get_unchecked(index)
+        self.code.as_ptr()
     }
     fn add_debug_info(&mut self, pc : usize, last_line : usize, last_index : usize, last_type : &str)
     {
@@ -301,6 +301,9 @@ impl<'a> CompilerState<'a> {
             return Some(var);
         }
         if self.globalstate.bindings.contains_key(&index)
+        || self.globalstate.trivial_bindings.contains_key(&index)
+        || self.globalstate.simple_bindings.contains_key(&index)
+        || self.globalstate.trivial_simple_bindings.contains_key(&index)
         {
             return Some(IdenLocation::Binding(index));
         }

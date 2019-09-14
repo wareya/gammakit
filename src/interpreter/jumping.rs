@@ -42,7 +42,15 @@ impl Interpreter
         // if they do, we need to add the return value to the old frame instead of the current frame
         let frames_len_before = self.frames.len();
         let ret = 
-        if let Some(binding_wrapper) = self.get_binding(name)
+        if let Some(binding) = self.get_trivial_binding(name)
+        {
+            binding(self, args)?
+        }
+        else if let Some(binding) = self.get_trivial_simple_binding(name)
+        {
+            binding(args)?
+        }
+        else if let Some(binding_wrapper) = self.get_binding(name)
         {
             let binding = &mut *binding_wrapper.try_borrow_mut().or_else(|_| plainerr("error: tried to borrow internal function while it was borrowed elsewhere"))?;
             binding(self, args)?

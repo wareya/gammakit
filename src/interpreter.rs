@@ -20,10 +20,16 @@ pub type StepResult = Result<bool, String>;
 type OpResult = Result<(), String>;
 /// Type signature of functions to be registered as bindings.
 pub type Binding = FnMut(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
-/// Type signature of functions to be registered as simple bindings.
+/// For trivial bindings.
+pub type TrivialBinding = fn(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
+/// For simple bindings.
 pub type SimpleBinding = FnMut(Vec<Value>) -> Result<Value, String>;
-/// Type signature of functions to be registered as arrow function bindings.
+/// For trivial simple bindings.
+pub type TrivialSimpleBinding = fn(Vec<Value>) -> Result<Value, String>;
+/// For arrow bindings.
 pub type ArrowBinding = FnMut(ValueLoc, Vec<Value>) -> Result<Value, String>;
+/// For trivial arrow bindings.
+pub type TrivialArrowBinding = fn(ValueLoc, Vec<Value>) -> Result<Value, String>;
 
 fn minierr(mystr : &'static str) -> String
 {
@@ -50,8 +56,11 @@ pub struct GlobalState {
     pub (crate) functions: BTreeMap<usize, Value>, // accessed as funcname
     
     pub (crate) bindings: BTreeMap<usize, Rc<RefCell<Binding>>>,
+    pub (crate) trivial_bindings: BTreeMap<usize, TrivialBinding>,
     pub (crate) simple_bindings: BTreeMap<usize, Rc<RefCell<SimpleBinding>>>,
+    pub (crate) trivial_simple_bindings: BTreeMap<usize, TrivialSimpleBinding>,
     pub (crate) arrow_bindings: BTreeMap<usize, Rc<RefCell<ArrowBinding>>>,
+    pub (crate) trivial_arrow_bindings: BTreeMap<usize, TrivialArrowBinding>,
     
     parser: Parser,
 }
@@ -74,8 +83,11 @@ impl GlobalState {
             functions : BTreeMap::new(),
             
             bindings : BTreeMap::new(),
+            trivial_bindings : BTreeMap::new(),
             simple_bindings : BTreeMap::new(),
+            trivial_simple_bindings : BTreeMap::new(),
             arrow_bindings : BTreeMap::new(),
+            trivial_arrow_bindings : BTreeMap::new(),
             
             parser,
         }

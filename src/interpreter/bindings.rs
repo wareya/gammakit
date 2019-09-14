@@ -112,15 +112,37 @@ impl Interpreter
     pub fn insert_binding(&mut self, funcname : String, func : Rc<RefCell<Binding>>)
     {
         let index = self.get_string_index(&funcname);
+        self.global.trivial_bindings.remove(&index);
         self.global.simple_bindings.remove(&index);
+        self.global.trivial_simple_bindings.remove(&index);
         self.global.bindings.insert(index, func);
+    }
+    /// Insert a normal binding that does not need access to the interpreter or indeed any other external state.
+    pub fn insert_trivial_binding(&mut self, funcname : String, func : TrivialBinding)
+    {
+        let index = self.get_string_index(&funcname);
+        self.global.bindings.remove(&index);
+        self.global.simple_bindings.remove(&index);
+        self.global.trivial_simple_bindings.remove(&index);
+        self.global.trivial_bindings.insert(index, func);
     }
     /// Insert a normal binding that does not need access to the interpreter.
     pub fn insert_simple_binding(&mut self, funcname : String, func : Rc<RefCell<SimpleBinding>>)
     {
         let index = self.get_string_index(&funcname);
         self.global.bindings.remove(&index);
+        self.global.trivial_bindings.remove(&index);
+        self.global.trivial_simple_bindings.remove(&index);
         self.global.simple_bindings.insert(index, func);
+    }
+    /// Insert a normal binding that does not need access to the interpreter or indeed any other external state.
+    pub fn insert_trivial_simple_binding(&mut self, funcname : String, func : TrivialSimpleBinding)
+    {
+        let index = self.get_string_index(&funcname);
+        self.global.bindings.remove(&index);
+        self.global.trivial_bindings.remove(&index);
+        self.global.simple_bindings.remove(&index);
+        self.global.trivial_simple_bindings.insert(index, func);
     }
     /// Insert an associated function ("arrow" function) binding.
     pub fn insert_arrow_binding(&mut self, funcname : String, func : Rc<RefCell<ArrowBinding>>)
@@ -128,14 +150,15 @@ impl Interpreter
         let index = self.get_string_index(&funcname);
         self.global.arrow_bindings.insert(index, func);
     }
+    pub fn insert_trivial_arrow_binding(&mut self, funcname : String, func : TrivialArrowBinding)
+    {
+        let index = self.get_string_index(&funcname);
+        self.global.trivial_arrow_bindings.insert(index, func);
+    }
     /// Inserts or reinserts the default bindings. These SHOULD be safe, but if you're paranoid or you're making a very restrictive implementation of gammakit, you can feel free not to call this after initializing the interpreter.
     pub fn insert_default_bindings(&mut self)
     {
-        macro_rules! insert { ( $x:expr, $y:ident ) => { self.insert_binding($x.to_string(), Rc::new(RefCell::new(Interpreter::$y))); } }
-        
-        insert!("print"                 , sim_func_print                );
-        insert!("printraw"              , sim_func_printraw             );
-        insert!("string"                , sim_func_string               );
+        macro_rules! insert { ( $x:expr, $y:ident ) => { self.insert_trivial_binding($x.to_string(), Interpreter::$y); } }
         
         insert!("parse_text"            , sim_func_parse_text           );
         insert!("compile_text"          , sim_func_compile_text         );
@@ -144,16 +167,22 @@ impl Interpreter
         insert!("instance_exists"       , sim_func_instance_exists      );
         insert!("instance_kill"         , sim_func_instance_kill        );
         
-        insert!("round"                 , sim_func_round                );
-        insert!("floor"                 , sim_func_floor                );
-        insert!("ceil"                  , sim_func_ceil                 );
+        macro_rules! insert_simple { ( $x:expr, $y:ident ) => { self.insert_trivial_simple_binding($x.to_string(), Interpreter::$y); } }
         
-        insert!("sqrt"                  , sim_func_sqrt                 );
-        insert!("pow"                   , sim_func_pow                  );
-        insert!("log"                   , sim_func_log                  );
-        insert!("ln"                    , sim_func_ln                   );
+        insert_simple!("print"                 , sim_func_print                );
+        insert_simple!("printraw"              , sim_func_printraw             );
+        insert_simple!("string"                , sim_func_string               );
         
-        macro_rules! insert_arrow { ( $x:expr, $y:ident ) => { self.insert_arrow_binding($x.to_string(), Rc::new(RefCell::new(Interpreter::$y))); } }
+        insert_simple!("round"                 , sim_func_round                );
+        insert_simple!("floor"                 , sim_func_floor                );
+        insert_simple!("ceil"                  , sim_func_ceil                 );
+        
+        insert_simple!("sqrt"                  , sim_func_sqrt                 );
+        insert_simple!("pow"                   , sim_func_pow                  );
+        insert_simple!("log"                   , sim_func_log                  );
+        insert_simple!("ln"                    , sim_func_ln                   );
+        
+        macro_rules! insert_arrow { ( $x:expr, $y:ident ) => { self.insert_trivial_arrow_binding($x.to_string(), Interpreter::$y); } }
         
         insert_arrow!("len"             , sim_subfunc_len               );
         insert_arrow!("keys"            , sim_subfunc_keys              );
@@ -170,15 +199,27 @@ impl Interpreter
     {
         match_or_none!(self.global.bindings.get(&name), Some(f) => Rc::clone(f))
     }
+    pub (crate) fn get_trivial_binding(&self, name : usize) -> Option<TrivialBinding>
+    {
+        self.global.trivial_bindings.get(&name).map(|x| *x)
+    }
     pub (crate) fn get_simple_binding(&self, name : usize) -> Option<Rc<RefCell<SimpleBinding>>>
     {
         match_or_none!(self.global.simple_bindings.get(&name), Some(f) => Rc::clone(f))
+    }
+    pub (crate) fn get_trivial_simple_binding(&self, name : usize) -> Option<TrivialSimpleBinding>
+    {
+        self.global.trivial_simple_bindings.get(&name).map(|x| *x)
     }
     pub (crate) fn get_arrow_binding(&self, name : usize) -> Option<Rc<RefCell<ArrowBinding>>>
     {
         match_or_none!(self.global.arrow_bindings.get(&name), Some(f) => Rc::clone(f))
     }
-    pub (crate) fn sim_func_print(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn get_trivial_arrow_binding(&self, name : usize) -> Option<TrivialArrowBinding>
+    {
+        self.global.trivial_arrow_bindings.get(&name).map(|x| *x)
+    }
+    pub (crate) fn sim_func_print(mut args : Vec<Value>) -> Result<Value, String>
     {
         for arg in args.drain(..)
         {
@@ -186,7 +227,7 @@ impl Interpreter
         }
         Ok(Value::Number(0.0))
     }
-    pub (crate) fn sim_func_printraw(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_func_printraw(mut args : Vec<Value>) -> Result<Value, String>
     {
         for arg in args.drain(..)
         {
@@ -194,7 +235,7 @@ impl Interpreter
         }
         Ok(Value::Number(0.0))
     }
-    pub (crate) fn sim_func_string(&mut self, args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_func_string(args : Vec<Value>) -> Result<Value, String>
     {
         if args.len() != 1
         {
@@ -202,39 +243,39 @@ impl Interpreter
         }
         Ok(Value::Text(format_val(&args[0]).ok_or_else(|| minierr("error: tried to stringify an unprintable value"))?))
     }
-    pub (crate) fn sim_func_round(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_func_round(mut args : Vec<Value>) -> Result<Value, String>
     {
         let num = args.extract_num(0)?;
         Ok(Value::Number(num.round()))
     }
-    pub (crate) fn sim_func_ceil(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_func_ceil(mut args : Vec<Value>) -> Result<Value, String>
     {
         let num = args.extract_num(0)?;
         Ok(Value::Number(num.ceil()))
     }
-    pub (crate) fn sim_func_floor(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_func_floor(mut args : Vec<Value>) -> Result<Value, String>
     {
         let num = args.extract_num(0)?;
         Ok(Value::Number(num.floor()))
     }
-    pub (crate) fn sim_func_sqrt(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_func_sqrt(mut args : Vec<Value>) -> Result<Value, String>
     {
         let num = args.extract_num(0)?;
         Ok(Value::Number(num.sqrt()))
     }
-    pub (crate) fn sim_func_pow(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_func_pow(mut args : Vec<Value>) -> Result<Value, String>
     {
         let num1 = args.extract_num(0)?;
         let num2 = args.extract_num(1)?;
         Ok(Value::Number(num1.powf(num2)))
     }
-    pub (crate) fn sim_func_log(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_func_log(mut args : Vec<Value>) -> Result<Value, String>
     {
         let num1 = args.extract_num(0)?;
         let num2 = args.extract_num(1)?;
         Ok(Value::Number(num1.log(num2)))
     }
-    pub (crate) fn sim_func_ln(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    pub (crate) fn sim_func_ln(mut args : Vec<Value>) -> Result<Value, String>
     {
         let num = args.extract_num(0)?;
         Ok(Value::Number(num.ln()))

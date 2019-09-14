@@ -42,7 +42,30 @@ impl Interpreter
     
     fn call_arrow_function<'a>(&'a mut self, subfuncval : Box<SubFuncVal>, args : Vec<Value>, isexpr : bool) -> OpResult
     {
-        if let Some(binding_wrapper) = self.get_arrow_binding(subfuncval.name)
+        if let Some(binding) = self.get_trivial_arrow_binding(subfuncval.name)
+        {
+            match subfuncval.source
+            {
+                StackValue::Val(val) =>
+                {
+                    let ret = binding(ValueLoc::Static(val), args)?;
+                    if isexpr
+                    {
+                        self.stack_push_val(ret);
+                    }
+                }
+                StackValue::Var(source) =>
+                {
+                    let val = self.evaluate(source)?;
+                    let ret = binding(val, args)?;
+                    if isexpr
+                    {
+                        self.stack_push_val(ret);
+                    }
+                }
+            };
+        }
+        else if let Some(binding_wrapper) = self.get_arrow_binding(subfuncval.name)
         {
             let binding = &mut *binding_wrapper.try_borrow_mut().or_else(|_| plainerr("error: tried to borrow internal function while it was borrowed elsewhere"))?;
             

@@ -102,7 +102,7 @@ impl Interpreter
         }
         unsafe
         {
-            let r = *(self.top_frame.code.get_unchecked(self.top_frame.pc) as *const u8 as *const u16);
+            let r = *(self.top_frame.code.as_ptr().add(self.top_frame.pc) as *const u16);
             self.top_frame.pc += 2;
             Ok(r)
         }
@@ -117,7 +117,7 @@ impl Interpreter
         }
         unsafe
         {
-            let r = *(self.top_frame.code.get_unchecked(self.top_frame.pc) as *const u8 as *const u64) as usize;
+            let r = *(self.top_frame.code.as_ptr().add(self.top_frame.pc) as *const u64) as usize;
             self.top_frame.pc += 8;
             Ok(r)
         }
@@ -132,7 +132,7 @@ impl Interpreter
         }
         unsafe
         {
-            let r = *(self.top_frame.code.get_unchecked(self.top_frame.pc) as *const u8 as *const f64);
+            let r = *(self.top_frame.code.as_ptr().add(self.top_frame.pc) as *const f64);
             self.top_frame.pc += 8;
             Ok(r)
         }
