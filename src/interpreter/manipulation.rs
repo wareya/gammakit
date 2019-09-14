@@ -16,6 +16,18 @@ macro_rules! vec_pop_front_generic { ( $list:expr, $x:ident ) =>
     }
 } }
 
+macro_rules! past_end_of_code_err { ($self:expr) =>
+{
+    if cfg!(code_bounds_debugging)
+    {
+        plainerr("error: tried to access past end of code")
+    }
+    else
+    {
+        panic!("error: tried to access past end of code; {:?}", $self.top_frame);
+    }
+} }
+
 impl Interpreter
 {
     #[inline]
@@ -39,75 +51,11 @@ impl Interpreter
         self.top_frame.pc -= new;
     }
     #[inline]
-    pub (crate) fn round_up_pc_2(&mut self)
-    {
-        self.top_frame.pc = (((self.top_frame.pc-1)>>1)+1)<<1;
-    }
-    #[inline]
-    pub (crate) fn round_up_pc_8(&mut self)
-    {
-        self.top_frame.pc = (((self.top_frame.pc-1)>>3)+1)<<3;
-    }
-    
-    #[inline]
-    pub (crate) fn pull_2_from_code(&mut self) -> Result<[u8; 2], String>
-    {
-        if self.top_frame.pc+2 > self.top_frame.code.len()
-        {
-            if cfg!(code_bounds_debugging)
-            {
-                return plainerr("error: tried to access past end of code");
-            }
-            else
-            {
-                panic!("error: tried to access past end of code; {:?}", self.top_frame);
-            }
-        }
-        self.round_up_pc_2();
-        let pc = self.top_frame.pc;
-        self.top_frame.pc += 2;
-        unsafe
-        {
-            let vec = self.top_frame.code.get_unchecked(pc..pc+2);
-            Ok([vec[0], vec[1]])
-        }
-    }
-    #[inline]
-    pub (crate) fn pull_8_from_code(&mut self) -> Result<[u8; 8], String>
-    {
-        if self.top_frame.pc+8 > self.top_frame.code.len()
-        {
-            if cfg!(code_bounds_debugging)
-            {
-                return plainerr("error: tried to access past end of code");
-            }
-            else
-            {
-                panic!("error: tried to access past end of code; {:?}", self.top_frame);
-            }
-        }
-        self.round_up_pc_8();
-        let pc = self.top_frame.pc;
-        self.top_frame.pc += 8;
-        unsafe
-        {
-            let vec = self.top_frame.code.get_unchecked(pc..pc+8);
-            Ok([vec[0], vec[1], vec[2], vec[3], vec[4], vec[5], vec[6], vec[7]])
-        }
-    }
-    #[inline]
     pub (crate) fn pull_single_from_code(&mut self) -> Result<u8, String>
     {
         if self.top_frame.pc+1 > self.top_frame.code.len()
         {
-            if cfg!(code_bounds_debugging)
-            {
-                return plainerr("error: tried to access past end of code");
-            }
-            else
-            {
-                panic!("error: tried to access past end of code; {:?}", self.top_frame);
-            }
+            past_end_of_code_err!(self)?;
         }
         let pc = self.top_frame.pc;
         self.top_frame.pc += 1;
@@ -133,17 +81,61 @@ impl Interpreter
     {
         vec_pop_front_generic!(args, Dict)
     }
+    
+    #[inline]
+    pub (crate) fn round_up_pc_2(&mut self)
+    {
+        self.top_frame.pc = (((self.top_frame.pc-1)>>1)+1)<<1;
+    }
+    #[inline]
+    pub (crate) fn round_up_pc_8(&mut self)
+    {
+        self.top_frame.pc = (((self.top_frame.pc-1)>>3)+1)<<3;
+    }
+    #[inline]
     pub (crate) fn read_u16(&mut self) -> Result<u16, String>
     {
-        Ok(unpack_u16(self.pull_2_from_code()?))
+        self.round_up_pc_2();
+        if self.top_frame.pc+2 > self.top_frame.code.len()
+        {
+            past_end_of_code_err!(self)?;
+        }
+        unsafe
+        {
+            let r = *(self.top_frame.code.get_unchecked(self.top_frame.pc) as *const u8 as *const u16);
+            self.top_frame.pc += 2;
+            Ok(r)
+        }
     }
+    #[inline]
     pub (crate) fn read_usize(&mut self) -> Result<usize, String>
     {
-        Ok(unpack_u64(self.pull_8_from_code()?) as usize)
+        self.round_up_pc_8();
+        if self.top_frame.pc+8 > self.top_frame.code.len()
+        {
+            past_end_of_code_err!(self)?;
+        }
+        unsafe
+        {
+            let r = *(self.top_frame.code.get_unchecked(self.top_frame.pc) as *const u8 as *const u64) as usize;
+            self.top_frame.pc += 8;
+            Ok(r)
+        }
     }
+    #[inline]
     pub (crate) fn read_float(&mut self) -> Result<f64, String>
     {
-        Ok(unpack_f64(self.pull_8_from_code()?))
+        self.round_up_pc_8();
+        if self.top_frame.pc+8 > self.top_frame.code.len()
+        {
+            past_end_of_code_err!(self)?;
+        }
+        unsafe
+        {
+            let r = *(self.top_frame.code.get_unchecked(self.top_frame.pc) as *const u8 as *const f64);
+            self.top_frame.pc += 8;
+            Ok(r)
+        }
     }
     pub (crate) fn read_string_index(&mut self) -> Result<usize, String>
     {
@@ -166,14 +158,7 @@ impl Interpreter
         let start = self.get_pc();
         if start >= self.top_frame.code.len()
         {
-            if cfg!(code_bounds_debugging)
-            {
-                return Err("error: tried to decode a string past the end of code".to_string());
-            }
-            else
-            {
-                panic!("error: tried to decode a string past the end of code; {:?}", self.top_frame);
-            }
+            past_end_of_code_err!(self)?;
         }
         
         let mut end = start+1;

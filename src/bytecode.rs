@@ -2,30 +2,15 @@
 
 pub (crate) fn pack_u16(num : u16) -> Vec<u8>
 {
-    num.to_le_bytes().to_vec()
+    num.to_ne_bytes().to_vec()
 }
-pub (crate) fn unpack_u16(vec : [u8; 2]) -> u16
-{
-    u16::from_le_bytes(vec)
-}
-
 pub (crate) fn pack_u64(num : u64) -> Vec<u8>
 {
-    num.to_le_bytes().to_vec()
+    num.to_ne_bytes().to_vec()
 }
-pub (crate) fn unpack_u64(vec : [u8; 8]) ->  u64
-{
-    u64::from_le_bytes(vec)
-}
-
 pub (crate) fn pack_f64(num : f64) -> Vec<u8>
 {
     pack_u64(num.to_bits())
-}
-
-pub (crate) fn unpack_f64(vec : [u8; 8]) ->  f64
-{
-    f64::from_bits(u64::from_le_bytes(vec))
 }
 
 pub (crate) const NOP : u8 = 0x00;
