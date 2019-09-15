@@ -16,25 +16,46 @@ categories = ["parser-implementations"]
 
 readme = "readme.md"
 
+
+[features]
+compiler_bytecode_desync_debugging = []
+stack_len_debugging = []
+compiler_invalid_execution_debugging = []
+broken_compiler_debugging = []
+code_bounds_debugging = []
+stack_access_debugging = []
+debugging = ["compiler_bytecode_desync_debugging", "stack_len_debugging", "compiler_invalid_execution_debugging", "broken_compiler_debugging", "code_bounds_debugging", "stack_access_debugging"]
+
+
 [lib]
 doc = true
 
-[dependencies]
-regex = "1"
-
-[profile.bench]
-opt-level = 3
-debug = false
-incremental = false
-overflow-checks = false
-lto = true
+[dependencies.regex]
+version = "1.3.1"
+default-features = false
+features = ["std"]
 
 [profile.release]
 opt-level = 3
-debug = false
+debug-assertions = false
+debug = 0
 incremental = false
 overflow-checks = false
-lto = true
+panic = "abort"
+
+[profile.dev]
+opt-level = 1
+debug = true
+incremental = false
+overflow-checks = true
+panic = "abort"
+
+[profile.bench]
+opt-level = 3
+debug-assertions = false
+debug = 0
+incremental = false
+overflow-checks = false
 
 [profile.test]
 opt-level = 1

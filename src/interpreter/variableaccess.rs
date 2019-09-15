@@ -122,8 +122,6 @@ impl Interpreter
                 return_indexed(self.evaluate_of_direct(dirvar)?, &arrayvar.indexes),
             NonArrayVariable::Global(globalvar) =>
                 return_indexed(self.evaluate_of_global(globalvar)?, &arrayvar.indexes),
-            NonArrayVariable::BareGlobal(bareglobalvar) =>
-                return_indexed(self.evaluate_of_bareglobal(bareglobalvar)?, &arrayvar.indexes),
             NonArrayVariable::ActualArray(array) =>
                 return_indexed(ValueLoc::Static(Value::Array(array)), &arrayvar.indexes),
             NonArrayVariable::ActualDict(dict) =>
@@ -146,17 +144,14 @@ impl Interpreter
         }
         else
         {
-            panic!("askldfaweif reimplement somehow");
             // fallback to instance functions
-            /*
-            let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
+            let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| format!("internal error: tried to access non-extant object type"))?;
             
-            let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
+            let funcdat = objspec.functions.get(&name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(name), ident))?;
             
             let mut mydata = funcdat.clone();
             mydata.forcecontext = ident;
-            valhandler(Value::new_funcval(None, mydata))
-            */
+            Ok(Value::new_funcval(None, mydata))
         }
     }
     pub(crate) fn evaluate_of_indirect<'a>(&'a mut self, indirvar : IndirectVar) -> Result<ValueLoc<'a>, String>
@@ -174,17 +169,14 @@ impl Interpreter
         }
         else
         {
-            panic!("askldfaweif reimplement somehow");
             // fallback to instance functions
-            /*
-            let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
+            let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| format!("internal error: tried to access non-extant object type"))?;
             
-            let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(indirvar.name), ident))?;
+            let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant instance variable"))?;
             
             let mut mydata = funcdat.clone();
             mydata.forcecontext = ident;
-            valhandler(Value::new_funcval(None, mydata))
-            */
+            Ok(ValueLoc::Static(Value::new_funcval(None, mydata)))
         }
     }
     pub(crate) fn evaluate_of_global<'a>(&'a mut self, globalvar : usize) -> Result<ValueLoc<'a>, String>
@@ -203,15 +195,6 @@ impl Interpreter
     {
         Ok(ValueLoc::Mut(self.top_frame.variables.get_mut(index).ok_or_else(|| "internal error: variable stack out-of-bounds access".to_string())?))
     }
-    pub (crate) fn evaluate_self<'a>(&'a mut self) -> Result<ValueLoc<'a>, String>
-    {
-        Ok(ValueLoc::Static(Value::Instance(*self.top_frame.instancestack.last_mut().ok_or_else(|| "error: tried to access `self` while not inside of instance scope".to_string())?)))
-    }
-    pub (crate) fn evaluate_other<'a>(&'a mut self) -> Result<ValueLoc<'a>, String>
-    {
-        let loc = self.top_frame.instancestack.len()-2;
-        Ok(ValueLoc::Static(Value::Instance(*self.top_frame.instancestack.get_mut(loc).ok_or_else(|| "error: tried to access `other` while not inside of at least two instance scopes".to_string())?)))
-    }
     pub (crate) fn evaluate<'a>(&'a mut self, variable : Variable) -> Result<ValueLoc<'a>, String>
     {
         match variable
@@ -221,8 +204,6 @@ impl Interpreter
             Variable::Global(globalvar) => self.evaluate_of_global(globalvar),
             Variable::BareGlobal(bareglobalvar) => self.evaluate_of_bareglobal(bareglobalvar),
             Variable::Direct(name) => self.evaluate_of_direct(name),
-            Variable::Selfref => self.evaluate_self(),
-            Variable::Other => self.evaluate_other(),
         }
     }
     pub (crate) fn evaluate_value(&mut self, variable : Variable) -> Result<Value, String>

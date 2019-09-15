@@ -39,7 +39,6 @@ pub (crate) struct ForEachData {
     pub (super) variables: u64,
     pub (super) loop_start: usize,
     pub (super) loop_end: usize,
-    pub (super) name: usize,
     pub (super) values: ForEachValues,
 }
 
@@ -106,7 +105,6 @@ pub (crate) struct Instance {
 #[derive(Debug, Clone)]
 pub (crate) enum NonArrayVariable {
     Indirect(IndirectVar), // x.y.z evaluates x.y before storing it as the instance identity under which to find y, but then (x.y).z is held as-is
-    BareGlobal(usize),
     Global(usize),
     Direct(usize),
     ActualArray(Box<Vec<Value>>),
@@ -140,9 +138,7 @@ pub (crate) enum Variable {
     Indirect(IndirectVar),
     BareGlobal(usize),
     Global(usize),
-    Direct(usize),
-    Selfref,
-    Other,
+    Direct(usize)
 }
 
 impl Variable {

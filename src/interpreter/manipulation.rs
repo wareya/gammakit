@@ -180,17 +180,6 @@ impl Interpreter
         
         Ok(FuncSpec { argcount, code : self.top_frame.code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, generator })
     }
-    pub (crate) fn read_named_function(&mut self, generator : bool) -> Result<(usize, FuncSpec), String>
-    {
-        let name = self.read_string_index()?;
-        let argcount = self.read_u16()? as usize;
-        let bodylen = self.read_usize()?;
-        
-        let startaddr = self.get_pc();
-        self.add_pc(bodylen);
-        
-        Ok((name, FuncSpec { argcount, code : self.top_frame.code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, generator }))
-    }
     
     pub (crate) fn read_lambda(&mut self) -> Result<(Vec<Value>, FuncSpec), String>
     {

@@ -15,14 +15,15 @@ impl Interpreter
         
         self.push_new_frame(Frame::new_from_call(&function.code, function.startaddr, function.endaddr, isexpr, false))?;
         
+        self.top_frame.variables.push(Value::Func(Box::new(funcdata.clone())));
+        
         // copy lambda's universe, if there is one
         if let Some(ref universe) = funcdata.predefined
         {
-            self.top_frame.variables = universe.clone();
+            self.top_frame.variables.extend(universe.clone());
         }
         self.set_pc(function.startaddr);
         
-        self.top_frame.variables.push(Value::Func(Box::new(funcdata.clone())));
         self.top_frame.variables.append(&mut args);
         
         Ok(())
@@ -79,7 +80,7 @@ impl Interpreter
         }
         Ok(())
     }
-    pub (crate) fn call_function(&mut self, funcdata : Box<FuncVal>, args : Vec<Value>, isexpr : bool) -> OpResult
+    pub (crate) fn call_function(&mut self, funcdata : Box<FuncVal>, mut args : Vec<Value>, isexpr : bool) -> OpResult
     {
         let defdata = &funcdata.userdefdata;
         
@@ -97,10 +98,11 @@ impl Interpreter
                 
                 for _ in 0..defdata.argcount
                 {
-                    new_frame.variables.push(self.stack_pop_val().ok_or_else(|| minierr("internal error: failed to process arguments for function call"))?);
+                    new_frame.variables.push(args.pop().unwrap());
                 }
                 
                 self.stack_push_val(Value::Generator(Box::new(GeneratorState{frame: Some(new_frame)})));
+                return Ok(());
             }
         }
         else if !defdata.fromobj

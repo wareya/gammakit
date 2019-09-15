@@ -19,15 +19,15 @@ use variableaccess::ValueLoc;
 pub type StepResult = Result<bool, String>;
 type OpResult = Result<(), String>;
 /// Type signature of functions to be registered as bindings.
-pub type Binding = FnMut(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
+pub type Binding = dyn FnMut(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
 /// For trivial bindings.
 pub type TrivialBinding = fn(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
 /// For simple bindings.
-pub type SimpleBinding = FnMut(Vec<Value>) -> Result<Value, String>;
+pub type SimpleBinding = dyn FnMut(Vec<Value>) -> Result<Value, String>;
 /// For trivial simple bindings.
 pub type TrivialSimpleBinding = fn(Vec<Value>) -> Result<Value, String>;
 /// For arrow bindings.
-pub type ArrowBinding = FnMut(ValueLoc, Vec<Value>) -> Result<Value, String>;
+pub type ArrowBinding = dyn FnMut(ValueLoc, Vec<Value>) -> Result<Value, String>;
 /// For trivial arrow bindings.
 pub type TrivialArrowBinding = fn(ValueLoc, Vec<Value>) -> Result<Value, String>;
 
@@ -297,5 +297,16 @@ impl Interpreter {
     pub fn dump_code(&self) -> Vec<u8>
     {
         self.top_frame.code.get(..).unwrap().iter().cloned().collect()
+    }
+    pub fn print_op_perf_log(&self)
+    {
+        //let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / 1_000_000.0 / (*interpreter.op_map_hits.get(k).unwrap() as f64).sqrt())).collect::<Vec<_>>();
+        //let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / *interpreter.op_map_hits.get(k).unwrap() as f64)).collect::<Vec<_>>();
+        let mut op_map = self.op_map.iter().map(|(k, v)| (*k, *v as f64 / 1_000_000_000.0)).collect::<Vec<_>>();
+        op_map.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        for (op, time) in op_map
+        {
+            println!("{:02X}:{}", op, time);
+        }
     }
 }

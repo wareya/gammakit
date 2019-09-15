@@ -6,7 +6,6 @@ use std::collections::{HashMap, BTreeMap, BTreeSet};
 use super::interpreter::GlobalState;
 use super::interpreter::types::{FuncSpec, ObjSpec};
 
-#[derive(Debug)]
 pub (crate) struct DebugInfo
 {
     pub (crate) last_line : usize,
@@ -14,7 +13,13 @@ pub (crate) struct DebugInfo
     pub (crate) last_type : String,
 }
 
-#[derive(Debug)]
+impl std::fmt::Debug for DebugInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+    {
+        write!(f, "DebugInfo {{ <redacted> }}")
+    }
+}
+
 pub struct Code
 {
     pub (crate) code : Rc<Vec<u8>>,
@@ -37,6 +42,13 @@ impl std::cmp::PartialEq for Code
     }
 }
 impl Eq for Code {}
+
+impl std::fmt::Debug for Code {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
+    {
+        write!(f, "Code {{ <redacted> }}")
+    }
+}
 
 impl Code
 {
@@ -295,6 +307,12 @@ impl<'a> CompilerState<'a> {
     }
     fn find_identifier(&mut self, name : &String) -> Option<IdenLocation>
     {
+        match name.as_str()
+        {
+            "self" => return Some(IdenLocation::Selfref),
+            "other" => return Some(IdenLocation::Other),
+            _ => {},
+        }
         let index = self.get_string_index(name);
         if let Some(var) = self.frames.last().unwrap().find_identifier(index)
         {
@@ -451,7 +469,7 @@ impl<'a> CompilerState<'a> {
         self.compile_u64(var_stack_length as u64);
         Ok(())
     }
-    fn compile_context_wrapped(&mut self, context : Context, fun : &Fn(&mut CompilerState) -> Result<(), String>) -> Result<(), String>
+    fn compile_context_wrapped(&mut self, context : Context, fun : &dyn Fn(&mut CompilerState) -> Result<(), String>) -> Result<(), String>
     {
         let old_context = self.context;
         self.context = context;
@@ -462,13 +480,13 @@ impl<'a> CompilerState<'a> {
         
         Ok(())
     }
-    fn compile_scope_wrapped(&mut self, fun : &Fn(&mut CompilerState) -> Result<(), String>) -> Result<(), String>
+    fn compile_scope_wrapped(&mut self, fun : &dyn Fn(&mut CompilerState) -> Result<(), String>) -> Result<(), String>
     {
-        self.frames.last_mut().unwrap().add_scope();
+        self.add_scope();
         
         fun(self)?;
         
-        let var_stack_length = self.frames.last_mut().unwrap().pop_scope();
+        let var_stack_length = self.pop_scope();
         self.compile_unscope(var_stack_length)
     }
     fn compile_any(&mut self, ast : &ASTNode) -> Result<(), String>
@@ -770,6 +788,8 @@ impl<'a> CompilerState<'a> {
                     self.code.push(PUSHOBJ);
                     self.compile_u64(index as u64);
                 }
+                IdenLocation::Selfref => self.code.push(PUSHSELF),
+                IdenLocation::Other   => self.code.push(PUSHOTHER),
                 _ => return Err(format!("not implemented yet kjawefawlefs"))
             }
         }
@@ -1323,6 +1343,7 @@ impl<'a> CompilerState<'a> {
         }
         
         self.open_frame();
+        
         self.add_function(&"lambda_self".to_string()).ok_or_else(|| format!("error: redeclared identifier `lambda_self`"))?;
         
         self.code.push(LAMBDA);
@@ -1336,7 +1357,8 @@ impl<'a> CompilerState<'a> {
           
         for arg in args
         {
-            self.compile_string_index(&arg.child(0)?.text);
+            let name = &arg.child(0)?.text;
+            self.add_variable(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
         }
         
         let position_1 = self.code.len();
@@ -1461,7 +1483,7 @@ impl<'a> CompilerState<'a> {
         
         if init_exists
         {
-            self.frames.last_mut().unwrap().add_scope();
+            self.add_scope();
             self.compile_nth_child(header, 0)?;
         }
         
@@ -1503,7 +1525,7 @@ impl<'a> CompilerState<'a> {
         // for loops need an extra layer of scope around them if they have an init statement
         if init_exists
         {
-            let var_stack_length = self.frames.last_mut().unwrap().pop_scope();
+            let var_stack_length = self.pop_scope();
             self.compile_unscope(var_stack_length)?;
         }
         Ok(())
@@ -1530,15 +1552,19 @@ impl<'a> CompilerState<'a> {
         
         self.compile_scope_wrapped(&|x|
         {
-            x.compile_pushname(&ast.child(2)?.child(0)?.text)?;
-            
             x.compile_nth_child(ast, 4)?;
+            
             x.code.push(FOREACH);
             let block_len_rewrite_pos = x.compile_u64(0);
             let position_1 = x.code.len();
+            
             x.code.push(FOREACHHEAD);
+            x.add_variable(&ast.child(2)?.child(0)?.text);
+            
             x.compile_nth_child(ast, 6)?;
+            
             x.code.push(FOREACHLOOP);
+            
             let position_2 = x.code.len();
             let block_len = position_2 - position_1;
             x.rewrite_code(block_len_rewrite_pos, pack_u64(block_len as u64))

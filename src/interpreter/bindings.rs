@@ -302,7 +302,10 @@ impl Interpreter
         variables.insert(id_index, Value::Instance(instance_id));
         for var in object.variables.keys() // FIXME make this stuff use exact index somehow
         {
-            variables.insert(*var, Value::Number(0.0));
+            if *var != id_index
+            {
+                variables.insert(*var, Value::Number(0.0));
+            }
         }
         self.global.instances.insert(instance_id, Instance { objtype : object_id, ident : instance_id, variables });
         
