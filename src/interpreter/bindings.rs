@@ -194,6 +194,8 @@ impl Interpreter
         
         insert_arrow!("push"            , sim_subfunc_push              );
         insert_arrow!("pop"             , sim_subfunc_pop               );
+        
+        insert_arrow!("replace_char"    , sim_subfunc_replace_char      );
     }
     pub (crate) fn get_binding(&self, name : usize) -> Option<Rc<RefCell<Binding>>>
     {
@@ -671,6 +673,32 @@ impl Interpreter
                 Ok(ret)
             }
             _ => plainerr("error: pop() must be called with an array as the first argument")
+        }
+    }
+    pub (crate) fn sim_subfunc_replace_char(mut myself : ValueLoc, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        if args.len() != 2
+        {
+            return Err(format!("error: wrong number of arguments to replace_char(); expected 2, got {}", args.len()));
+        }
+        let indexnum = match_or_err!(args.expect_extract(0)?, Value::Number(indexnum) => indexnum, minierr("error: argument to replace_char must be a number"))?.round() as usize;
+        let insert = match_or_err!(args.expect_extract(1)?, Value::Text(text) => text, minierr("error: argument to replace_char must be a number"))?;
+        
+        match myself.as_mut()?
+        {
+            Value::Text(ref mut string) =>
+            {
+                if let Some((i, c)) = string.char_indices().nth(indexnum)
+                {
+                    string.replace_range(i..i+c.len_utf8(), &insert);
+                    Ok(Value::Number(0.0))
+                }
+                else
+                {
+                    Err(format!("error: tried to access past the end of a string with replace_char"))
+                }
+            }
+            _ => plainerr("error: replace_char() must be called on a string")
         }
     }
 }

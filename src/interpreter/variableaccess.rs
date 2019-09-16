@@ -104,6 +104,40 @@ pub (crate) fn return_indexed<'a>(var : ValueLoc<'a>, indexes : &[HashableValue]
             let newvar = ValueLoc::Static(var.remove(index).ok_or_else(|| format!("error: tried to access non-extant index {:?} of a dict", index))?);
             return_indexed(newvar, new_indexes)
         }
+        
+        ValueLoc::<'a>::Mut(Value::Text(string)) =>
+        {
+            let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as a string index"))?.round() as usize;
+            
+            if !new_indexes.is_empty()
+            {
+                return plainerr("error: tried to consecutively index into a string more than once (e.g. \"asdf\"[1][1])");
+            }
+            let newvar = ValueLoc::Static(Value::Text([string.chars().nth(indexnum).ok_or_else(|| format!("error: tried to access non-extant index {} of a string", indexnum))?].iter().collect()));
+            Ok(newvar)
+        }
+        ValueLoc::<'a>::Immut(Value::Text(string)) =>
+        {
+            let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as a string index"))?.round() as usize;
+            
+            if !new_indexes.is_empty()
+            {
+                return plainerr("error: tried to consecutively index into a string more than once (e.g. \"asdf\"[1][1])");
+            }
+            let newvar = ValueLoc::Static(Value::Text([string.chars().nth(indexnum).ok_or_else(|| format!("error: tried to access non-extant index {} of a string", indexnum))?].iter().collect()));
+            Ok(newvar)
+        }
+        ValueLoc::Static(Value::Text(string)) =>
+        {
+            let indexnum = match_or_err!(index, HashableValue::Number(indexnum) => indexnum, minierr("error: tried to use a non-number as a string index"))?.round() as usize;
+            
+            if !new_indexes.is_empty()
+            {
+                return plainerr("error: tried to consecutively index into a string more than once (e.g. \"asdf\"[1][1])");
+            }
+            let newvar = ValueLoc::Static(Value::Text([string.chars().nth(indexnum).ok_or_else(|| format!("error: tried to access non-extant index {} of a string", indexnum))?].iter().collect()));
+            Ok(newvar)
+        }
         // TODO reintroduce string support
         _ => Err(format!("error: tried to index into a non-array, non-dict value {:?} with index {:?}", var, index))
     }

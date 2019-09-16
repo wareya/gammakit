@@ -250,13 +250,13 @@ print(trew);
 
 var xaa = "myarray";
 print("asdf");
-//print(xaa[1]); // TODO reintroduce string indexing
+print(xaa[1]);
 print(myarray[1]);
 print("asdf2");
 
 print(i.getholder().getprintthing()("alkergikadsg"));
 
-//xaa[1] = "e"; // TODO reintroduce string indexing
+xaa->replace_char(1, "Ｙ");
 
 print(xaa);
 
@@ -547,7 +547,7 @@ var flei = "test";
 print("indexing into literal arrays, dicts, and strings:");
 print([0,1,2,3,4][3]);
 print({"asdf" : 0}["asdf"]);
-//print("asdf"[0], "asdf"[3]); // FIXME reintroduce indexing into strings
+print("asdf"[0], "asdf"[3]);
 
 print("dismembering:");
 var badarray = [0, 1, 2, 3];
