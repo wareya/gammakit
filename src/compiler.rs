@@ -183,13 +183,13 @@ impl Scope {
 
 struct Frame {
     scopes : Vec<Scope>,
-    object : Option<ObjSpec>,
+    objects : Vec<ObjSpec>,
 }
 
 impl Frame {
     fn new() -> Frame
     {
-        Frame { scopes : vec!(Scope::new(0)), object : None }
+        Frame { scopes : vec!(Scope::new(0)), objects : vec!() }
     }
     fn total_size(&self) -> usize
     {
@@ -218,9 +218,13 @@ impl Frame {
                 return Some(index);
             }
         }
-        if let Some(myobj) = &self.object
+        if let Some(myobj) = &self.objects.last()
         {
             if let Some(index) = myobj.variables.get(&name)
+            {
+                return Some(IdenLocation::InstanceVar(name)); // FIXME make this use exact index
+            }
+            if let Some(index) = myobj.functions.get(&name)
             {
                 return Some(IdenLocation::InstanceVar(name)); // FIXME make this use exact index
             }
@@ -381,6 +385,7 @@ impl<'a> CompilerState<'a> {
         self.add_hook(&"funcdef", CompilerState::compile_funcdef);
         self.add_hook(&"globalfuncdef", CompilerState::compile_globalfuncdef);
         self.add_hook(&"withstatement", CompilerState::compile_with);
+        self.add_hook(&"withasstatement", CompilerState::compile_withas);
         self.add_hook(&"declaration", CompilerState::compile_declaration);
         self.add_hook(&"bareglobaldec", CompilerState::compile_bareglobaldec);
         self.add_hook(&"binstate", CompilerState::compile_binstate);
@@ -1021,6 +1026,33 @@ impl<'a> CompilerState<'a> {
         self.globalstate.objects.insert(nameindex, incomplete_object.clone());
         self.globalstate.instances_by_type.insert(nameindex, BTreeSet::new());
         
+        let mut dummy_functions = BTreeMap::new();
+        for part in &parts.children
+        {
+            if part.child(0)?.text == "objfuncdef"
+            {
+                let def = &part.child(0)?;
+                let funcname = &def.child(1)?.child(0)?.text;
+                let argcount = def.child(3)?.children.len();
+                
+                let func = FuncSpec {
+                    startaddr : 0,
+                    endaddr : 0,
+                    code : Code::new(),
+                    argcount : argcount,
+                    parentobj : nameindex,
+                    forcecontext : 0,
+                    fromobj : true,
+                    generator : false,
+                };
+                
+                dummy_functions.insert(self.get_string_index(funcname), func);
+            }
+        }
+        
+        incomplete_object.functions = dummy_functions;
+        self.globalstate.objects.insert(nameindex, incomplete_object.clone());
+        
         let mut functions = BTreeMap::new();
         for part in &parts.children
         {
@@ -1032,14 +1064,14 @@ impl<'a> CompilerState<'a> {
                 let oldcode = self.code.clone();
                 self.code = Code::new();
                 self.open_frame();
-                self.frames.last_mut().unwrap().object = Some(incomplete_object.clone());
+                self.frames.last_mut().unwrap().objects.push(incomplete_object.clone());
                 
-                let mut argcount = 0;
+                let argcount = def.child(3)?.children.len();
+                self.add_function(funcname).ok_or_else(|| format!("error: redeclared identifier `{}`", funcname))?;
                 for arg in &def.child(3)?.children
                 {
                     let name = &arg.child(0)?.text;
                     self.add_variable(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
-                    argcount += 1;
                 }
                 if funcname == "create" && argcount != 0
                 {
@@ -1178,19 +1210,50 @@ impl<'a> CompilerState<'a> {
     
     fn compile_with(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        panic!("FIXME need to reimplement with");
-        
-        self.compile_nth_child(ast, 1)?;
+        let name = &ast.child(2)?.child(0)?.text;
+        let index = self.get_string_index(name);
         self.code.push(WITH);
+        self.compile_u64(index as u64);
         
         let len_position = self.compile_u64(0);
         
         let position_1 = self.code.len();
-        self.compile_nth_child(ast, 2)?;
-        self.code.push(WITHLOOP);
-        
+        let myobj = self.globalstate.objects.get(&index).ok_or_else(|| format!("error: unknown object type `{}`", name))?;
+        self.frames.last_mut().unwrap().objects.push(myobj.clone());
+        self.compile_scope_wrapped(&|x|
+        {
+            x.compile_nth_child(ast, 4)?;
+            x.code.push(WITHLOOP);
+            Ok(())
+        })?;
+        self.frames.last_mut().unwrap().objects.pop();
         let position_2 = self.code.len();
+        let block_len = position_2 - position_1;
+        self.rewrite_code(len_position, pack_u64(block_len as u64))?;
         
+        Ok(())
+    }
+    fn compile_withas(&mut self, ast : &ASTNode) -> Result<(), String>
+    {
+        self.compile_nth_child(ast, 2)?;
+        self.code.push(WITHAS);
+        
+        let obj_name = &ast.child(4)?.child(0)?.text;
+        let obj_index = self.get_string_index(obj_name);
+        
+        let len_position = self.compile_u64(0);
+        
+        let position_1 = self.code.len();
+        let myobj = self.globalstate.objects.get(&obj_index).ok_or_else(|| format!("error: unknown object type `{}`", obj_name))?;
+        self.frames.last_mut().unwrap().objects.push(myobj.clone());
+        self.compile_scope_wrapped(&|x|
+        {
+            x.compile_nth_child(ast, 6)?;
+            x.code.push(WITHLOOP);
+            Ok(())
+        })?;
+        self.frames.last_mut().unwrap().objects.pop();
+        let position_2 = self.code.len();
         let block_len = position_2 - position_1;
         self.rewrite_code(len_position, pack_u64(block_len as u64))?;
         

@@ -99,6 +99,7 @@ impl Interpreter
         set!(SWITCHEXIT, sim_SWITCHEXIT);
         set!(UNSCOPE, sim_UNSCOPE);
         set!(WITH, sim_WITH);
+        set!(WITHAS, sim_WITHAS);
             
         set!(WHILETEST, sim_WHILETEST);
         set!(WHILELOOP, sim_WHILELOOP);
@@ -531,56 +532,57 @@ impl Interpreter
     }
     pub (crate) fn sim_WITH(&mut self) -> OpResult
     {
-        #[cfg(feature = "stack_len_debugging")]
-        {
-            if self.stack_len() < 1
-            {
-                return plainerr("internal error: WITH instruction requires 1 values on the stack but found 0");
-            }
-        }
-        // NOTE: the self.top_frame.scopes.len() >= 0xFFFF error case is handled by SCOPE instruction
-        let other_id = self.stack_pop_val().ok_or_else(|| minierr("internal error: tried to use with() on a non-value expression"))?;
-        
+        let object_id = self.read_usize()?;
         let codelen = self.read_usize()?;
-        
         let current_pc = self.get_pc();
         
-        if let Value::Object(object_id) = other_id
+        let instance_id_list : Vec<usize> = self.global.instances_by_type.get(&object_id).ok_or_else(|| minierr("error: tried to use non-existant object type in with expression"))?.iter().cloned().collect();
+        if let Some(first) = instance_id_list.first()
         {
-            let instance_id_list : Vec<usize> = self.global.instances_by_type.get(&object_id).ok_or_else(|| minierr("error: tried to use non-existant instance in with expression"))?.iter().cloned().collect();
-            if let Some(first) = instance_id_list.first()
-            {
-                self.top_frame.instancestack.push(*first);
-                self.top_frame.controlstack.push(Controller::With(WithData{
-                    variables : self.top_frame.variables.len() as u64,
-                    loop_start : current_pc,
-                    loop_end : current_pc + codelen,
-                    instances : instance_id_list.get(1..).unwrap().iter().rev().map(|id| Value::Number(*id as f64)).collect()
-                }));
-            }
-            else
-            {
-                // silently skip block if there are no instances of this object type
-                self.add_pc(codelen as usize);
-            }
-        }
-        else 
-        {
-            let instance_id = match_or_err!(other_id, Value::Instance(x) => x, minierr("error: tried to use with() with a value that was not an object id or instance id"))?;
-            if !self.global.instances.contains_key(&instance_id)
-            {
-                return plainerr("error: tried to use non-extant instance as argument of with()");
-            }
-            
-            self.top_frame.instancestack.push(instance_id);
-            
+            self.top_frame.instancestack.push(*first);
             self.top_frame.controlstack.push(Controller::With(WithData{
                 variables : self.top_frame.variables.len() as u64,
                 loop_start : current_pc,
                 loop_end : current_pc + codelen,
-                instances : Vec::new()
+                instances : instance_id_list.get(1..).unwrap().iter().rev().map(|id| Value::Number(*id as f64)).collect()
             }));
         }
+        else
+        {
+            // silently skip block if there are no instances of this object type
+            self.add_pc(codelen as usize);
+        }
+        
+        Ok(())
+    }
+    pub (crate) fn sim_WITHAS(&mut self) -> OpResult
+    {
+        #[cfg(feature = "stack_len_debugging")]
+        {
+            if self.stack_len() < 1
+            {
+                return plainerr("internal error: WITHAS instruction requires 1 values on the stack but found 0");
+            }
+        }
+        let other_id = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: withas expression was a variable instead of a value"))?;
+        let instance_id = match_or_err!(other_id, Value::Instance(x) => x, minierr("error: tried to use with() with a value that was not an object id or instance id"))?;
+        let codelen = self.read_usize()?;
+        let current_pc = self.get_pc();
+        
+        if !self.global.instances.contains_key(&instance_id)
+        {
+            return plainerr("error: tried to use non-extant instance as argument of with()");
+        }
+        
+        self.top_frame.instancestack.push(instance_id);
+        
+        self.top_frame.controlstack.push(Controller::With(WithData{
+            variables : self.top_frame.variables.len() as u64,
+            loop_start : current_pc,
+            loop_end : current_pc + codelen,
+            instances : Vec::new()
+        }));
+        
         Ok(())
     }
     pub (crate) fn sim_SWITCH(&mut self) -> OpResult

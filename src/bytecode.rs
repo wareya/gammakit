@@ -63,8 +63,9 @@ pub (crate) const IF : u8 = 0x80;
 pub (crate) const WHILE : u8 = 0x82;
 pub (crate) const FOR : u8 = 0x83;
 pub (crate) const WITH : u8 = 0x84;
-pub (crate) const FOREACH : u8 = 0x85;
-pub (crate) const SWITCH : u8 = 0x86;
+pub (crate) const WITHAS : u8 = 0x85;
+pub (crate) const FOREACH : u8 = 0x86;
+pub (crate) const SWITCH : u8 = 0x87;
 
 pub (crate) const BREAK : u8 = 0x90;
 pub (crate) const CONTINUE : u8 = 0x91;

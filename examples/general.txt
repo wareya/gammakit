@@ -21,12 +21,10 @@ def noopfunc()
     
 }
 
-/*
 with(BlankObj)
 {
     
 }
-*/
 
 noopfunc();
 
@@ -55,7 +53,7 @@ obj Character
     }
     def getprintthing()
     {
-        return self.printthing;
+        return printthing;
     }
     def getholder()
     {
@@ -84,19 +82,21 @@ def asdf()
 var as = asdf();
 print(as);
 print(asdf()*2);
-
-/*
-with(i)
+with(i as Character)
 {
     print(x);
     x -= 1;
 }
-*/
+with(i as Character)
+{
+    print(x);
+    x -= 1;
+}
 print(i.x);
 
 var i2 = instance_create(Character);
 i2.localvar = 10;
-/*
+
 with(Character)
 {
     var asdfe4 = 10;
@@ -105,7 +105,7 @@ with(Character)
 
 with(Character)
     var asdfe4 = 10;
-*/
+
 i2.localvar = 5672453;
 
 var bs = i2.printthing("alkergikadsg");
