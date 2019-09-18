@@ -577,6 +577,7 @@ impl<'a> CompilerState<'a> {
         {
             for child in ast.child_slice(0, -1)?
             {
+                // FIXME detect if next is indirection; if yes, don't wrap in Lvar context
                 self.compile_context_wrapped(Context::Lvar, &|x|
                 {
                     if child.text == "name"
@@ -644,6 +645,7 @@ impl<'a> CompilerState<'a> {
         {
             for child in ast.child_slice(0, -1)?
             {
+                // FIXME detect if next is indirection; if yes, don't wrap in Lvar context
                 self.compile_context_wrapped(Context::Lvar, &|x|
                 {
                     if child.text == "name"

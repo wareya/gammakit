@@ -964,7 +964,6 @@ impl Interpreter
             {
                 self.stack_push_val(dict.remove(&index).ok_or_else(|| format!("error: tried to access non-extant index {:?} of a dict", index))?);
             }
-            // TODO reintroduce string support
             StackValue::Val(val) =>
             {
                 self.stack_push_val(return_indexed(ValueLoc::Static(val), &[index])?.to_val());
