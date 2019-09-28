@@ -184,7 +184,7 @@ impl Interpreter {
         self.restart(&self.top_frame.code.clone());
     }
     
-    pub fn restart_into_string(&mut self, text: &str) -> Result<(), String>
+    pub fn restart_into_string(&mut self, text: &str) -> Result<Code, String>
     {
         let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
         
@@ -194,7 +194,7 @@ impl Interpreter {
         
         let code = compile_bytecode(&ast, &mut self.global)?;
         self.restart(&code);
-        Ok(())
+        Ok(code)
     }
     /// Clears global state (objects/instances).
     /// 

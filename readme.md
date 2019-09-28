@@ -11,15 +11,14 @@ As of writing, Gammakit is approximately 5000 lines of code, not counting blank 
 Some random features:
 
 - GameMaker-like objects
-  - instance_create and instance_kill
-  - instance varibles with "far" (as opposed to "var")
-  - object functions with "def" (instance-context only, static object functions not supported)
+  - Instance_create and instance_kill
+  - Object functions (methods) with "def" (instance-context only, static/associated object functions not supported)
   - Inheritance is not supported yet but probably will be in the future
 - Lexically scoped
-  - Lexical scope is emulated; interior functions don't close over the scope they're defined in
+  - Interior functions don't close over the scope they're defined in
 - Dynamically typed
   - Types: Number (f64), Text (utf-8 string), Array, Dict, Set, Func, Generator, Instance, Object, Custom
-- Arrays, dictionaries (keys may only be numbers or strings), and sets are copied by value, not reference
+- Arrays, dictionaries (keys may only be numbers or strings), and sets (numbers/strings only) are copied by value, not reference
 - Switch statement where case blocks have their own scope, with no fallthrough, not even explicit fallthrough
   - Basically a glorified if-else chain where the switch value is only evaluated and stored once
   - Case labels are, consequently, allowed to be arbitrary expressions
@@ -121,23 +120,18 @@ If you use with() while inside of an instance scope, then "other" will dereferen
 TODO:
 - a destroy() event for instance_kill()
 - various helpful string and array functions
-- a "defer" statement?
 - inheritance? how would it work? like func_super()?
-- globalsubdef?
-- global constants?
-- "finalize" command for generators so that the next yield acts like a return instead of a yield
-- extend metaprogramming with argument lists, function types (subdef, generator, etc), etc
+- replace parent/text AST node stuff with enum
+- extend metaprogramming with argument lists, function type (generator, etc), captures
 
 TODO (sanitation/low-priority):
+- a "defer" statement?
 - replace instances of "as" with instances of "from"
 - make keys() iterate over dict/set elements in insertion order
 - make sure format_val does the same as the above
-- replace parent/text AST node stuff with enum
 - forbid if-else inside an if condition's block with no enclosing braces
+- "finalize" command for generators so that the next yield acts like a return instead of a yield
 - extend number type to "64-bit signed int or 64-bit float" rather than just "64-bit float"
-
-MAYBE:
-- "all"? (vs "other", "self")
 
 MAYBE (metaprogramming):
 - give the runtime control over interpreters of its own; runtime panics will invalidate interpreters

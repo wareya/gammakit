@@ -160,12 +160,14 @@ impl Interpreter
     {
         macro_rules! insert { ( $x:expr, $y:ident ) => { self.insert_trivial_binding($x.to_string(), Interpreter::$y); } }
         
-        insert!("parse_text"            , sim_func_parse_text           );
-        insert!("compile_text"          , sim_func_compile_text         );
-        insert!("compile_ast"           , sim_func_compile_ast          );
-        insert!("instance_create"       , sim_func_instance_create      );
-        insert!("instance_exists"       , sim_func_instance_exists      );
-        insert!("instance_kill"         , sim_func_instance_kill        );
+        insert!("parse_text"             , sim_func_parse_text              );
+        insert!("parse_text_with_grammar", sim_func_parse_text_with_grammar );
+        insert!("compile_text"           , sim_func_compile_text            );
+        insert!("compile_ast"            , sim_func_compile_ast             );
+        insert!("compile_ast_generator"  , sim_func_compile_ast_generator   );
+        insert!("instance_create"        , sim_func_instance_create         );
+        insert!("instance_exists"        , sim_func_instance_exists         );
+        insert!("instance_kill"          , sim_func_instance_kill           );
         
         macro_rules! insert_simple { ( $x:expr, $y:ident ) => { self.insert_trivial_simple_binding($x.to_string(), Interpreter::$y); } }
         
@@ -384,6 +386,24 @@ impl Interpreter
         
         Ok(ast_to_dict(&ast))
     }
+    pub (crate) fn sim_func_parse_text_with_grammar(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        if args.len() != 2
+        {
+            return Err(format!("error: wrong number of arguments to parse_text_with_grammar(); expected 2, got {}", args.len()));
+        }
+        
+        let text = self.vec_pop_front_text(&mut args).ok_or_else(|| minierr("error: first argument to parse_text_with_grammar() must be a string"))?;
+        let grammar = self.vec_pop_front_text(&mut args).ok_or_else(|| minierr("error: second argument to parse_text_with_grammar() must be a string"))?;
+        let mut parser = Parser::new_from_grammar(&grammar)?;
+        
+        let program_lines : Vec<String> = text.lines().map(|x| x.to_string()).collect();
+        let tokens = parser.tokenize(&program_lines, true)?;
+        
+        let ast = parser.parse_program(&tokens, &program_lines, true)?.ok_or_else(|| minierr("error: string failed to parse"))?;
+        
+        Ok(ast_to_dict(&ast))
+    }
 
     pub (crate) fn sim_func_compile_ast(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
@@ -409,6 +429,33 @@ impl Interpreter
               parentobj : 0,
               forcecontext : 0,
               generator : false,
+            }
+        ) )
+    }
+    pub (crate) fn sim_func_compile_ast_generator(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        if args.len() != 1
+        {
+            return Err(format!("error: wrong number of arguments to compile_ast_generator(); expected 1, got {}", args.len()));
+        }
+        
+        let dict = self.vec_pop_front_dict(&mut args).ok_or_else(|| minierr("error: first argument to compile_ast_generator() must be a dictionary"))?;
+        let ast = dict_to_ast(&dict)?;
+        let code = compile_bytecode(&ast, &mut self.global)?;
+        
+        // endaddr at the start because Rc::new() moves `code`
+        Ok
+        ( Value::new_funcval
+          ( None,
+            FuncSpec
+            { endaddr : code.len(), // must be before code : Rc::new(code)
+              argcount : 0,
+              code,
+              startaddr : 0,
+              fromobj : false,
+              parentobj : 0,
+              forcecontext : 0,
+              generator : true,
             }
         ) )
     }

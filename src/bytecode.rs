@@ -24,7 +24,6 @@ pub (crate) const PUSHGLOBALVAL : u8 = 0x17;
 pub (crate) const PUSHGLOBALFUNC : u8 = 0x18;
 pub (crate) const PUSHBAREGLOBAL : u8 = 0x19;
 pub (crate) const PUSHINSTVAR : u8 = 0x1A;
-pub (crate) const PUSHINSTFUNC : u8 = 0x1B;
 pub (crate) const PUSHBIND : u8 = 0x1C;
 pub (crate) const PUSHOBJ : u8 = 0x1D;
 pub (crate) const PUSHSELF : u8 = 0x1E;
@@ -49,8 +48,7 @@ pub (crate) const INVOKECALL : u8 = 0x4F;
 
 pub (crate) const INVOKE : u8 = 0x50;
 
-pub (crate) const SCOPE : u8 = 0x60;
-pub (crate) const UNSCOPE : u8 = 0x61;
+pub (crate) const UNSCOPE : u8 = 0x60;
 pub (crate) const SWITCHCASE : u8 = 0x68;
 pub (crate) const SWITCHDEFAULT : u8 = 0x69;
 pub (crate) const SWITCHEXIT : u8 = 0x6F;

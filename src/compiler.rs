@@ -410,6 +410,7 @@ impl<'a> CompilerState<'a> {
         self.add_hook(&"forheaderstatement", CompilerState::compile_children);
         self.add_hook(&"forheaderexpr", CompilerState::compile_children);
         self.add_hook(&"invocation_expr", CompilerState::compile_invocation_expr);
+        self.add_hook(&"invocation_call", CompilerState::compile_invocation_call);
         self.add_hook(&"setbody", CompilerState::compile_setbody);
         self.add_hook(&"foreach", CompilerState::compile_foreach);
         self.add_hook(&"switch", CompilerState::compile_switch);
@@ -1605,6 +1606,19 @@ impl<'a> CompilerState<'a> {
         self.compile_nth_child(ast, 1)?;
         self.code.push(INVOKE);
         self.code.push(INVOKEEXPR);
+        
+        Ok(())
+    }
+    fn compile_invocation_call(&mut self, ast : &ASTNode) -> Result<(), String>
+    {
+        if ast.children.len() != 2
+        {
+            return plainerr("error: invocation must have exactly two children");
+        }
+        
+        self.compile_nth_child(ast, 1)?;
+        self.code.push(INVOKE);
+        self.code.push(INVOKECALL);
         
         Ok(())
     }

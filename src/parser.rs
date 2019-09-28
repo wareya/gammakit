@@ -498,7 +498,7 @@ impl Parser {
     {
         if tokens.len() == 0
         {
-            return Ok((None, 0, None));
+            return Ok((Some(ASTNode{text : "program".to_string(), line : 0, position : 0, isparent : true, children : Vec::new(), precedence : None }), 0, None));
         }
         
         let mut latesterror : Option<ParseError> = None;
@@ -705,7 +705,7 @@ impl Parser {
                     }
                     else
                     {
-                        println!("internal error: failed to grab context for parse error");
+                        println!("internal error: failed to grab context for parse error {:?} {:?}", raw_ast, tokens);
                     }
                 }
                 
@@ -734,7 +734,7 @@ impl Parser {
             }
             else
             {
-                plainerr("internal error: parser did not return AST despite it failing is_none() check")
+                plainerr("error: failed to parse")
             }
         }
         else
