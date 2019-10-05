@@ -1,3 +1,5 @@
+#![allow(clippy::inconsistent_digit_grouping)]
+
 extern crate gammakit;
 use gammakit::*;
 
@@ -6,7 +8,6 @@ use std::io::Write;
 
 fn main() -> Result<(), String>
 {
-    use std::collections::HashMap;
     use std::time::Instant;
     let mut interpreter = Interpreter::new(Parser::new_from_default()?);
     interpreter.insert_default_bindings();

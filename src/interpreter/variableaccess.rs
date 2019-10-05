@@ -1,7 +1,5 @@
 use crate::interpreter::*;
 
-macro_rules! plainerr { ( $x:expr ) => { Err($x.to_string()) } }
-
 #[derive(Debug)]
 pub enum ValueLoc<'a> {
     Static(Value),
@@ -19,6 +17,7 @@ impl<'a> ValueLoc<'a> {
             ValueLoc::Mut(v) => (*v).clone(),
         }
     }
+    #[allow(clippy::wrong_self_convention)]
     pub fn to_val(self) -> Value
     {
         match self
@@ -41,7 +40,7 @@ impl<'a> ValueLoc<'a> {
     {
         match self
         {
-            ValueLoc::Static(_) | ValueLoc::Immut(_) => Err("error: tried to assign to a read-only value".to_string()),
+            ValueLoc::Static(_) | ValueLoc::Immut(_) => plainerr("error: tried to assign to a read-only value"),
             ValueLoc::Mut(v) => Ok(*v),
         }
     }
@@ -49,8 +48,8 @@ impl<'a> ValueLoc<'a> {
     {
         match self
         {
-            ValueLoc::Static(_) | ValueLoc::Immut(_) => Err("error: tried to assign to a read-only value".to_string()),
-            ValueLoc::Mut(v) => Ok(**v = newval),
+            ValueLoc::Static(_) | ValueLoc::Immut(_) => plainerr("error: tried to assign to a read-only value"),
+            ValueLoc::Mut(v) => (**v = newval, Ok(())).1,
         }
     }
 }
@@ -145,7 +144,7 @@ pub (crate) fn return_indexed<'a>(var : ValueLoc<'a>, indexes : &[HashableValue]
 
 impl Interpreter
 {
-    pub(crate) fn evaluate_of_array<'a>(&'a mut self, arrayvar : ArrayVar) -> Result<ValueLoc<'a>, String>
+    pub(crate) fn evaluate_of_array(&mut self, arrayvar : ArrayVar) -> Result<ValueLoc<'_>, String>
     {
         match arrayvar.location
         {
@@ -179,7 +178,7 @@ impl Interpreter
         else
         {
             // fallback to instance functions
-            let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| format!("internal error: tried to access non-extant object type"))?;
+            let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| "internal error: tried to access non-extant object type".to_string())?;
             
             let funcdat = objspec.functions.get(&name).ok_or_else(|| format!("error: tried to read non-extant variable `{}` in instance `{}`", self.get_indexed_string(name), ident))?;
             
@@ -188,7 +187,7 @@ impl Interpreter
             Ok(Value::new_funcval(None, mydata))
         }
     }
-    pub(crate) fn evaluate_of_indirect<'a>(&'a mut self, indirvar : IndirectVar) -> Result<ValueLoc<'a>, String>
+    pub(crate) fn evaluate_of_indirect(&mut self, indirvar : IndirectVar) -> Result<ValueLoc<'_>, String>
     {
         let ident = indirvar.ident;
         if !self.global.instances.contains_key(&ident)
@@ -204,16 +203,16 @@ impl Interpreter
         else
         {
             // fallback to instance functions
-            let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| format!("internal error: tried to access non-extant object type"))?;
+            let objspec = self.global.objects.get(&instance.objtype).ok_or_else(|| "internal error: tried to access non-extant object type".to_string())?;
             
-            let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| format!("error: tried to read non-extant instance variable"))?;
+            let funcdat = objspec.functions.get(&indirvar.name).ok_or_else(|| "error: tried to read non-extant instance variable".to_string())?;
             
             let mut mydata = funcdat.clone();
             mydata.forcecontext = ident;
             Ok(ValueLoc::Static(Value::new_funcval(None, mydata)))
         }
     }
-    pub(crate) fn evaluate_of_global<'a>(&'a mut self, globalvar : usize) -> Result<ValueLoc<'a>, String>
+    pub(crate) fn evaluate_of_global(&mut self, globalvar : usize) -> Result<ValueLoc<'_>, String>
     {
         if !self.global.variables.contains_key(&globalvar)
         {
@@ -221,15 +220,15 @@ impl Interpreter
         }
         Ok(ValueLoc::Mut(self.global.variables.get_mut(&globalvar).unwrap()))
     }
-    pub(crate) fn evaluate_of_bareglobal<'a>(&'a mut self, bareglobalvar : usize) -> Result<ValueLoc<'a>, String>
+    pub(crate) fn evaluate_of_bareglobal(&mut self, bareglobalvar : usize) -> Result<ValueLoc<'_>, String>
     {
         Ok(ValueLoc::Immut(self.global.barevariables.get(&bareglobalvar).ok_or_else(|| format!("internal error: tried to access bare global variable `{}` that doesn't exist", self.get_indexed_string(bareglobalvar)))?))
     }
-    pub(crate) fn evaluate_of_direct<'a>(&'a mut self, index : usize) -> Result<ValueLoc<'a>, String>
+    pub(crate) fn evaluate_of_direct(&mut self, index : usize) -> Result<ValueLoc<'_>, String>
     {
         Ok(ValueLoc::Mut(self.top_frame.variables.get_mut(index).ok_or_else(|| "internal error: variable stack out-of-bounds access".to_string())?))
     }
-    pub (crate) fn evaluate<'a>(&'a mut self, variable : Variable) -> Result<ValueLoc<'a>, String>
+    pub (crate) fn evaluate(&mut self, variable : Variable) -> Result<ValueLoc<'_>, String>
     {
         match variable
         {

@@ -594,17 +594,10 @@ impl Parser {
                 std::mem::swap(ast, dummy);
             }
             
-            match ast.text.as_str()
+            // TODO move this to the compiler    
+            if ast.text == "funccall" && ast.last_child()?.child(0)?.text != "funcargs"
             {
-                // TODO move this to the compiler
-                "funccall" =>
-                {
-                    if ast.last_child()?.child(0)?.text != "funcargs"
-                    {
-                        return plainerr("error: tried to use non-function expression as a funccall statement");
-                    }
-                }
-                _ => {}
+                return plainerr("error: tried to use non-function expression as a funccall statement");
             }
             
             for mut child in &mut ast.children

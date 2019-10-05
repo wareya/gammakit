@@ -102,7 +102,8 @@ impl Interpreter
         }
         unsafe
         {
-            let r = *(self.top_frame.code.as_ptr().add(self.top_frame.pc) as *const u16);
+            #[allow(clippy::cast_ptr_alignment)]
+            let r = (self.top_frame.code.as_ptr().add(self.top_frame.pc) as *const u16).read_unaligned();
             self.top_frame.pc += 2;
             Ok(r)
         }
@@ -117,7 +118,8 @@ impl Interpreter
         }
         unsafe
         {
-            let r = *(self.top_frame.code.as_ptr().add(self.top_frame.pc) as *const u64) as usize;
+            #[allow(clippy::cast_ptr_alignment)]
+            let r = (self.top_frame.code.as_ptr().add(self.top_frame.pc) as *const u64).read_unaligned() as usize;
             self.top_frame.pc += 8;
             Ok(r)
         }
@@ -132,16 +134,14 @@ impl Interpreter
         }
         unsafe
         {
-            let r = *(self.top_frame.code.as_ptr().add(self.top_frame.pc) as *const f64);
+            #[allow(clippy::cast_ptr_alignment)]
+            let r = (self.top_frame.code.as_ptr().add(self.top_frame.pc) as *const f64).read_unaligned();
             self.top_frame.pc += 8;
             Ok(r)
         }
     }
-    pub (crate) fn read_string_index(&mut self) -> Result<usize, String>
-    {
-        self.read_usize()
-    }
     
+    #[allow(clippy::ptr_arg)]
     #[inline]
     pub (crate) fn get_string_index(&mut self, string : &String) -> usize
     {
@@ -204,12 +204,6 @@ impl Interpreter
         self.add_pc(bodylen);
         
         Ok((captures, FuncSpec { argcount, code : self.top_frame.code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, generator : false }))
-    }
-    
-    #[inline]
-    pub (crate) fn stack_pop_name(&mut self) -> Option<usize>
-    {
-        match_or_none!(self.stack_pop_var(), Some(Variable::Direct(name)) => name)
     }
     
     #[inline]

@@ -205,7 +205,7 @@ impl Interpreter
     }
     pub (crate) fn get_trivial_binding(&self, name : usize) -> Option<TrivialBinding>
     {
-        self.global.trivial_bindings.get(&name).map(|x| *x)
+        self.global.trivial_bindings.get(&name).copied()
     }
     pub (crate) fn get_simple_binding(&self, name : usize) -> Option<Rc<RefCell<SimpleBinding>>>
     {
@@ -213,7 +213,7 @@ impl Interpreter
     }
     pub (crate) fn get_trivial_simple_binding(&self, name : usize) -> Option<TrivialSimpleBinding>
     {
-        self.global.trivial_simple_bindings.get(&name).map(|x| *x)
+        self.global.trivial_simple_bindings.get(&name).copied()
     }
     pub (crate) fn get_arrow_binding(&self, name : usize) -> Option<Rc<RefCell<ArrowBinding>>>
     {
@@ -221,7 +221,7 @@ impl Interpreter
     }
     pub (crate) fn get_trivial_arrow_binding(&self, name : usize) -> Option<TrivialArrowBinding>
     {
-        self.global.trivial_arrow_bindings.get(&name).map(|x| *x)
+        self.global.trivial_arrow_bindings.get(&name).copied()
     }
     pub (crate) fn sim_func_print(mut args : Vec<Value>) -> Result<Value, String>
     {
@@ -742,7 +742,7 @@ impl Interpreter
                 }
                 else
                 {
-                    Err(format!("error: tried to access past the end of a string with replace_char"))
+                    plainerr("error: tried to access past the end of a string with replace_char")
                 }
             }
             _ => plainerr("error: replace_char() must be called on a string")

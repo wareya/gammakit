@@ -1,4 +1,5 @@
 #![allow(clippy::len_zero)]
+#![allow(clippy::ptr_arg)]
 
 use super::{strings::*, ast::*, bytecode::*};
 use std::rc::Rc;
@@ -10,6 +11,7 @@ pub (crate) struct DebugInfo
 {
     pub (crate) last_line : usize,
     pub (crate) last_index : usize,
+    #[allow(unused)]
     pub (crate) last_type : String,
 }
 
@@ -124,7 +126,6 @@ enum Context {
     Unknown,
     Statement,
     Lvar,
-    Objdef,
 }
 
 struct Scope {
@@ -220,11 +221,11 @@ impl Frame {
         }
         if let Some(myobj) = &self.objects.last()
         {
-            if let Some(index) = myobj.variables.get(&name)
+            if myobj.variables.contains_key(&name)
             {
                 return Some(IdenLocation::InstanceVar(name)); // FIXME make this use exact index
             }
-            if let Some(index) = myobj.functions.get(&name)
+            if myobj.functions.contains_key(&name)
             {
                 return Some(IdenLocation::InstanceVar(name)); // FIXME make this use exact index
             }
@@ -286,6 +287,7 @@ impl<'a> CompilerState<'a> {
     {
         self.globalstate.get_string_index(string)
     }
+    #[allow(unused)]
     pub (crate) fn get_string(&mut self, index : usize) -> String
     {
         self.globalstate.get_string(index)
@@ -341,7 +343,7 @@ impl<'a> CompilerState<'a> {
         {
             return Some(IdenLocation::GlobalFunc(index));
         }
-        return None;
+        None
     }
     fn open_frame(&mut self)
     {
@@ -541,11 +543,7 @@ impl<'a> CompilerState<'a> {
     {
         if ast.child(0)?.text == "name" && ast.child(0)?.child(0)?.text == "global" && ast.child(1)?.child(0)?.text == "indirection"
         {
-            let mut need_mutable_context = matches!(self.context, Context::Lvar);
-            if ast.children.len() >= 3 && !matches!(ast.child(2)?.child(0)?.text.as_str(), "funcargs" | "indirection")
-            {
-                need_mutable_context = true;
-            }
+            let need_mutable_context = matches!(self.context, Context::Lvar) || (ast.children.len() >= 3 && !matches!(ast.child(2)?.child(0)?.text.as_str(), "funcargs" | "indirection"));
             if need_mutable_context
             {
                 self.compile_pushglobal(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
@@ -609,11 +607,7 @@ impl<'a> CompilerState<'a> {
         
         if ast.child(0)?.text == "name" && ast.child(0)?.child(0)?.text == "global" && ast.child(1)?.child(0)?.text == "indirection"
         {
-            let mut need_mutable_context = matches!(self.context, Context::Lvar);
-            if ast.children.len() >= 3 && !matches!(ast.child(2)?.child(0)?.text.as_str(), "funcargs" | "indirection")
-            {
-                need_mutable_context = true;
-            }
+            let need_mutable_context = matches!(self.context, Context::Lvar) || (ast.children.len() >= 3 && !matches!(ast.child(2)?.child(0)?.text.as_str(), "funcargs" | "indirection"));
             if need_mutable_context
             {
                 self.compile_pushglobal(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
@@ -797,8 +791,7 @@ impl<'a> CompilerState<'a> {
                     self.compile_u64(index as u64);
                 }
                 IdenLocation::Selfref => self.code.push(PUSHSELF),
-                IdenLocation::Other   => self.code.push(PUSHOTHER),
-                _ => return Err(format!("not implemented yet kjawefawlefs"))
+                IdenLocation::Other   => self.code.push(PUSHOTHER)
             }
         }
         else
@@ -817,7 +810,7 @@ impl<'a> CompilerState<'a> {
         self.compile_string_index_with_prefix(PUSHGLOBALVAL, string);
         Ok(())
     }
-    fn compile_pushstr(&mut self, string : &String) -> Result<(), String>
+    fn compile_pushstr(&mut self, string : &str) -> Result<(), String>
     {
         self.compile_string_with_prefix(PUSHSTR, string);
         Ok(())
@@ -1009,6 +1002,7 @@ impl<'a> CompilerState<'a> {
         {
             if part.child(0)?.text == "objvardef"
             {
+                #[allow(clippy::map_entry)] // this is simpler and expresses the intent better the "stupid" way
                 for varname in part.child(0)?.child_slice(1, -1)?
                 {
                     let varname = &varname.child(0)?.text;
@@ -1042,7 +1036,7 @@ impl<'a> CompilerState<'a> {
                     startaddr : 0,
                     endaddr : 0,
                     code : Code::new(),
-                    argcount : argcount,
+                    argcount,
                     parentobj : nameindex,
                     forcecontext : 0,
                     fromobj : true,
@@ -1410,7 +1404,7 @@ impl<'a> CompilerState<'a> {
         
         self.open_frame();
         
-        self.add_function(&"lambda_self".to_string()).ok_or_else(|| format!("error: redeclared identifier `lambda_self`"))?;
+        self.add_function(&"lambda_self".to_string()).ok_or_else(|| minierr("error: redeclared identifier `lambda_self`"))?;
         
         self.code.push(LAMBDA);
         self.compile_u64(captures.len() as u64);

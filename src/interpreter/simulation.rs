@@ -711,7 +711,7 @@ impl Interpreter
         let immediate = self.pull_single_from_code()?;
         
         let var = self.stack_pop_var().ok_or_else(|| stack_access_err("internal error: argument to UNSTATE could not be found or was not a variable"))?;
-        let mut val = self.evaluate(var)?;
+        let val = self.evaluate(var)?;
         do_unstate_function(immediate, val)?;
         Ok(())
     }

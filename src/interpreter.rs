@@ -92,6 +92,7 @@ impl GlobalState {
             parser,
         }
     }
+    #[allow(clippy::ptr_arg)]
     pub (crate) fn get_string_index(&mut self, string : &String) -> usize
     {
         if let Some(index) = self.string_table.get(string)
@@ -159,7 +160,7 @@ impl Interpreter {
             last_error : None,
             op_map_hits : BTreeMap::new(),
             op_map : BTreeMap::new(),
-            track_op_performance : false
+            track_op_performance : true
         }
     }
     /// Loads new code into the interpreter.
@@ -275,7 +276,7 @@ impl Interpreter {
             {
                 return Ok(steps);
             }
-            else if let Ok(_) = ret
+            else if ret.is_ok()
             {
                 start_pc = self.get_pc();
                 continue;
@@ -296,7 +297,7 @@ impl Interpreter {
     }
     pub fn dump_code(&self) -> Vec<u8>
     {
-        self.top_frame.code.get(..).unwrap().iter().cloned().collect()
+        self.top_frame.code.get(..).unwrap().to_vec()
     }
     pub fn print_op_perf_log(&self)
     {

@@ -40,7 +40,7 @@ impl Interpreter
         self.top_frame.push(stackvalue)
     }
     
-    fn call_arrow_function<'a>(&'a mut self, subfuncval : Box<SubFuncVal>, args : Vec<Value>, isexpr : bool) -> OpResult
+    fn call_arrow_function(&mut self, subfuncval : SubFuncVal, args : Vec<Value>, isexpr : bool) -> OpResult
     {
         if let Some(binding) = self.get_trivial_arrow_binding(subfuncval.name)
         {
@@ -123,7 +123,7 @@ impl Interpreter
         {
             Value::Func(funcdata) => self.call_function(funcdata, args, isexpr)?,
             Value::InternalFunc(funcdata) => self.call_internal_function(funcdata, args, isexpr)?,
-            Value::SubFunc(subfuncval) => self.call_arrow_function(subfuncval, args, isexpr)?,
+            Value::SubFunc(subfuncval) => self.call_arrow_function(*subfuncval, args, isexpr)?,
             _ => return Err(format!("internal error: value meant to hold function data in FUNCEXPR/FUNCCALL was not holding function data; {:?}", funcdata))
         }
         

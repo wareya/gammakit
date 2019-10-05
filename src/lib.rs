@@ -16,6 +16,7 @@
 
 #![allow(clippy::suspicious_else_formatting)]
 #![allow(clippy::redundant_closure)]
+#![allow(clippy::box_vec)] // we use Box<Vec> for arrays in order to reduce the size of the Value enum to 64 bytes
 
 #[macro_use]
 mod matches;
@@ -41,12 +42,12 @@ mod tests {
     #[test]
     fn test_everything() -> Result<(), String>
     {
-        let mut parser = Parser::new_from_default()?;
+        let parser = Parser::new_from_default()?;
         let mut interpreter = Interpreter::new(parser);
         interpreter.insert_default_bindings();
 
         let mut program = String::new();
-        File::open("program.txt").or_else(|_| Err("failed to open program".to_string()))?.read_to_string(&mut program).or_else(|_| Err("failed to read program into memory".to_string()))?;
+        File::open("examples/general.txt").or_else(|_| Err("failed to open program".to_string()))?.read_to_string(&mut program).or_else(|_| Err("failed to read program into memory".to_string()))?;
         
         interpreter.restart_into_string(&program)?;
         
@@ -77,7 +78,7 @@ mod tests {
     #[test]
     fn test_nbodies() -> Result<(), String>
     {
-        use std::collections::HashMap;
+        //use std::collections::HashMap;
         //println!("size of StackValue is {}", std::mem::size_of::<StackValue>());
         //println!("size of Value is {}", std::mem::size_of::<Value>());
         //println!("size of String is {}", std::mem::size_of::<String>());
@@ -92,12 +93,12 @@ mod tests {
         //println!("size of HashableValue is {}", std::mem::size_of::<HashableValue>());
         
         use std::time::Instant;
-        let mut parser = Parser::new_from_default()?;
+        let parser = Parser::new_from_default()?;
         let mut interpreter = Interpreter::new(parser);
         interpreter.insert_default_bindings();
 
         let mut program = String::new();
-        File::open("nbody.txt").or_else(|_| Err("failed to open program".to_string()))?.read_to_string(&mut program).or_else(|_| Err("failed to read program into memory".to_string()))?;
+        File::open("examples/nbody.txt").or_else(|_| Err("failed to open program".to_string()))?.read_to_string(&mut program).or_else(|_| Err("failed to read program into memory".to_string()))?;
         
         interpreter.restart_into_string(&program)?;
         
