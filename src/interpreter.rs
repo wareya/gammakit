@@ -132,6 +132,8 @@ impl GlobalState {
 
 type OpFunc = fn(&mut Interpreter) -> OpResult;
 
+const TRACK_OP_PERFORMANCE : bool = false;
+
 // interpreter state
 /// Interprets compiled bytecode.
 pub struct Interpreter {
@@ -143,7 +145,6 @@ pub struct Interpreter {
     pub (crate) op_map_hits: BTreeMap<u8, u128>,
     pub (crate) op_map: BTreeMap<u8, u128>,
     doexit: bool,
-    pub (crate) track_op_performance: bool,
 }
 
 
@@ -151,7 +152,7 @@ impl Interpreter {
     /// Creates a new interpreter 
     pub fn new(parser : Parser) -> Interpreter
     {
-        Interpreter::build_opfunc_table();
+        simulation::build_opfunc_table();
         Interpreter {
             top_frame : Frame::new_root(&Code::new()),
             frames : vec!(),
@@ -160,7 +161,6 @@ impl Interpreter {
             last_error : None,
             op_map_hits : BTreeMap::new(),
             op_map : BTreeMap::new(),
-            track_op_performance : true
         }
     }
     /// Loads new code into the interpreter.
@@ -215,14 +215,13 @@ impl Interpreter {
     #[inline]
     fn step_internal(&mut self) -> OpResult
     {
-        use std::time::Instant;
-        
-        if !self.track_op_performance
+        if !TRACK_OP_PERFORMANCE
         {
             self.run_next_op()?;
         }
         else
         {
+            use std::time::Instant;
             let start_time = Instant::now();
             let op = self.run_next_op()?;
             *self.op_map_hits.entry(op).or_insert(0) += 1;

@@ -33,7 +33,7 @@ fn main() -> Result<(), String>
     println!("simulation took {:?}", duration);
     println!("steps {:?}", steps);
     println!("{:?} steps per second", steps as f64 / (duration.as_millis() as f64 / 1000.0));
-    println!("{:?} nanooseconds per step", duration.as_millis() as f64 * 1000_000.0 / steps as f64);
+    println!("{:?} nanoseconds per step", duration.as_millis() as f64 * 1000_000.0 / steps as f64);
     interpreter.print_op_perf_log();
     
     if let Some(err) = &interpreter.last_error

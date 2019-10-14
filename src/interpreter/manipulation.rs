@@ -95,50 +95,44 @@ impl Interpreter
     #[inline]
     pub (crate) fn read_u16(&mut self) -> Result<u16, String>
     {
+        use std::convert::TryInto;
         self.round_up_pc_2();
         if self.top_frame.pc+2 > self.top_frame.code.len()
         {
             past_end_of_code_err!(self)?;
         }
-        unsafe
-        {
-            #[allow(clippy::cast_ptr_alignment)]
-            let r = (self.top_frame.code.as_ptr().add(self.top_frame.pc) as *const u16).read_unaligned();
-            self.top_frame.pc += 2;
-            Ok(r)
-        }
+        #[allow(clippy::cast_ptr_alignment)]
+        let r = u16::from_le_bytes(self.top_frame.code.get(self.top_frame.pc..self.top_frame.pc+2).unwrap().try_into().unwrap());
+        self.top_frame.pc += 2;
+        Ok(r)
     }
     #[inline]
     pub (crate) fn read_usize(&mut self) -> Result<usize, String>
     {
+        use std::convert::TryInto;
         self.round_up_pc_8();
         if self.top_frame.pc+8 > self.top_frame.code.len()
         {
             past_end_of_code_err!(self)?;
         }
-        unsafe
-        {
-            #[allow(clippy::cast_ptr_alignment)]
-            let r = (self.top_frame.code.as_ptr().add(self.top_frame.pc) as *const u64).read_unaligned() as usize;
-            self.top_frame.pc += 8;
-            Ok(r)
-        }
+        #[allow(clippy::cast_ptr_alignment)]
+        let r = u64::from_le_bytes(self.top_frame.code.get(self.top_frame.pc..self.top_frame.pc+8).unwrap().try_into().unwrap()) as usize;
+        self.top_frame.pc += 8;
+        Ok(r)
     }
     #[inline]
     pub (crate) fn read_float(&mut self) -> Result<f64, String>
     {
+        use std::convert::TryInto;
         self.round_up_pc_8();
         if self.top_frame.pc+8 > self.top_frame.code.len()
         {
             past_end_of_code_err!(self)?;
         }
-        unsafe
-        {
-            #[allow(clippy::cast_ptr_alignment)]
-            let r = (self.top_frame.code.as_ptr().add(self.top_frame.pc) as *const f64).read_unaligned();
-            self.top_frame.pc += 8;
-            Ok(r)
-        }
+        #[allow(clippy::cast_ptr_alignment)]
+        let r = f64::from_bits(u64::from_le_bytes(self.top_frame.code.get(self.top_frame.pc..self.top_frame.pc+8).unwrap().try_into().unwrap()));
+        self.top_frame.pc += 8;
+        Ok(r)
     }
     
     #[allow(clippy::ptr_arg)]

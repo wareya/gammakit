@@ -6,33 +6,36 @@ Currently, *there are no API stability guarantees in this software at all.* Anyt
 
 # Features
 
-As of writing, Gammakit is approximately 5000 lines of code, not counting blank lines or lines with just comments. Gammakit aims to be small and easy to embed.
+As of writing, Gammakit is approximately 6000 lines of code, not counting blank lines or lines with just comments. Gammakit aims to be small and easy to embed.
 
 Some random features:
 
 - GameMaker-like objects
   - Instance_create and instance_kill
-  - Object functions (methods) with "def" (instance-context only, static/associated object functions not supported)
+  - Object functions (methods) (instance context only, static/associated object functions not supported)
   - Inheritance is not supported yet but probably will be in the future
 - Lexically scoped
   - Interior functions don't close over the scope they're defined in
+  - User-defined functions can be passed around freely
 - Dynamically typed
-  - Types: Number (f64), Text (utf-8 string), Array, Dict, Set, Func, Generator, Instance, Object, Custom
+  - Types: Number (f64), Text (utf-8 string), Array, Dict, Set, Func, Generator, Instance, Object, Custom (for arbitrary storage by the program using gammakit)
 - Arrays, dictionaries (keys may only be numbers or strings), and sets (numbers/strings only) are copied by value, not reference
 - Switch statement where case blocks have their own scope, with no fallthrough, not even explicit fallthrough
   - Basically a glorified if-else chain where the switch value is only evaluated and stored once
   - Case labels are, consequently, allowed to be arbitrary expressions
-- User-defined functions are constructed at runtime and can be passed around
 - Lambdas
   - Capture by value, assigned to specific variable names, not by closing over the scope they're defined in
 - Generators
   - Separate initialization and invocation
-  - The generator state value returned by initialiation truth-tests as whether the generator has finalized
-  - Using the invoke statement on a generator state value resumes its execution until it yields or returns
+  - Can be stepped one step at a time with the "invoke"; resumes its execution until it yields or returns
+  - The generator state value truth-tests as whether the generator has finalized
+  - Can be copied which essentially forks them
 - Runtime metaprogramming
   - Procedural code generation with text and/or ASTs, compiles into a bytecode function taking no arguments that you can call several times
 
-For example, the following code:
+## Runtime Metaprogramming
+  
+he following code:
 
     var myf = compile_text("print(\"test\");");
     myf();
@@ -120,6 +123,7 @@ If you use with() while inside of an instance scope, then "other" will dereferen
 TODO:
 - a destroy() event for instance_kill()
 - various helpful string and array functions
+- object type reflection functions
 - inheritance? how would it work? like func_super()?
 - replace parent/text AST node stuff with enum
 - extend metaprogramming with argument lists, function type (generator, etc), captures

@@ -80,6 +80,7 @@ impl Code
     {
         self.code.get(index)
     }
+    #[allow(unused)]
     pub (crate) unsafe fn as_ptr(&self) -> *const u8
     {
         self.code.as_ptr()

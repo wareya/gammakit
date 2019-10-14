@@ -41,79 +41,79 @@ fn strange_err<S : ToString>(text : S) -> String
 
 static mut OPTABLE : [OpFunc; 256] = [Interpreter::sim_INVALID as OpFunc; 256];
 
+pub (crate) fn build_opfunc_table()
+{
+    macro_rules! set { ( $x:ident, $y:ident ) => { unsafe { OPTABLE[$x as usize] = Interpreter::$y; } } }
+    
+    set!(NOP, sim_NOP);
+    set!(PUSHFLT, sim_PUSHFLT);
+    set!(PUSHSTR, sim_PUSHSTR);
+    set!(PUSHVAR, sim_PUSHVAR);
+    set!(EVALUATEVAR, sim_EVALUATEVAR);
+    set!(PUSHBAREGLOBAL, sim_PUSHBAREGLOBAL);
+    set!(EVALUATEBAREGLOBAL, sim_EVALUATEBAREGLOBAL);
+    set!(PUSHINSTVAR, sim_PUSHINSTVAR);
+    set!(EVALUATEINSTVAR, sim_EVALUATEINSTVAR);
+    set!(PUSHOBJ, sim_PUSHOBJ);
+    set!(PUSHBIND, sim_PUSHBIND);
+    set!(PUSHGLOBAL, sim_PUSHGLOBAL);
+    set!(PUSHGLOBALFUNC, sim_PUSHGLOBALFUNC);
+    set!(PUSHGLOBALVAL, sim_PUSHGLOBALVAL);
+    set!(PUSHSELF, sim_PUSHSELF);
+    set!(PUSHOTHER, sim_PUSHOTHER);
+    set!(NEWVAR, sim_NEWVAR);
+    set!(BINSTATE, sim_BINSTATE);
+    set!(UNSTATE, sim_UNSTATE);
+    set!(SETBAREGLOBAL, sim_SETBAREGLOBAL);
+    set!(BINOP, sim_BINOP);
+    set!(UNOP, sim_UNOP);
+    set!(SHORTCIRCUITIFTRUE, sim_SHORTCIRCUITIFTRUE);
+    set!(SHORTCIRCUITIFFALSE, sim_SHORTCIRCUITIFFALSE);
+    set!(INDIRECTION, sim_INDIRECTION);
+    set!(EVALUATEINDIRECTION, sim_EVALUATEINDIRECTION);
+    set!(DISMEMBER, sim_DISMEMBER);
+    set!(FUNCCALL, sim_FUNCCALL);
+    set!(FUNCEXPR, sim_FUNCEXPR);
+    set!(INVOKE, sim_INVOKE);
+    set!(INVOKECALL, sim_INVOKECALL);
+    set!(INVOKEEXPR, sim_INVOKEEXPR);
+    set!(FUNCDEF, sim_FUNCDEF);
+    set!(LAMBDA, sim_LAMBDA);
+    set!(GENERATORDEF, sim_GENERATORDEF);
+    set!(COLLECTARRAY, sim_COLLECTARRAY);
+    set!(COLLECTDICT, sim_COLLECTDICT);
+    set!(COLLECTSET, sim_COLLECTSET);
+    set!(ARRAYEXPR, sim_ARRAYEXPR);
+    set!(EVALUATEARRAYEXPR, sim_EVALUATEARRAYEXPR);
+    set!(BREAK, sim_BREAK);
+    set!(CONTINUE, sim_CONTINUE);
+    set!(IF, sim_IF);
+    set!(WHILE, sim_WHILE);
+    set!(FOR, sim_FOR);
+    set!(FOREACH, sim_FOREACH);
+    set!(SWITCH, sim_SWITCH);
+    set!(SWITCHCASE, sim_SWITCHCASE);
+    set!(SWITCHDEFAULT, sim_SWITCHDEFAULT);
+    set!(SWITCHEXIT, sim_SWITCHEXIT);
+    set!(UNSCOPE, sim_UNSCOPE);
+    set!(WITH, sim_WITH);
+    set!(WITHAS, sim_WITHAS);
+        
+    set!(WHILETEST, sim_WHILETEST);
+    set!(WHILELOOP, sim_WHILELOOP);
+    set!(WITHLOOP, sim_WITHLOOP);
+    set!(FOREACHLOOP, sim_FOREACHLOOP);
+    set!(FOREACHHEAD, sim_FOREACHHEAD);
+        
+    set!(JUMPRELATIVE, sim_JUMPRELATIVE);
+        
+    set!(EXIT, sim_EXIT);
+    set!(RETURN, sim_RETURN);
+    set!(YIELD, sim_YIELD);
+}
+
 impl Interpreter
 {
-    pub (crate) fn build_opfunc_table()
-    {
-        macro_rules! set { ( $x:ident, $y:ident ) => { unsafe { OPTABLE[$x as usize] = Interpreter::$y; } } }
-        
-        set!(NOP, sim_NOP);
-        set!(PUSHFLT, sim_PUSHFLT);
-        set!(PUSHSTR, sim_PUSHSTR);
-        set!(PUSHVAR, sim_PUSHVAR);
-        set!(EVALUATEVAR, sim_EVALUATEVAR);
-        set!(PUSHBAREGLOBAL, sim_PUSHBAREGLOBAL);
-        set!(EVALUATEBAREGLOBAL, sim_EVALUATEBAREGLOBAL);
-        set!(PUSHINSTVAR, sim_PUSHINSTVAR);
-        set!(EVALUATEINSTVAR, sim_EVALUATEINSTVAR);
-        set!(PUSHOBJ, sim_PUSHOBJ);
-        set!(PUSHBIND, sim_PUSHBIND);
-        set!(PUSHGLOBAL, sim_PUSHGLOBAL);
-        set!(PUSHGLOBALFUNC, sim_PUSHGLOBALFUNC);
-        set!(PUSHGLOBALVAL, sim_PUSHGLOBALVAL);
-        set!(PUSHSELF, sim_PUSHSELF);
-        set!(PUSHOTHER, sim_PUSHOTHER);
-        set!(NEWVAR, sim_NEWVAR);
-        set!(BINSTATE, sim_BINSTATE);
-        set!(UNSTATE, sim_UNSTATE);
-        set!(SETBAREGLOBAL, sim_SETBAREGLOBAL);
-        set!(BINOP, sim_BINOP);
-        set!(UNOP, sim_UNOP);
-        set!(SHORTCIRCUITIFTRUE, sim_SHORTCIRCUITIFTRUE);
-        set!(SHORTCIRCUITIFFALSE, sim_SHORTCIRCUITIFFALSE);
-        set!(INDIRECTION, sim_INDIRECTION);
-        set!(EVALUATEINDIRECTION, sim_EVALUATEINDIRECTION);
-        set!(DISMEMBER, sim_DISMEMBER);
-        set!(FUNCCALL, sim_FUNCCALL);
-        set!(FUNCEXPR, sim_FUNCEXPR);
-        set!(INVOKE, sim_INVOKE);
-        set!(INVOKECALL, sim_INVOKECALL);
-        set!(INVOKEEXPR, sim_INVOKEEXPR);
-        set!(FUNCDEF, sim_FUNCDEF);
-        set!(LAMBDA, sim_LAMBDA);
-        set!(GENERATORDEF, sim_GENERATORDEF);
-        set!(COLLECTARRAY, sim_COLLECTARRAY);
-        set!(COLLECTDICT, sim_COLLECTDICT);
-        set!(COLLECTSET, sim_COLLECTSET);
-        set!(ARRAYEXPR, sim_ARRAYEXPR);
-        set!(EVALUATEARRAYEXPR, sim_EVALUATEARRAYEXPR);
-        set!(BREAK, sim_BREAK);
-        set!(CONTINUE, sim_CONTINUE);
-        set!(IF, sim_IF);
-        set!(WHILE, sim_WHILE);
-        set!(FOR, sim_FOR);
-        set!(FOREACH, sim_FOREACH);
-        set!(SWITCH, sim_SWITCH);
-        set!(SWITCHCASE, sim_SWITCHCASE);
-        set!(SWITCHDEFAULT, sim_SWITCHDEFAULT);
-        set!(SWITCHEXIT, sim_SWITCHEXIT);
-        set!(UNSCOPE, sim_UNSCOPE);
-        set!(WITH, sim_WITH);
-        set!(WITHAS, sim_WITHAS);
-            
-        set!(WHILETEST, sim_WHILETEST);
-        set!(WHILELOOP, sim_WHILELOOP);
-        set!(WITHLOOP, sim_WITHLOOP);
-        set!(FOREACHLOOP, sim_FOREACHLOOP);
-        set!(FOREACHHEAD, sim_FOREACHHEAD);
-            
-        set!(JUMPRELATIVE, sim_JUMPRELATIVE);
-            
-        set!(EXIT, sim_EXIT);
-        set!(RETURN, sim_RETURN);
-        set!(YIELD, sim_YIELD);
-    }
-    
     #[inline]
     pub (crate) fn run_next_op(&mut self) -> Result<u8, String>
     {
@@ -128,7 +128,7 @@ impl Interpreter
                 panic!("internal error: simulation stepped while outside of the range of the frame it was in");
             }
         })?;
-        unsafe { OPTABLE[op as usize](self) }?;
+        unsafe { OPTABLE[op as usize](self) } ?;
         Ok(op)
     }
     
