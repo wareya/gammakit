@@ -122,11 +122,10 @@ If you use with() while inside of an instance scope, then "other" will dereferen
 
 TODO:
 - various helpful string and array functions
-- object type reflection functions
 - inheritance? how would it work? like func_super()?
 - replace parent/text AST node stuff with enum
 - extend metaprogramming with argument lists, function type (generator, etc), captures
-- make instance identifiers truth-test as whether the instance exists though
+- make instance identifiers truth-test as whether the instance exists
 
 TODO (sanitation/low-priority):
 - a "defer" statement?
@@ -143,7 +142,7 @@ MAYBE (metaprogramming):
 
 # Other
 
-As of writing, clippy processes gammakit with no complaints, aside from suspicious_else_formatting, which is a false positive. Certain lints are disabled in certain files where they are inappropriate, unhelpful, or generate false positives.
+As of writing, clippy processes gammakit with no complaints. Certain lints are disabled in certain files where they are inappropriate, unhelpful, or generate false positives.
 
 # License
 

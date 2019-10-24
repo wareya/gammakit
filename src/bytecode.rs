@@ -35,23 +35,22 @@ pub (crate) const FUNCEXPR : u8 = 0x22;
 pub (crate) const INVOKEEXPR : u8 = 0x28;
 
 pub (crate) const NEWVAR : u8 = 0x30;
-
-pub (crate) const EVALUATEVAR : u8 = 0x35;
-pub (crate) const EVALUATEBAREGLOBAL : u8 = 0x39;
-pub (crate) const EVALUATEINSTVAR : u8 = 0x3A;
+pub (crate) const UNSCOPE : u8 = 0x31;
 
 pub (crate) const BINSTATE : u8 = 0x40;
 pub (crate) const UNSTATE : u8 = 0x41;
 pub (crate) const SETBAREGLOBAL : u8 = 0x42;
 pub (crate) const FUNCCALL : u8 = 0x48;
+pub (crate) const INVOKE : u8 = 0x4E;
 pub (crate) const INVOKECALL : u8 = 0x4F;
 
-pub (crate) const INVOKE : u8 = 0x50;
+pub (crate) const EVALUATEVAR : u8 = 0x50;
+pub (crate) const EVALUATEBAREGLOBAL : u8 = 0x51;
+pub (crate) const EVALUATEINSTVAR : u8 = 0x52;
 
-pub (crate) const UNSCOPE : u8 = 0x60;
-pub (crate) const SWITCHCASE : u8 = 0x68;
-pub (crate) const SWITCHDEFAULT : u8 = 0x69;
-pub (crate) const SWITCHEXIT : u8 = 0x6F;
+pub (crate) const SWITCHCASE : u8 = 0x60;
+pub (crate) const SWITCHDEFAULT : u8 = 0x61;
+pub (crate) const SWITCHEXIT : u8 = 0x62;
 
 pub (crate) const COLLECTARRAY : u8 = 0x70;
 pub (crate) const COLLECTDICT : u8 = 0x71;
@@ -67,8 +66,6 @@ pub (crate) const SWITCH : u8 = 0x87;
 
 pub (crate) const BREAK : u8 = 0x90;
 pub (crate) const CONTINUE : u8 = 0x91;
-pub (crate) const SHORTCIRCUITIFTRUE : u8 = 0x98;
-pub (crate) const SHORTCIRCUITIFFALSE : u8 = 0x99;
 
 pub (crate) const INDIRECTION : u8 = 0xA0;
 pub (crate) const ARRAYEXPR : u8 = 0xA2;
@@ -79,7 +76,7 @@ pub (crate) const EVALUATEARRAYEXPR : u8 = 0xAF;
 
 pub (crate) const FUNCDEF : u8 = 0xB0;
 pub (crate) const LAMBDA : u8 = 0xB1;
-pub (crate) const GENERATORDEF : u8 = 0xB4;
+pub (crate) const GENERATORDEF : u8 = 0xB2;
 
 pub (crate) const WHILETEST : u8 = 0xC0;
 pub (crate) const WHILELOOP : u8 = 0xC1;
@@ -88,6 +85,8 @@ pub (crate) const FOREACHLOOP : u8 = 0xC3;
 pub (crate) const FOREACHHEAD : u8 = 0xC4;
 
 pub (crate) const JUMPRELATIVE : u8 = 0xD0;
+pub (crate) const SHORTCIRCUITIFTRUE : u8 = 0xD8;
+pub (crate) const SHORTCIRCUITIFFALSE : u8 = 0xD9;
 
 pub (crate) const EXIT : u8 = 0xF0;
 pub (crate) const RETURN : u8 = 0xF1;

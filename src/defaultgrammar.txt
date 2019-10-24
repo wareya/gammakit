@@ -210,6 +210,7 @@ return $expr$
 return
 yield $expr$
 yield
+finalize
 
 condition:
 $ifcondition$

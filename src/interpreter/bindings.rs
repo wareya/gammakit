@@ -168,6 +168,13 @@ impl Interpreter
         insert!("instance_create"        , sim_func_instance_create         );
         insert!("instance_exists"        , sim_func_instance_exists         );
         insert!("instance_kill"          , sim_func_instance_kill           );
+        insert!("instance_object"        , sim_func_instance_object         );
+        insert!("instance_has_variable"  , sim_func_instance_has_variable   );
+        insert!("instance_has_function"  , sim_func_instance_has_function   );
+        
+        insert!("object_count"           , sim_func_object_count            );
+        insert!("object_has_variable"    , sim_func_object_has_variable     );
+        insert!("object_has_function"    , sim_func_object_has_function     );
         
         macro_rules! insert_simple { ( $x:expr, $y:ident ) => { self.insert_trivial_simple_binding($x.to_string(), Interpreter::$y); } }
         
@@ -362,7 +369,7 @@ impl Interpreter
         
         if let Some(inst) = self.global.instances.get(&instance_id)
         {
-            let object = self.global.objects.get(&inst.objtype).ok_or_else(|| format!("error: tried to create instance of non-extant object type {}", inst.objtype))?;
+            let object = self.global.objects.get(&inst.objtype).ok_or_else(|| format!("error: tried to kill instance of non-extant object type {}", inst.objtype))?;
             if let Some(function) = object.functions.get(&destroy_index)
             {
                 let mut mydata = function.clone();
@@ -380,6 +387,99 @@ impl Interpreter
         }
         
         Ok(Value::Number(0.0))
+    }
+    pub (crate) fn sim_func_instance_object(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        if args.len() != 1
+        {
+            return Err(format!("error: wrong number of arguments to instance_object(); expected 1, got {}", args.len()));
+        }
+        
+        let instance_id = self.vec_pop_front_instance(&mut args).ok_or_else(|| minierr("error: first argument to instance_kill() must be an instance"))?;
+        
+        if let Some(inst) = self.global.instances.get(&instance_id)
+        {
+            return Ok(Value::Object(inst.objtype));
+        }
+        
+        Ok(Value::Number(0.0))
+    }
+    pub (crate) fn sim_func_instance_has_variable(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        if args.len() != 2
+        {
+            return Err(format!("error: wrong number of arguments to instance_has_variable(); expected 2, got {}", args.len()));
+        }
+        
+        let instance_id = self.vec_pop_front_instance(&mut args).ok_or_else(|| minierr("error: first argument to instance_has_variable() must be an instance"))?;
+        let text = self.vec_pop_front_text(&mut args).ok_or_else(|| minierr("error: second argument to instance_has_variable() must be a string"))?;
+        let text_id = self.get_string_index(&text);
+        
+        if let Some(inst) = self.global.instances.get(&instance_id)
+        {
+            return Ok(Value::Number(bool_floaty(inst.variables.contains_key(&text_id))));
+        }
+        
+        Ok(Value::Number(0.0))
+    }
+    pub (crate) fn sim_func_instance_has_function(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        if args.len() != 2
+        {
+            return Err(format!("error: wrong number of arguments to instance_has_function(); expected 2, got {}", args.len()));
+        }
+        
+        let instance_id = self.vec_pop_front_instance(&mut args).ok_or_else(|| minierr("error: first argument to instance_has_function() must be an instance"))?;
+        let text = self.vec_pop_front_text(&mut args).ok_or_else(|| minierr("error: second argument to instance_has_function() must be a string"))?;
+        let text_id = self.get_string_index(&text);
+        
+        if let Some(inst) = self.global.instances.get(&instance_id)
+        {
+            let object = self.global.objects.get(&inst.objtype).ok_or_else(|| format!("error: tried to use instance of non-extant object type {}", inst.objtype))?;
+            return Ok(Value::Number(bool_floaty(object.functions.contains_key(&text_id))));
+        }
+        
+        Ok(Value::Number(0.0))
+    }
+    pub (crate) fn sim_func_object_count(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        if args.len() != 1
+        {
+            return Err(format!("error: wrong number of arguments to object_count(); expected 1, got {}", args.len()));
+        }
+        
+        let object_id = self.vec_pop_front_object(&mut args).ok_or_else(|| minierr("error: first argument to object_count() must be an object"))?;
+        
+        let instance_list = self.global.instances_by_type.get(&object_id).ok_or_else(|| format!("error: tried to use non-extant object type {}", object_id))?;
+        Ok(Value::Number(instance_list.len() as f64))
+    }
+    pub (crate) fn sim_func_object_has_variable(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        if args.len() != 2
+        {
+            return Err(format!("error: wrong number of arguments to object_has_variable(); expected 2, got {}", args.len()));
+        }
+        
+        let object_id = self.vec_pop_front_object(&mut args).ok_or_else(|| minierr("error: first argument to object_has_variable() must be an object"))?;
+        let text = self.vec_pop_front_text(&mut args).ok_or_else(|| minierr("error: second argument to object_has_variable() must be a string"))?;
+        let text_id = self.get_string_index(&text);
+        
+        let object = self.global.objects.get(&object_id).ok_or_else(|| format!("error: tried to use non-extant object type {}", object_id))?;
+        Ok(Value::Number(bool_floaty(object.variables.contains_key(&text_id))))
+    }
+    pub (crate) fn sim_func_object_has_function(&mut self, mut args : Vec<Value>) -> Result<Value, String>
+    {
+        if args.len() != 2
+        {
+            return Err(format!("error: wrong number of arguments to object_has_function(); expected 2, got {}", args.len()));
+        }
+        
+        let object_id = self.vec_pop_front_object(&mut args).ok_or_else(|| minierr("error: first argument to object_has_function() must be an object"))?;
+        let text = self.vec_pop_front_text(&mut args).ok_or_else(|| minierr("error: second argument to object_has_function() must be a string"))?;
+        let text_id = self.get_string_index(&text);
+        
+        let object = self.global.objects.get(&object_id).ok_or_else(|| format!("error: tried to use non-extant object type {}", object_id))?;
+        Ok(Value::Number(bool_floaty(object.functions.contains_key(&text_id))))
     }
     pub (crate) fn sim_func_parse_text(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {

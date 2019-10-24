@@ -74,6 +74,9 @@ print(i.id);
 print(i.y);
 print(i.id.y);
 
+print(instance_object(i));
+print(Character);
+
 def asdf()
 {
     return 234658;
@@ -577,3 +580,17 @@ for(output in test_state)
     print(output);
 for(output in test_state)
     print(output);
+
+
+print("new stuff");
+
+print(instance_has_variable(i, "asdgakwer"));
+print(instance_has_variable(i, "x"));
+print(instance_has_function(i, "auiaesd"));
+print(instance_has_function(i, "create"));
+print(object_has_variable(Character, "asdgakwer"));
+print(object_has_variable(Character, "x"));
+print(object_has_function(Character, "auiaesd"));
+print(object_has_function(Character, "create"));
+print(object_count(Character));
+
