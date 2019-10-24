@@ -1073,7 +1073,11 @@ impl<'a> CompilerState<'a> {
                 }
                 if funcname == "create" && argcount != 0
                 {
-                    return Err("error: create event must have 0 arguments".to_string());
+                    return Err("error: `create` function must have 0 arguments".to_string());
+                }
+                if funcname == "destroy" && argcount != 0
+                {
+                    return Err("error: `destroy` function must have 0 arguments".to_string());
                 }
                 for statement in &def.child(6)?.children
                 {

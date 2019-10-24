@@ -357,8 +357,20 @@ impl Interpreter
             return Err(format!("error: wrong number of arguments to instance_create(); expected 1, got {}", args.len()));
         }
         
+        let destroy_index = self.get_string_index(&"destroy".to_string());
         let instance_id = self.vec_pop_front_instance(&mut args).ok_or_else(|| minierr("error: first argument to instance_kill() must be an instance"))?;
         
+        if let Some(inst) = self.global.instances.get(&instance_id)
+        {
+            let object = self.global.objects.get(&inst.objtype).ok_or_else(|| format!("error: tried to create instance of non-extant object type {}", inst.objtype))?;
+            if let Some(function) = object.functions.get(&destroy_index)
+            {
+                let mut mydata = function.clone();
+                mydata.forcecontext = instance_id;
+                let pseudo_funcvar = Box::new(FuncVal{predefined : None, userdefdata : mydata});
+                self.call_function(pseudo_funcvar, Vec::new(), false)?;
+            }
+        }
         if let Some(inst) = self.global.instances.remove(&instance_id)
         {
             if let Some(ref mut instance_list) = self.global.instances_by_type.get_mut(&inst.objtype)
@@ -728,8 +740,8 @@ impl Interpreter
         {
             return Err(format!("error: wrong number of arguments to replace_char(); expected 2, got {}", args.len()));
         }
-        let indexnum = match_or_err!(args.expect_extract(0)?, Value::Number(indexnum) => indexnum, minierr("error: argument to replace_char must be a number"))?.round() as usize;
-        let insert = match_or_err!(args.expect_extract(1)?, Value::Text(text) => text, minierr("error: argument to replace_char must be a number"))?;
+        let indexnum = match_or_err!(args.expect_extract(0)?, Value::Number(indexnum) => indexnum, minierr("error: argument 1 to replace_char must be a number"))?.round() as usize;
+        let insert = match_or_err!(args.expect_extract(1)?, Value::Text(text) => text, minierr("error: argument 2 to replace_char must be text"))?;
         
         match myself.as_mut()?
         {

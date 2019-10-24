@@ -121,12 +121,12 @@ If you use with() while inside of an instance scope, then "other" will dereferen
 # Roadmap
 
 TODO:
-- a destroy() event for instance_kill()
 - various helpful string and array functions
 - object type reflection functions
 - inheritance? how would it work? like func_super()?
 - replace parent/text AST node stuff with enum
 - extend metaprogramming with argument lists, function type (generator, etc), captures
+- make instance identifiers truth-test as whether the instance exists though
 
 TODO (sanitation/low-priority):
 - a "defer" statement?
