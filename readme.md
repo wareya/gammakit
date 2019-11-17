@@ -35,7 +35,7 @@ Some random features:
 
 ## Runtime Metaprogramming
   
-he following code:
+The following code:
 
     var myf = compile_text("print(\"test\");");
     myf();
