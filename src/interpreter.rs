@@ -39,6 +39,10 @@ fn plainerr<T>(mystr : &'static str) -> Result<T, String>
 {
     Err(minierr(mystr))
 }
+fn fat_vec<T>() -> Vec<T>
+{
+    Vec::with_capacity(4)
+}
 
 // global interpreter data
 pub struct GlobalState {
@@ -155,7 +159,7 @@ impl Interpreter {
         simulation::build_opfunc_table();
         Interpreter {
             top_frame : Frame::new_root(&Code::new()),
-            frames : vec!(),
+            frames : fat_vec(),
             doexit : false,
             global : GlobalState::new(parser),
             last_error : None,
@@ -175,7 +179,7 @@ impl Interpreter {
     pub fn restart(&mut self, code: &Code)
     {
         self.top_frame = Frame::new_root(code);
-        self.frames = vec!();
+        self.frames = fat_vec();
         self.doexit = false;
         self.last_error = None;
     }

@@ -600,7 +600,7 @@ impl Interpreter
         let num_cases = self.read_u16()?;
         let current_pc = self.get_pc();
         
-        let mut case_block_addresses = vec!();
+        let mut case_block_addresses = Vec::with_capacity(num_cases as usize);
         for _ in 0..num_cases
         {
             case_block_addresses.push(current_pc + self.read_usize()?);

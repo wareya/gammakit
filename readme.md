@@ -102,7 +102,7 @@ The following bindings are special "arrow" bindings, and are invoked as e.g. mya
     string/array->slice(start, end) (returns sliced string/array)
     dict/set->contains(key) (returns whether it contains the given key)
 
-Some arrow bindings can mutate the variable they're called on, in addition to returning a value. insert() returns 0.0 (nothing), and remove() returns the element that was removed (except for sets, where it returns 0.0).
+Some arrow bindings can mutate the variable they're called on, in addition to returning a value. insert() returns 0.0 (nothing), and remove() returns the element that was removed (except for sets, where it returns 0.0, the default return value for functions that return nothing).
     
     string/array/dict->insert(index/key, val)
     set->insert(val)
@@ -126,6 +126,25 @@ TODO:
 - replace parent/text AST node stuff with enum
 - extend metaprogramming with argument lists, function type (generator, etc), captures
 - make instance identifiers truth-test as whether the instance exists
+- make strings, arrays, dicts, and sets truth-test as whether they are empty
+- add functions for testing the type of a variable
+- add a nothing type
+- a way to sort arrays
+- bitwise operators, bit shifting
+- hex literals, binary literals, intrusive ' and _ characters mid numeric literal
+- add a module system; instead of feeding the compiler/interpreter a file, you have to feed it a module tree; in return you get a set of compiled modules
+- make generator state variables opaque pointers (which means shared underlying value)
+- `generator_state()` as syntactical sugar for `invoke generator_state`
+- `generator_state->clone()` or `generator_state->fork()` or something (naming things is hard)
+- "finalize" command for generators so that the next yield acts like a return instead of a yield
+- "string formatting" of some kind
+- instance IDs in sets/dicts
+- a pointer type that sorta, kinda acts like an instance with just the property "value" (function `pointer_create()` etc) (use reference counting? use a `pointer_kill()` function?)
+- queue, deque data structures
+- profiling (after modules)
+- loading compiled bytecode (with debugging data, etc)
+- multi line string literals
+- work in no_std
 
 TODO (sanitation/low-priority):
 - a "defer" statement?
@@ -133,12 +152,11 @@ TODO (sanitation/low-priority):
 - make keys() iterate over dict/set elements in insertion order
 - make sure format_val does the same as the above
 - forbid if-else inside an if condition's block with no enclosing braces
-- "finalize" command for generators so that the next yield acts like a return instead of a yield
 - extend number type to "64-bit signed int or 64-bit float" rather than just "64-bit float"
 
 MAYBE (metaprogramming):
 - give the runtime control over interpreters of its own; runtime panics will invalidate interpreters
-- investigate feasibility of grammar, parser, and compiler hooks
+- investigate feasibility of compiler hooks
 
 # Other
 

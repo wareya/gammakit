@@ -1,0 +1,16 @@
+generator gentest()
+{
+    for(var i = 1; i <= 10; i++)
+        yield i;
+    print("--------");
+    for(var i = 11; i <= 100; i++)
+    {
+        if(i == 100)
+            return i;
+        else
+            yield i;
+    }
+}
+var genstate = gentest();
+for(i in genstate)
+    print(i);

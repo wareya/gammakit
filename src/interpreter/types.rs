@@ -218,11 +218,11 @@ impl Frame {
     pub (super) fn new_root(code : &Code) -> Frame
     {
         let codelen = code.len();
-        Frame { code : code.clone(), startpc : 0, pc : 0, endpc : codelen, variables : vec!(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr : false, currline : 0, generator: false }
+        Frame { code : code.clone(), startpc : 0, pc : 0, endpc : codelen, variables : fat_vec(), instancestack : Vec::new(), controlstack : fat_vec(), stack : fat_vec(), isexpr : false, currline : 0, generator: false }
     }
     pub (super) fn new_from_call(code : &Code, startpc : usize, endpc : usize, isexpr : bool, generator : bool) -> Frame
     {
-        Frame { code : code.clone(), startpc, pc : startpc, endpc, variables : vec!(), instancestack : Vec::new(), controlstack : Vec::new(), stack : Vec::new(), isexpr, currline : 0, generator }
+        Frame { code : code.clone(), startpc, pc : startpc, endpc, variables : fat_vec(), instancestack : Vec::new(), controlstack : fat_vec(), stack : fat_vec(), isexpr, currline : 0, generator }
     }
     pub (super) fn len(&mut self) -> usize
     {

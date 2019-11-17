@@ -184,7 +184,7 @@ impl Interpreter
             return Err(format!("internal error: not enough values on stack to satisfy requirements of read_lambda (need {}, have {})", capturecount, self.top_frame.stack.len()));
         }
         
-        let mut captures = Vec::new();
+        let mut captures = Vec::with_capacity(capturecount);
         for _i in 0..capturecount
         {
             let val = self.stack_pop_val().ok_or_else(|| minierr("internal error: read_lambda failed to collect capture value from stack"))?;
