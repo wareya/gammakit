@@ -242,6 +242,7 @@ pub (crate) fn value_equal(left : &Value, right : &Value) -> Result<bool, String
         (Value::Generator(_), Value::Generator(_)) => Ok(false),
         (Value::Instance(left), Value::Instance(right)) | (Value::Object(left), Value::Object(right)) => Ok(left==right),
         (Value::Custom(left), Value::Custom(right)) => Ok(left.discrim == right.discrim && left.storage == right.storage),
+        (Value::Null, Value::Null) => Ok(true),
         _ => Ok(false) // all non-matching type pairs test false
     }
 }
