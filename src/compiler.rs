@@ -1289,7 +1289,7 @@ impl<'a> CompilerState<'a> {
                         let nameindex = self.get_string_index(name);
                         if self.globalstate.variables.contains_key(&nameindex)
                         {
-                            return Err(format!("error: redeclared bare global variable `{}`", name))?;;
+                            return Err(format!("error: redeclared bare global variable `{}`", name))?;
                         }
                         self.globalstate.insert_global(nameindex);
                         
@@ -1316,7 +1316,7 @@ impl<'a> CompilerState<'a> {
                         let nameindex = self.get_string_index(name);
                         if self.globalstate.variables.contains_key(&nameindex)
                         {
-                            return Err(format!("error: redeclared bare global variable `{}`", name))?;;
+                            return Err(format!("error: redeclared bare global variable `{}`", name))?;
                         }
                         self.globalstate.insert_global(nameindex);
                     }
@@ -1333,7 +1333,7 @@ impl<'a> CompilerState<'a> {
         let nameindex = self.get_string_index(name);
         if self.globalstate.barevariables.contains_key(&nameindex)
         {
-            return Err(format!("error: redeclared bare global variable `{}`", name))?;;
+            return Err(format!("error: redeclared bare global variable `{}`", name))?;
         }
         self.globalstate.insert_bare_global(nameindex);
         
@@ -1415,7 +1415,7 @@ impl<'a> CompilerState<'a> {
         self.compile_u64(captures.len() as u64);
         for capture_name in capture_names.iter().rev()
         {
-            self.add_variable(capture_name).ok_or_else(|| format!("error: redeclared identifier `{}`", capture_name))?;;
+            self.add_variable(capture_name).ok_or_else(|| format!("error: redeclared identifier `{}`", capture_name))?;
         }
         self.compile_u16(args.len() as u16);
         let len_position = self.compile_u64(0 as u64);
