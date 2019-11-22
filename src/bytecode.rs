@@ -17,6 +17,7 @@ pub (crate) const NOP : u8 = 0x00;
 
 pub (crate) const PUSHFLT : u8 = 0x10;
 pub (crate) const PUSHSTR : u8 = 0x11;
+pub (crate) const PUSHNULL : u8 = 0x12;
 
 pub (crate) const PUSHVAR : u8 = 0x15;
 pub (crate) const PUSHGLOBAL : u8 = 0x16;

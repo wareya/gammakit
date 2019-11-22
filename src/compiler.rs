@@ -367,6 +367,7 @@ impl<'a> CompilerState<'a> {
         self.add_hook(&"blankstatement", CompilerState::compile_nop);
         self.add_hook(&"statement", CompilerState::compile_statement);
         self.add_hook(&"funccall", CompilerState::compile_funccall);
+        self.add_hook(&"null", CompilerState::compile_null);
         self.add_hook(&"name", CompilerState::compile_name);
         self.add_hook(&"rhunexpr_right", CompilerState::compile_children);
         self.add_hook(&"funcargs", CompilerState::compile_funcargs);
@@ -814,6 +815,11 @@ impl<'a> CompilerState<'a> {
     fn compile_pushstr(&mut self, string : &str) -> Result<(), String>
     {
         self.compile_string_with_prefix(PUSHSTR, string);
+        Ok(())
+    }
+    fn compile_null(&mut self, _ast : &ASTNode) -> Result<(), String>
+    {
+        self.code.push(PUSHNULL);
         Ok(())
     }
     fn compile_name(&mut self, ast : &ASTNode) -> Result<(), String>

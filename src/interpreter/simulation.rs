@@ -48,6 +48,7 @@ pub (crate) fn build_opfunc_table()
     set!(NOP, sim_NOP);
     set!(PUSHFLT, sim_PUSHFLT);
     set!(PUSHSTR, sim_PUSHSTR);
+    set!(PUSHNULL, sim_PUSHNULL);
     set!(PUSHVAR, sim_PUSHVAR);
     set!(EVALUATEVAR, sim_EVALUATEVAR);
     set!(PUSHBAREGLOBAL, sim_PUSHBAREGLOBAL);
@@ -157,6 +158,11 @@ impl Interpreter
     {
         let text = self.read_string()?;
         self.stack_push_val(Value::Text(text));
+        Ok(())
+    }
+    pub (crate) fn sim_PUSHNULL(&mut self) -> OpResult
+    {
+        self.stack_push_val(Value::Null);
         Ok(())
     }
     pub (crate) fn sim_PUSHVAR(&mut self) -> OpResult

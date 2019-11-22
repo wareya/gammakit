@@ -9,6 +9,9 @@ false
 string: TOKEN
 %"([^"\\]|\\["nrt\\])*"%
 
+null: TOKEN
+null
+
 name: TOKEN
 %[a-zA-Z_][0-9a-zA-Z_]*%
 
@@ -75,6 +78,7 @@ $arraybody$
 $dictbody$
 $setbody$
 $string$
+$null$
 $name$
 
 invocation_expr:
@@ -94,6 +98,7 @@ $dictbody$
 $setbody$
 $number$
 $string$
+$null$
 $name$
 
 rvar:
