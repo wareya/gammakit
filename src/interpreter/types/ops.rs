@@ -516,12 +516,17 @@ pub (crate) fn do_unstate_function(op : u8,  val : ValueLoc) -> Result<(), Strin
     }
 }
 
-pub (crate) fn value_truthy(imm : &Value) -> bool
+pub (crate) fn value_truthy(interpreter : &Interpreter, immediate : &Value) -> bool
 {
-    match imm
+    match immediate
     {
         Value::Number(value) => float_booly(*value),
+        Value::Text(text) => text != "",
+        Value::Array(array) => !array.is_empty(),
+        Value::Dict(dict) => !dict.is_empty(),
+        Value::Set(set) => !set.is_empty(),
         Value::Generator(gen_state) => gen_state.frame.is_some(),
-        _ => true
+        Value::Instance(instance_id) => interpreter.global.instances.contains_key(&instance_id),
+        _ => false
     }
 }

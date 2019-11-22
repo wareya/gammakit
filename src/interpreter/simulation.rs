@@ -457,7 +457,7 @@ impl Interpreter
         }
         let testval = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: failed to find value on stack while handling IF controller"))?;
         let codelen = self.read_usize()?;
-        if !value_truthy(&testval)
+        if !value_truthy(self, &testval)
         {
             self.add_pc(codelen);
         }
@@ -766,7 +766,7 @@ impl Interpreter
         
         let rel = self.read_usize()?;
         
-        let truthy = value_truthy(&val);
+        let truthy = value_truthy(self, &val);
         
         if truthy as bool == truthiness
         {
@@ -980,7 +980,7 @@ impl Interpreter
             let dest = data.loop_end;
             let todrain = data.variables;
             let testval = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: failed to find value on stack while handling WHILE controller"))?;
-            if !value_truthy(&testval)
+            if !value_truthy(self, &testval)
             {
                 self.set_pc(dest);
                 self.drain_vars(todrain);

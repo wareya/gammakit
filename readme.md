@@ -126,9 +126,6 @@ TODO:
 - inheritance? how would it work? like func_super()?
 - replace parent/text AST node stuff with enum
 - extend metaprogramming with argument lists, function type (generator, etc), captures
-- make instance identifiers truth-test as whether the instance exists
-- make strings, arrays, dicts, and sets truth-test as whether they are empty
-- add functions for testing the type of a variable
 - bitwise operators, bit shifting
 - hex literals, binary literals, intrusive ' and _ characters mid numeric literal
 - add a module system; instead of feeding the compiler/interpreter a file, you have to feed it a module tree; in return you get a set of compiled modules
