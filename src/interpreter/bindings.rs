@@ -162,9 +162,11 @@ impl Interpreter
         
         insert!("parse_text"             , sim_func_parse_text              );
         insert!("parse_text_with_grammar", sim_func_parse_text_with_grammar );
+        
         insert!("compile_text"           , sim_func_compile_text            );
         insert!("compile_ast"            , sim_func_compile_ast             );
         insert!("compile_ast_generator"  , sim_func_compile_ast_generator   );
+        
         insert!("instance_create"        , sim_func_instance_create         );
         insert!("instance_exists"        , sim_func_instance_exists         );
         insert!("instance_kill"          , sim_func_instance_kill           );
@@ -205,6 +207,10 @@ impl Interpreter
         insert_arrow!("pop"             , sim_subfunc_pop               );
         
         insert_arrow!("replace_char"    , sim_subfunc_replace_char      );
+        
+        insert_arrow!("typeof_str"      , sim_subfunc_typeof_str        );
+        insert_arrow!("typeof_num"      , sim_subfunc_typeof_num        );
+        insert_arrow!("discriminator"   , sim_subfunc_discriminator     );
     }
     pub (crate) fn get_binding(&self, name : usize) -> Option<Rc<RefCell<Binding>>>
     {
@@ -858,6 +864,52 @@ impl Interpreter
                 }
             }
             _ => plainerr("error: replace_char() must be called on a string")
+        }
+    }
+    pub (crate) fn sim_subfunc_typeof_str(myself : ValueLoc, _args : Vec<Value>) -> Result<Value, String>
+    {
+        Ok(Value::Text(match myself.as_ref()
+        {
+            Value::Null => "null",
+            Value::Number(_) => "number",
+            Value::Text(_) => "string",
+            Value::Array(_) => "array",
+            Value::Dict(_) => "dict",
+            Value::Set(_) => "set",
+            Value::Instance(_) => "instance",
+            Value::Object(_) => "object",
+            Value::Func(_) => "function",
+            Value::InternalFunc(_) => "internal function",
+            Value::Generator(_) => "generator state",
+            Value::Custom(_) => "custom",
+            Value::SubFunc(_) => "arrow function",
+        }.to_string()))
+    }
+    pub (crate) fn sim_subfunc_typeof_num(myself : ValueLoc, _args : Vec<Value>) -> Result<Value, String>
+    {
+        Ok(Value::Number(match myself.as_ref()
+        {
+            Value::Null => 0,
+            Value::Number(_) => 1,
+            Value::Text(_) => 2,
+            Value::Array(_) => 3,
+            Value::Dict(_) => 4,
+            Value::Set(_) => 5,
+            Value::Instance(_) => 6,
+            Value::Object(_) => 7,
+            Value::Func(_) => 8,
+            Value::InternalFunc(_) => 9,
+            Value::Generator(_) => 10,
+            Value::Custom(_) => 11,
+            Value::SubFunc(_) => 12,
+        } as f64))
+    }
+    pub (crate) fn sim_subfunc_discriminator(myself : ValueLoc, _args : Vec<Value>) -> Result<Value, String>
+    {
+        match myself.as_ref()
+        {
+            Value::Custom(val) => Ok(Value::Number(val.discrim as f64)),
+            _ => Err("error: used ->discriminator() on a value that was not a `Custom` value (used as a typed opaque pointer by applications that embed gammakit)".to_string()),
         }
     }
 }
