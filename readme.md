@@ -122,14 +122,13 @@ If you use with() while inside of an instance scope, then "other" will dereferen
 
 TODO:
 - various helpful string and array functions
+- a way to sort arrays
 - inheritance? how would it work? like func_super()?
 - replace parent/text AST node stuff with enum
 - extend metaprogramming with argument lists, function type (generator, etc), captures
 - make instance identifiers truth-test as whether the instance exists
 - make strings, arrays, dicts, and sets truth-test as whether they are empty
 - add functions for testing the type of a variable
-- add a nothing type
-- a way to sort arrays
 - bitwise operators, bit shifting
 - hex literals, binary literals, intrusive ' and _ characters mid numeric literal
 - add a module system; instead of feeding the compiler/interpreter a file, you have to feed it a module tree; in return you get a set of compiled modules
@@ -138,7 +137,6 @@ TODO:
 - `generator_state->clone()` or `generator_state->fork()` or something (naming things is hard)
 - "finalize" command for generators so that the next yield acts like a return instead of a yield
 - "string formatting" of some kind
-- instance IDs in sets/dicts
 - a pointer type that sorta, kinda acts like an instance with just the property "value" (function `pointer_create()` etc) (use reference counting? use a `pointer_kill()` function?)
 - queue, deque data structures
 - profiling (after modules)

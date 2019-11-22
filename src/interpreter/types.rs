@@ -184,6 +184,7 @@ pub struct SubFuncVal {
 /// Stores typed values (e.g. variables after evaluation, raw literal values).
 #[derive(Debug, Clone)]
 pub enum Value {
+    Null,
     Number(f64),
     Text(String),
     Array(Box<Vec<Value>>),
@@ -197,6 +198,13 @@ pub enum Value {
     Custom(Custom),
     // cannot be assigned
     SubFunc(Box<SubFuncVal>),
+}
+
+impl Value {
+    pub fn default() -> Value
+    {
+        Value::Null
+    }
 }
 
 #[derive(Debug, Clone)]

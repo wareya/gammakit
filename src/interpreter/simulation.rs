@@ -249,7 +249,7 @@ impl Interpreter
     
     pub (crate) fn sim_NEWVAR(&mut self) -> OpResult
     {
-        self.top_frame.variables.push(Value::Number(0.0));
+        self.top_frame.variables.push(Value::default());
         
         Ok(())
     }
@@ -1107,7 +1107,7 @@ impl Interpreter
             // exit implies no remaining value on the stack. if the outside expects a value, push it
             if frame_was_expr
             {
-                self.stack_push_val(Value::Number(0.0));
+                self.stack_push_val(Value::default());
             }
             if was_generator
             {

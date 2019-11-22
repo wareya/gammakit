@@ -8,7 +8,7 @@ use super::types::ops::{float_booly, bool_floaty};
 pub trait VecHelpers<Value> {
     /// Slow; use extract() instead
     fn pop_front(&mut self) -> Option<Value>;
-    /// If the given element exists, extracts it by value, replacing what was there with Value::Number(0.0)
+    /// If the given element exists, extracts it by value, replacing what was there with Value::default()
     /// Otherwise returns None
     fn extract(&mut self, index : usize) -> Option<Value>;
     /// For numbers.
@@ -26,7 +26,7 @@ impl VecHelpers<Value> for Vec<Value> {
     {
         if index < self.len()
         {
-            let mut val = Value::Number(0.0);
+            let mut val = Value::default();
             std::mem::swap(&mut self[index], &mut val);
             Some(val)
         }
@@ -236,7 +236,7 @@ impl Interpreter
         {
             println!("{}", format_val(&arg).ok_or_else(|| minierr("error: tried to print unprintable value"))?);
         }
-        Ok(Value::Number(0.0))
+        Ok(Value::default())
     }
     pub (crate) fn sim_func_printraw(mut args : Vec<Value>) -> Result<Value, String>
     {
@@ -244,7 +244,7 @@ impl Interpreter
         {
             print!("{}", format_val(&arg).ok_or_else(|| minierr("error: tried to print unprintable value"))?);
         }
-        Ok(Value::Number(0.0))
+        Ok(Value::default())
     }
     pub (crate) fn sim_func_string(args : Vec<Value>) -> Result<Value, String>
     {
@@ -315,7 +315,7 @@ impl Interpreter
         {
             if *var != id_index
             {
-                variables.insert(*var, Value::Number(0.0));
+                variables.insert(*var, Value::default());
             }
         }
         self.global.instances.insert(instance_id, Instance { objtype : object_id, ident : instance_id, variables });
@@ -386,7 +386,7 @@ impl Interpreter
             }
         }
         
-        Ok(Value::Number(0.0))
+        Ok(Value::default())
     }
     pub (crate) fn sim_func_instance_object(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
@@ -402,7 +402,7 @@ impl Interpreter
             return Ok(Value::Object(inst.objtype));
         }
         
-        Ok(Value::Number(0.0))
+        Ok(Value::default())
     }
     pub (crate) fn sim_func_instance_has_variable(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
@@ -420,7 +420,7 @@ impl Interpreter
             return Ok(Value::Number(bool_floaty(inst.variables.contains_key(&text_id))));
         }
         
-        Ok(Value::Number(0.0))
+        Ok(Value::default())
     }
     pub (crate) fn sim_func_instance_has_function(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
@@ -439,7 +439,7 @@ impl Interpreter
             return Ok(Value::Number(bool_floaty(object.functions.contains_key(&text_id))));
         }
         
-        Ok(Value::Number(0.0))
+        Ok(Value::default())
     }
     pub (crate) fn sim_func_object_count(&mut self, mut args : Vec<Value>) -> Result<Value, String>
     {
@@ -692,7 +692,7 @@ impl Interpreter
                     let newstr = format!("{}{}{}", left, value, right);
                     *string = newstr;
                     
-                    return Ok(Value::Number(0.0));
+                    return Ok(Value::default());
                 }
                 plainerr("error: tried to insert a non-string into a string with insert()")
             }
@@ -710,7 +710,7 @@ impl Interpreter
                     return plainerr("error: tried to insert into an array at an out-of-range index");
                 }
                 array.insert(index as usize, value);
-                Ok(Value::Number(0.0))
+                Ok(Value::default())
             }
             Value::Dict(ref mut dict) =>
             {
@@ -721,7 +721,7 @@ impl Interpreter
                 let key = args.expect_extract(0)?;
                 let value = args.expect_extract(1)?;
                 dict.insert(val_to_hashval(key)?, value);
-                Ok(Value::Number(0.0))
+                Ok(Value::default())
             }
             Value::Set(ref mut set) =>
             {
@@ -731,7 +731,7 @@ impl Interpreter
                 }
                 let key = args.expect_extract(0)?;
                 set.insert(val_to_hashval(key)?);
-                Ok(Value::Number(0.0))
+                Ok(Value::default())
             }
             _ => plainerr("error: insert() must be called with an array, dictionary, set, or string as the first argument")
         }
@@ -750,14 +750,14 @@ impl Interpreter
                 if let Value::Text(value) = value
                 {
                     *string = format!("{}{}", string, value);
-                    return Ok(Value::Number(0.0));
+                    return Ok(Value::default());
                 }
                 plainerr("error: tried to concatenate a non-string to a string with push()")
             }
             Value::Array(ref mut array) =>
             {
                 array.push(value);
-                Ok(Value::Number(0.0))
+                Ok(Value::default())
             }
             _ => plainerr("error: push() must be called with an array or string as the first argument")
         }
@@ -808,7 +808,7 @@ impl Interpreter
             {
                 if set.remove(&val_to_hashval(key.clone())?)
                 {
-                    Ok(Value::Number(0.0))
+                    Ok(Value::default())
                 }
                 else
                 {
@@ -850,7 +850,7 @@ impl Interpreter
                 if let Some((i, c)) = string.char_indices().nth(indexnum)
                 {
                     string.replace_range(i..i+c.len_utf8(), &insert);
-                    Ok(Value::Number(0.0))
+                    Ok(Value::default())
                 }
                 else
                 {

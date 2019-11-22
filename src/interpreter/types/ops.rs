@@ -18,6 +18,7 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
 {
     match val
     {
+        Value::Null => Some("<null>".to_string()),
         Value::Number(float) => Some(format!("{:.10}", float).trim_end_matches('0').trim_end_matches('.').to_string()),
         Value::Text(string) => Some(string.clone()),
         Value::Array(array) =>

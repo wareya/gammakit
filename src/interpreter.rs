@@ -122,11 +122,11 @@ impl GlobalState {
     }
     pub (crate) fn insert_bare_global(&mut self, index : usize)
     {
-        self.barevariables.insert(index, Value::Number(0.0));
+        self.barevariables.insert(index, Value::default());
     }
     pub (crate) fn insert_global(&mut self, index : usize)
     {
-        self.variables.insert(index, Value::Number(0.0));
+        self.variables.insert(index, Value::default());
     }
     pub (crate) fn insert_globalfunc(&mut self, index : usize, func : FuncSpec)
     {
