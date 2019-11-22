@@ -25,6 +25,7 @@ impl ParseError {
     }
 }
 
+// adds a parse error if it has the same location, otherwise picks the earlier set (old set or new single as a set), produces result in place of left argument
 pub (crate) fn build_new_error(myself : &mut Option<ParseError>, token : usize, text : &str)
 {
     match myself
@@ -44,6 +45,7 @@ pub (crate) fn build_new_error(myself : &mut Option<ParseError>, token : usize, 
     }
 }
 
+// combines parse errors if they have the same location, otherwise picks the earlier one, produces result in place of left argument
 pub (crate) fn build_best_error(myself : &mut Option<ParseError>, other : Option<ParseError>)
 {
     match (myself.as_mut(), other)

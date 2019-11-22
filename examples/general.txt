@@ -594,3 +594,8 @@ print(object_has_function(Character, "auiaesd"));
 print(object_has_function(Character, "create"));
 print(object_count(Character));
 
+
+var baddict = {i : "instance in dict key"};
+print(baddict[i]);
+var badset2 = set {i, "instance in set"};
+print(badset2);

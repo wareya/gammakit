@@ -210,6 +210,7 @@ pub (crate) enum StackValue {
 pub enum HashableValue {
     Number(f64),
     Text(String),
+    Instance(usize),
 }
 
 // implementations
@@ -266,16 +267,18 @@ pub (crate) fn hashval_to_val(hashval : HashableValue) -> Value
 {
     match hashval
     {
-        HashableValue::Number(val) => Value::Number(val),
-        HashableValue::Text(val) => Value::Text(val),
+        HashableValue::Number(val)   => Value::Number(val),
+        HashableValue::Text(val)     => Value::Text(val),
+        HashableValue::Instance(val) => Value::Instance(val),
     }
 }
 pub (crate) fn val_to_hashval(val : Value) -> Result<HashableValue, String>
 {
     match val
     {
-        Value::Number(number) => Ok(HashableValue::Number(number)),
-        Value::Text(text) => Ok(HashableValue::Text(text)),
+        Value::Number(num)  => Ok(HashableValue::Number(num)),
+        Value::Text(text)   => Ok(HashableValue::Text(text)),
+        Value::Instance(id) => Ok(HashableValue::Instance(id)),
         _ => plainerr("error: tried to use non-hashable value as a dictionary key")
     }
 }
@@ -285,8 +288,9 @@ impl std::hash::Hash for HashableValue {
     {
         match self
         {
-            HashableValue::Number(num) => {0.hash(state); num.to_bits().hash(state);}
-            HashableValue::Text(text)  => {1.hash(state); text.hash(state);}
+            HashableValue::Number(num)     => {0.hash(state); num.to_bits().hash(state);}
+            HashableValue::Text(text)      => {1.hash(state); text.hash(state);}
+            HashableValue::Instance(text)  => {2.hash(state); text.hash(state);}
         }
     }
 }
@@ -295,8 +299,9 @@ impl std::cmp::PartialEq for HashableValue {
     {
         match (self, other)
         {
-            (HashableValue::Number(left), HashableValue::Number(right)) => left.to_bits() == right.to_bits(),
-            (HashableValue::Text(left), HashableValue::Text(right)) => left == right,
+            (HashableValue::Number(left)  , HashableValue::Number(right))   => left.to_bits() == right.to_bits(),
+            (HashableValue::Text(left)    , HashableValue::Text(right))     => left == right,
+            (HashableValue::Instance(left), HashableValue::Instance(right)) => left == right,
             _ => false
         }
     }
