@@ -4,23 +4,23 @@ impl Interpreter
 {
     pub (super) fn stack_len(&mut self) -> usize
     {
-        self.top_frame_mut().len()
+        self.top_frame.len()
     }
     pub (super) fn stack_pop_val(&mut self) -> Option<Value>
     {
-        self.top_frame_mut().pop_val()
+        self.top_frame.pop_val()
     }
     pub (super) fn stack_pop_var(&mut self) -> Option<Variable>
     {
-        self.top_frame_mut().pop_var()
+        self.top_frame.pop_var()
     }
     pub (super) fn stack_pop(&mut self) -> Option<StackValue>
     {
-        self.top_frame_mut().pop()
+        self.top_frame.pop()
     }
     pub (super) fn stack_pop_as_val(&mut self) -> Option<Value>
     {
-        match self.top_frame_mut().pop()
+        match self.top_frame.pop()
         {
             Some(StackValue::Var(x)) => self.evaluate_value(x).ok(),
             Some(StackValue::Val(x)) => Some(x),
@@ -29,15 +29,15 @@ impl Interpreter
     }
     pub (super) fn stack_push_val(&mut self, value : Value)
     {
-        self.top_frame_mut().push_val(value)
+        self.top_frame.push_val(value)
     }
     pub (super) fn stack_push_var(&mut self, variable : Variable)
     {
-        self.top_frame_mut().push_var(variable)
+        self.top_frame.push_var(variable)
     }
     pub (super) fn stack_push(&mut self, stackvalue : StackValue)
     {
-        self.top_frame_mut().push(stackvalue)
+        self.top_frame.push(stackvalue)
     }
     
     fn call_arrow_function(&mut self, subfuncval : SubFuncVal, args : Vec<Value>, isexpr : bool) -> OpResult

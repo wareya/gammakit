@@ -94,7 +94,6 @@ Gammakit has a small number of built-in bindings. The library user is expected t
     compile_ast(ast) (returns function)
     
     round/floor/ceil(number) (returns rounded/floored/ceiled number)
-    etc...
 
 The following bindings are special "arrow" bindings, and are invoked as e.g. myarray->len().
 
@@ -102,14 +101,12 @@ The following bindings are special "arrow" bindings, and are invoked as e.g. mya
     array/dict->keys() (returns array of indexes/keys)
     string/array->slice(start, end) (returns sliced string/array)
     dict/set->contains(key) (returns whether it contains the given key)
-    etc...
 
 Some arrow bindings can mutate the variable they're called on, in addition to returning a value. insert() returns 0.0 (nothing), and remove() returns the element that was removed (except for sets, where it returns 0.0, the default return value for functions that return nothing).
     
     string/array/dict->insert(index/key, val)
     set->insert(val)
     string/array/dict/set->remove(index/index/key/val) (returns removed element, except for sets, which return 0.0)
-    etc...
 
 If an arrow function meant to mutate a variable is called on a literal value, no error is thrown, the mutation step is just skipped.
 
@@ -124,32 +121,25 @@ If you use with() while inside of an instance scope, then "other" will dereferen
 # Roadmap
 
 TODO:
-- various helpful string and array functions (e.g. array sorting, substring finding, etc)
+- various helpful string and array functions
+- a way to sort arrays
 - inheritance? how would it work? like func_super()?
+- replace parent/text AST node stuff with enum
 - extend metaprogramming with argument lists, function type (generator, etc), captures
-
 - bitwise operators, bit shifting
 - hex literals, binary literals, intrusive ' and _ characters mid numeric literal
-
 - add a module system; instead of feeding the compiler/interpreter a file, you have to feed it a module tree; in return you get a set of compiled modules
-- profiling (after modules)
-- loading compiled bytecode (with debugging data, etc)
-
 - make generator state variables opaque pointers (which means shared underlying value)
 - `generator_state()` as syntactical sugar for `invoke generator_state`
 - `generator_state->clone()` or `generator_state->fork()` or something (naming things is hard)
-
-- a pointer type that sorta, kinda acts like an instance with just the property "value" (function `pointer_create()` etc) (use reference counting? use a `pointer_kill()` function? BOTH?)
-
+- "finalize" command for generators so that the next yield acts like a return instead of a yield
+- "string formatting" of some kind
+- a pointer type that sorta, kinda acts like an instance with just the property "value" (function `pointer_create()` etc) (use reference counting? use a `pointer_kill()` function?)
 - queue, deque data structures
-
-TODO (later):
+- profiling (after modules)
+- loading compiled bytecode (with debugging data, etc)
 - multi line string literals
 - work in no_std
-- "string formatting" of some kind
-- "finalize" command for generators so that the next yield acts like a return instead of a yield
-- replace parent/text AST node stuff with enum
-
 
 TODO (sanitation/low-priority):
 - a "defer" statement?

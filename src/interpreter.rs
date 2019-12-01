@@ -141,7 +141,7 @@ const TRACK_OP_PERFORMANCE : bool = false;
 // interpreter state
 /// Interprets compiled bytecode.
 pub struct Interpreter {
-    //top_frame: *mut Frame,
+    top_frame: Frame,
     frames: Vec<Frame>,
     global: GlobalState,
     /// Last error returned by step(). Gets cleared (reset to None) when step() runs without returning an error.
@@ -157,11 +157,9 @@ impl Interpreter {
     pub fn new(parser : Parser) -> Interpreter
     {
         simulation::build_opfunc_table();
-        let mut temp_frames = fat_vec();
-        temp_frames.push(Frame::new_root(&Code::new()));
         Interpreter {
-            frames : temp_frames,
-            //top_frame : frames.last_mut().unwrap(),
+            top_frame : Frame::new_root(&Code::new()),
+            frames : fat_vec(),
             doexit : false,
             global : GlobalState::new(parser),
             last_error : None,
@@ -180,29 +178,15 @@ impl Interpreter {
     /// Does not reset global state (objects/instances).
     pub fn restart(&mut self, code: &Code)
     {
+        self.top_frame = Frame::new_root(code);
         self.frames = fat_vec();
-        self.frames.push(Frame::new_root(code));
         self.doexit = false;
         self.last_error = None;
-    }
-    pub (crate) fn top_frame<'a>(&'a self) -> &'a Frame
-    {
-        //unsafe { &mut *self.top_frame }
-        self.frames.last().unwrap()
-    }
-    pub (crate) fn top_frame_mut<'a>(&'a mut self) -> &'a mut Frame
-    {
-        //unsafe { &mut *self.top_frame }
-        self.frames.last_mut().unwrap()
     }
     
     pub fn restart_in_place(&mut self)
     {
-        let new_root = self.frames.first().unwrap().code.clone();
-        self.frames = fat_vec();
-        self.frames.push(Frame::new_root(&new_root));
-        self.doexit = false;
-        self.last_error = None;
+        self.restart(&self.top_frame.code.clone());
     }
     
     pub fn restart_into_string(&mut self, text: &str) -> Result<Code, String>
@@ -268,13 +252,13 @@ impl Interpreter {
         }
         else if let Err(err) = &ret
         {
-            if let Some(info) = self.top_frame().code.get_debug_info(start_pc)
+            if let Some(info) = self.top_frame.code.get_debug_info(start_pc)
             {
                 self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X}", err, info.last_line, info.last_index, start_pc))
             }
             else
             {
-                self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, start_pc, self.top_frame().code.debug))
+                self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, start_pc, self.top_frame.code.debug))
             }
             Err(err.to_string())
         }
@@ -302,13 +286,13 @@ impl Interpreter {
             }
             else if let Err(err) = ret
             {
-                if let Some(info) = self.top_frame().code.get_debug_info(start_pc)
+                if let Some(info) = self.top_frame.code.get_debug_info(start_pc)
                 {
                     self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X}", err, info.last_line, info.last_index, start_pc))
                 }
                 else
                 {
-                    self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, start_pc, self.top_frame().code.debug))
+                    self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, start_pc, self.top_frame.code.debug))
                 }
                 return Err(err);
             }
@@ -316,7 +300,7 @@ impl Interpreter {
     }
     pub fn dump_code(&self) -> Vec<u8>
     {
-        self.top_frame().code.get(..).unwrap().to_vec()
+        self.top_frame.code.get(..).unwrap().to_vec()
     }
     pub fn print_op_perf_log(&self)
     {

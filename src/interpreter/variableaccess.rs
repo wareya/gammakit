@@ -226,7 +226,7 @@ impl Interpreter
     }
     pub(crate) fn evaluate_of_direct(&mut self, index : usize) -> Result<ValueLoc<'_>, String>
     {
-        Ok(ValueLoc::Mut(self.top_frame_mut().variables.get_mut(index).ok_or_else(|| "internal error: variable stack out-of-bounds access".to_string())?))
+        Ok(ValueLoc::Mut(self.top_frame.variables.get_mut(index).ok_or_else(|| "internal error: variable stack out-of-bounds access".to_string())?))
     }
     pub (crate) fn evaluate(&mut self, variable : Variable) -> Result<ValueLoc<'_>, String>
     {
