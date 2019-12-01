@@ -156,7 +156,7 @@ impl Interpreter
     }
     pub (crate) fn sim_PUSHSTR(&mut self) -> OpResult
     {
-        let text = self.read_string()?;
+        let text = self.read_indexed_string()?;
         self.stack_push_val(Value::Text(text));
         Ok(())
     }
@@ -603,7 +603,7 @@ impl Interpreter
         }
         let value = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: switch expression was a variable instead of a value"))?;
         
-        let num_cases = self.read_u16()?;
+        let num_cases = self.read_usize()?;
         let current_pc = self.get_pc();
         
         let mut case_block_addresses = Vec::with_capacity(num_cases as usize);
@@ -636,7 +636,7 @@ impl Interpreter
         }
         let value = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: switch case expression was a variable instead of a value"))?;
         
-        let which_case = self.read_u16()?;
+        let which_case = self.read_usize()?;
         
         let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref x)) => x, strange_err("internal error: SWITCHCASE instruction outside of switch statement"))?;
         let dest = *switchdata.blocks.get(which_case as usize).ok_or_else(|| strange_err("internal error: which_case in SWITCHCASE was too large"))?;
@@ -651,7 +651,7 @@ impl Interpreter
     }
     pub (crate) fn sim_SWITCHDEFAULT(&mut self) -> OpResult
     {
-        let which_case = self.read_u16()?;
+        let which_case = self.read_usize()?;
         let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref x)) => x, strange_err("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
         let dest = *switchdata.blocks.get(which_case as usize).ok_or_else(|| strange_err("internal error: which_case in SWITCHDEFAULT was too large"))?;
         self.set_pc(dest);
@@ -820,7 +820,7 @@ impl Interpreter
     }
     pub (crate) fn sim_COLLECTARRAY(&mut self) -> OpResult
     {
-        let numvals = self.read_u16()? as usize;
+        let numvals = self.read_usize()? as usize;
         #[cfg(feature = "stack_len_debugging")]
         {
             if self.stack_len() < numvals
@@ -840,7 +840,7 @@ impl Interpreter
     }
     pub (crate) fn sim_COLLECTDICT(&mut self) -> OpResult
     {
-        let numvals = self.read_u16()? as usize;
+        let numvals = self.read_usize()? as usize;
         #[cfg(feature = "stack_len_debugging")]
         {
             if self.stack_len() < numvals*2
@@ -866,7 +866,7 @@ impl Interpreter
     }
     pub (crate) fn sim_COLLECTSET(&mut self) -> OpResult
     {
-        let numvals = self.read_u16()? as usize;
+        let numvals = self.read_usize()? as usize;
         #[cfg(feature = "stack_len_debugging")]
         {
             if self.stack_len() < numvals

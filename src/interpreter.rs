@@ -300,7 +300,12 @@ impl Interpreter {
     }
     pub fn dump_code(&self) -> Vec<u8>
     {
-        self.top_frame.code.get(..).unwrap().to_vec()
+        let mut out = Vec::new();
+        for word in self.top_frame.code.get(..).unwrap()
+        {
+            out.extend(&word.to_ne_bytes());
+        }
+        out
     }
     pub fn print_op_perf_log(&self)
     {

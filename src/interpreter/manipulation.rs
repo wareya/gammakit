@@ -53,16 +53,9 @@ impl Interpreter
     #[inline]
     pub (crate) fn pull_single_from_code(&mut self) -> Result<u8, String>
     {
-        if self.top_frame.pc+1 > self.top_frame.code.len()
-        {
-            past_end_of_code_err!(self)?;
-        }
-        let pc = self.top_frame.pc;
+        let r = self.top_frame.code[self.top_frame.pc];
         self.top_frame.pc += 1;
-        unsafe
-        {
-            Ok(*self.top_frame.code.code.get_unchecked(pc))
-        }
+        Ok(r as u8)
     }
     
     pub (crate) fn vec_pop_front_instance(&mut self, args : &mut Vec<Value>) -> Option<usize>
@@ -83,55 +76,17 @@ impl Interpreter
     }
     
     #[inline]
-    pub (crate) fn round_up_pc_2(&mut self)
-    {
-        self.top_frame.pc = (((self.top_frame.pc-1)>>1)+1)<<1;
-    }
-    #[inline]
-    pub (crate) fn round_up_pc_8(&mut self)
-    {
-        self.top_frame.pc = (((self.top_frame.pc-1)>>3)+1)<<3;
-    }
-    #[inline]
-    pub (crate) fn read_u16(&mut self) -> Result<u16, String>
-    {
-        use std::convert::TryInto;
-        self.round_up_pc_2();
-        if self.top_frame.pc+2 > self.top_frame.code.len()
-        {
-            past_end_of_code_err!(self)?;
-        }
-        #[allow(clippy::cast_ptr_alignment)]
-        let r = u16::from_le_bytes(self.top_frame.code.get(self.top_frame.pc..self.top_frame.pc+2).unwrap().try_into().unwrap());
-        self.top_frame.pc += 2;
-        Ok(r)
-    }
-    #[inline]
     pub (crate) fn read_usize(&mut self) -> Result<usize, String>
     {
-        use std::convert::TryInto;
-        self.round_up_pc_8();
-        if self.top_frame.pc+8 > self.top_frame.code.len()
-        {
-            past_end_of_code_err!(self)?;
-        }
-        #[allow(clippy::cast_ptr_alignment)]
-        let r = u64::from_le_bytes(self.top_frame.code.get(self.top_frame.pc..self.top_frame.pc+8).unwrap().try_into().unwrap()) as usize;
-        self.top_frame.pc += 8;
+        let r = self.top_frame.code[self.top_frame.pc] as usize;
+        self.top_frame.pc += 1;
         Ok(r)
     }
     #[inline]
     pub (crate) fn read_float(&mut self) -> Result<f64, String>
     {
-        use std::convert::TryInto;
-        self.round_up_pc_8();
-        if self.top_frame.pc+8 > self.top_frame.code.len()
-        {
-            past_end_of_code_err!(self)?;
-        }
-        #[allow(clippy::cast_ptr_alignment)]
-        let r = f64::from_bits(u64::from_le_bytes(self.top_frame.code.get(self.top_frame.pc..self.top_frame.pc+8).unwrap().try_into().unwrap()));
-        self.top_frame.pc += 8;
+        let r = f64::from_bits(self.top_frame.code[self.top_frame.pc]);
+        self.top_frame.pc += 1;
         Ok(r)
     }
     
@@ -147,26 +102,14 @@ impl Interpreter
         self.global.get_string(index)
     }
     
-    pub (crate) fn read_string(&mut self) -> Result<String, String>
+    pub (crate) fn read_indexed_string(&mut self) -> Result<String, String>
     {
-        let start = self.get_pc();
-        if start >= self.top_frame.code.len()
-        {
-            past_end_of_code_err!(self)?;
-        }
-        
-        let mut end = start+1;
-        while end < self.top_frame.code.len() && self.top_frame.code[end] != 0
-        {
-            end += 1;
-        }
-        
-        self.set_pc(end+1);
-        Ok(String::from_utf8_lossy(&self.top_frame.code[start..end]).to_string())
+        let index = self.read_usize()?;
+        Ok(self.get_indexed_string(index))
     }
     pub (crate) fn read_function(&mut self, generator : bool) -> Result<FuncSpec, String>
     {
-        let argcount = self.read_u16()? as usize;
+        let argcount = self.read_usize()? as usize;
         let bodylen = self.read_usize()?;
         
         let startaddr = self.get_pc();
@@ -191,7 +134,7 @@ impl Interpreter
             captures.push(val);
         }
         
-        let argcount = self.read_u16()? as usize;
+        let argcount = self.read_usize()? as usize;
         let bodylen = self.read_usize()?;
         
         let startaddr = self.get_pc();
