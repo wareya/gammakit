@@ -174,20 +174,20 @@ impl Interpreter
     pub (crate) fn sim_EVALUATEVAR(&mut self) -> OpResult
     {
         let index = self.read_usize()?;
-        let val = self.top_frame.variables.get(index).ok_or_else(|| strange_err("internal error: variable stack out-of-bounds access"))?.clone();
+        let val = self.top_frame().variables.get(index).ok_or_else(|| strange_err("internal error: variable stack out-of-bounds access"))?.clone();
         self.stack_push_val(val);
         Ok(())
     }
     pub (crate) fn sim_PUSHINSTVAR(&mut self) -> OpResult
     {
-        let instance_id = *self.top_frame.instancestack.last().ok_or_else(|| strange_err("internal error: tried to access instance variable when not executing within instance scope"))?;
+        let instance_id = *self.top_frame().instancestack.last().ok_or_else(|| strange_err("internal error: tried to access instance variable when not executing within instance scope"))?;
         let index = self.read_usize()?;
         self.stack_push_var(Variable::from_indirection(instance_id, index));
         Ok(())
     }
     pub (crate) fn sim_EVALUATEINSTVAR(&mut self) -> OpResult
     {
-        let instance_id = *self.top_frame.instancestack.last().ok_or_else(|| strange_err("internal error: tried to access instance variable when not executing within instance scope"))?;
+        let instance_id = *self.top_frame().instancestack.last().ok_or_else(|| strange_err("internal error: tried to access instance variable when not executing within instance scope"))?;
         let index = self.read_usize()?;
         
         self.stack_push_val(self.evaluate_of_indirect_simple(instance_id, index)?);
@@ -241,21 +241,21 @@ impl Interpreter
     
     pub (crate) fn sim_PUSHSELF(&mut self) -> OpResult
     {
-        let instance_id = *self.top_frame.instancestack.last().ok_or_else(|| strange_err("internal error: tried to access `self` when not executing within instance scope"))?;
+        let instance_id = *self.top_frame().instancestack.last().ok_or_else(|| strange_err("internal error: tried to access `self` when not executing within instance scope"))?;
         self.stack_push_val(Value::Instance(instance_id));
         Ok(())
     }
     pub (crate) fn sim_PUSHOTHER(&mut self) -> OpResult
     {
-        let loc = self.top_frame.instancestack.len()-2;
-        let instance_id = *self.top_frame.instancestack.get_mut(loc).ok_or_else(|| "error: tried to access `other` while not inside of at least two instance scopes".to_string())?;
+        let loc = self.top_frame().instancestack.len()-2;
+        let instance_id = *self.top_frame().instancestack.get(loc).ok_or_else(|| "error: tried to access `other` while not inside of at least two instance scopes".to_string())?;
         self.stack_push_val(Value::Instance(instance_id));
         Ok(())
     }
     
     pub (crate) fn sim_NEWVAR(&mut self) -> OpResult
     {
-        self.top_frame.variables.push(Value::default());
+        self.top_frame_mut().variables.push(Value::default());
         
         Ok(())
     }
@@ -419,7 +419,7 @@ impl Interpreter
     {
         self.pop_controlstack_until_loop();
         
-        let controller = self.top_frame.controlstack.last().ok_or_else(|| minierr("error: break instruction not inside of loop"))?;
+        let controller = self.top_frame().controlstack.last().ok_or_else(|| minierr("error: break instruction not inside of loop"))?;
         
         let (variables, destination) =
         match controller
@@ -430,7 +430,7 @@ impl Interpreter
         
         self.drain_vars(variables);
         self.set_pc(destination);
-        self.top_frame.controlstack.pop();
+        self.top_frame_mut().controlstack.pop();
         
         Ok(())
     }
@@ -438,7 +438,7 @@ impl Interpreter
     {
         self.pop_controlstack_until_loop();
         
-        let controller = self.top_frame.controlstack.last().ok_or_else(|| minierr("error: continue instruction not inside of loop"))?;
+        let controller = self.top_frame().controlstack.last().ok_or_else(|| minierr("error: continue instruction not inside of loop"))?;
         
         let (variables, destination) =
         match controller
@@ -475,8 +475,9 @@ impl Interpreter
         let exprlen = self.read_usize()?;
         let codelen = self.read_usize()?;
         let current_pc = self.get_pc();
-        self.top_frame.controlstack.push(Controller::While(WhileData{
-            variables : self.top_frame.variables.len() as u64,
+        let numvars = self.top_frame().variables.len() as u64;
+        self.top_frame_mut().controlstack.push(Controller::While(WhileData{
+            variables : numvars,
             expr_start : current_pc,
             loop_start : current_pc+exprlen,
             loop_end : current_pc+exprlen+codelen
@@ -489,8 +490,9 @@ impl Interpreter
         let exprlen = self.read_usize()?;
         let codelen = self.read_usize()?;
         let current_pc = self.get_pc();
-        self.top_frame.controlstack.push(Controller::While(WhileData{
-            variables : self.top_frame.variables.len() as u64,
+        let numvars = self.top_frame().variables.len() as u64;
+        self.top_frame_mut().controlstack.push(Controller::While(WhileData{
+            variables : numvars,
             expr_start : current_pc,
             loop_start : current_pc+postlen+exprlen,
             loop_end : current_pc+postlen+exprlen+codelen
@@ -521,8 +523,9 @@ impl Interpreter
         
         let codelen = self.read_usize()?;
         let current_pc = self.get_pc();
-        self.top_frame.controlstack.push(Controller::ForEach(ForEachData{
-            variables : self.top_frame.variables.len() as u64,
+        let numvars = self.top_frame().variables.len() as u64;
+        self.top_frame_mut().controlstack.push(Controller::ForEach(ForEachData{
+            variables : numvars,
             loop_start : current_pc,
             loop_end : current_pc+codelen,
             values : list
@@ -545,9 +548,10 @@ impl Interpreter
         let instance_id_list : Vec<usize> = self.global.instances_by_type.get(&object_id).ok_or_else(|| minierr("error: tried to use non-existant object type in with expression"))?.iter().cloned().collect();
         if let Some(first) = instance_id_list.first()
         {
-            self.top_frame.instancestack.push(*first);
-            self.top_frame.controlstack.push(Controller::With(WithData{
-                variables : self.top_frame.variables.len() as u64,
+            let numvars = self.top_frame().variables.len() as u64;
+            self.top_frame_mut().instancestack.push(*first);
+            self.top_frame_mut().controlstack.push(Controller::With(WithData{
+                variables : numvars,
                 loop_start : current_pc,
                 loop_end : current_pc + codelen,
                 instances : instance_id_list.get(1..).unwrap().iter().rev().map(|id| Value::Number(*id as f64)).collect()
@@ -580,10 +584,10 @@ impl Interpreter
             return plainerr("error: tried to use non-extant instance as argument of with()");
         }
         
-        self.top_frame.instancestack.push(instance_id);
-        
-        self.top_frame.controlstack.push(Controller::With(WithData{
-            variables : self.top_frame.variables.len() as u64,
+        let numvars = self.top_frame().variables.len() as u64;
+        self.top_frame_mut().instancestack.push(instance_id);
+        self.top_frame_mut().controlstack.push(Controller::With(WithData{
+            variables : numvars,
             loop_start : current_pc,
             loop_end : current_pc + codelen,
             instances : Vec::new()
@@ -612,16 +616,16 @@ impl Interpreter
             case_block_addresses.push(current_pc + self.read_usize()?);
         }
         let exit = current_pc + self.read_usize()?;
-        
-        self.top_frame.controlstack.push(Controller::Switch(SwitchData{
-            variables : self.top_frame.variables.len() as u64,
+        let numvars = self.top_frame().variables.len() as u64;
+        self.top_frame_mut().controlstack.push(Controller::Switch(SwitchData{
+            variables : numvars,
             blocks : case_block_addresses,
             exit,
             value
         }));
         
         //eprintln!("end of sim_switch");
-        //eprintln!("{:?}", self.top_frame.controlstack.last().unwrap());
+        //eprintln!("{:?}", self.top_frame().controlstack.last().unwrap());
         
         Ok(())
     }
@@ -638,7 +642,7 @@ impl Interpreter
         
         let which_case = self.read_u16()?;
         
-        let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref x)) => x, strange_err("internal error: SWITCHCASE instruction outside of switch statement"))?;
+        let switchdata : &SwitchData = match_or_err!(self.top_frame().controlstack.last(), Some(Controller::Switch(ref x)) => x, strange_err("internal error: SWITCHCASE instruction outside of switch statement"))?;
         let dest = *switchdata.blocks.get(which_case as usize).ok_or_else(|| strange_err("internal error: which_case in SWITCHCASE was too large"))?;
         
         if ops::value_equal(&value, &switchdata.value)?
@@ -652,7 +656,7 @@ impl Interpreter
     pub (crate) fn sim_SWITCHDEFAULT(&mut self) -> OpResult
     {
         let which_case = self.read_u16()?;
-        let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref x)) => x, strange_err("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
+        let switchdata : &SwitchData = match_or_err!(self.top_frame().controlstack.last(), Some(Controller::Switch(ref x)) => x, strange_err("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
         let dest = *switchdata.blocks.get(which_case as usize).ok_or_else(|| strange_err("internal error: which_case in SWITCHDEFAULT was too large"))?;
         self.set_pc(dest);
         
@@ -660,7 +664,7 @@ impl Interpreter
     }
     pub (crate) fn sim_SWITCHEXIT(&mut self) -> OpResult
     {
-        let switchdata = match_or_err!(self.top_frame.controlstack.pop(), Some(Controller::Switch(x)) => x, strange_err("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
+        let switchdata = match_or_err!(self.top_frame_mut().controlstack.pop(), Some(Controller::Switch(x)) => x, strange_err("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
         self.set_pc(switchdata.exit);
         
         Ok(())
@@ -668,13 +672,13 @@ impl Interpreter
     pub (crate) fn sim_FUNCDEF(&mut self) -> OpResult
     {
         let myfuncspec = self.read_function(false)?;
-        self.top_frame.variables.push(Value::new_funcval(None, myfuncspec));
+        self.top_frame_mut().variables.push(Value::new_funcval(None, myfuncspec));
         Ok(())
     }
     pub (crate) fn sim_GENERATORDEF(&mut self) -> OpResult
     {
         let myfuncspec = self.read_function(true)?;
-        self.top_frame.variables.push(Value::new_funcval(None, myfuncspec));
+        self.top_frame_mut().variables.push(Value::new_funcval(None, myfuncspec));
         Ok(())
     }
     
@@ -981,7 +985,7 @@ impl Interpreter
     }
     pub (crate) fn sim_WHILETEST(&mut self) -> OpResult
     {
-        if let Some(Controller::While(ref data)) = self.top_frame.controlstack.last()
+        if let Some(Controller::While(ref data)) = self.top_frame().controlstack.last()
         {
             let dest = data.loop_end;
             let todrain = data.variables;
@@ -990,7 +994,7 @@ impl Interpreter
             {
                 self.set_pc(dest);
                 self.drain_vars(todrain);
-                self.top_frame.controlstack.pop();
+                self.top_frame_mut().controlstack.pop();
             }
             return Ok(());
         }
@@ -998,7 +1002,7 @@ impl Interpreter
     }
     pub (crate) fn sim_WHILELOOP(&mut self) -> OpResult
     {
-        if let Some(Controller::While(ref data)) = self.top_frame.controlstack.last()
+        if let Some(Controller::While(ref data)) = self.top_frame().controlstack.last()
         {
             let dest = data.expr_start;
             let todrain = data.variables;
@@ -1010,17 +1014,19 @@ impl Interpreter
     }
     pub (crate) fn sim_WITHLOOP(&mut self) -> OpResult
     {
-        self.top_frame.instancestack.pop();
+        let top_frame = self.top_frame_mut();
         
-        if let Some(Controller::With(ref mut data)) = self.top_frame.controlstack.last_mut()
+        top_frame.instancestack.pop();
+        
+        if let Some(Controller::With(ref mut data)) = top_frame.controlstack.last_mut()
         {
             if let Some(next_instance) = data.instances.pop()
             {
                 if let Value::Number(next_instance) = next_instance
                 {
-                    self.top_frame.instancestack.push(next_instance as usize);
+                    top_frame.instancestack.push(next_instance as usize);
                     let dest = data.loop_start;
-                    self.set_pc(dest);
+                    top_frame.pc = dest;
                 }
                 else
                 {
@@ -1029,7 +1035,7 @@ impl Interpreter
             }
             else
             {
-                self.top_frame.controlstack.pop();
+                top_frame.controlstack.pop();
             }
             return Ok(());
         }
@@ -1037,7 +1043,7 @@ impl Interpreter
     }
     pub (crate) fn sim_FOREACHLOOP(&mut self) -> OpResult
     {
-        if let Some(Controller::ForEach(ref mut data)) = self.top_frame.controlstack.last_mut()
+        if let Some(Controller::ForEach(ref mut data)) = self.top_frame_mut().controlstack.last_mut()
         {
             let todrain = data.variables;
             let dest = data.loop_start;
@@ -1066,7 +1072,8 @@ impl Interpreter
     }
     pub (crate) fn sim_FOREACHHEAD(&mut self) -> OpResult
     {
-        if let Some(Controller::ForEach(ref mut data)) = self.top_frame.controlstack.last_mut()
+        let top_frame = self.top_frame_mut();
+        if let Some(Controller::ForEach(ref mut data)) = top_frame.controlstack.last_mut()
         {
             let dest = data.loop_end;
             if let Some(value) = match data.values
@@ -1074,7 +1081,7 @@ impl Interpreter
                     ForEachValues::List(ref mut values) => values.pop(),
                     ForEachValues::Gen(ref mut gen) =>
                     {
-                        if let Some(StackValue::Val(Value::Generator(mut holder))) = self.top_frame.stack.pop()
+                        if let Some(StackValue::Val(Value::Generator(mut holder))) = top_frame.stack.pop()
                         {
                             std::mem::swap(&mut *holder, gen);
                         }
@@ -1082,16 +1089,16 @@ impl Interpreter
                         {
                             return strange_err_plain("internal error: failed to recover generator state in foreach loop over generator");
                         }
-                        self.stack_pop_val()
+                        top_frame.pop_val()
                     }
                 }
             {
-                self.top_frame.variables.push(value);
+                top_frame.variables.push(value);
             }
             else
             {
-                self.set_pc(dest);
-                self.top_frame.controlstack.pop();
+                top_frame.pc = dest;
+                top_frame.controlstack.pop();
             }
             return Ok(());
         }
@@ -1105,11 +1112,12 @@ impl Interpreter
     }
     pub (crate) fn sim_EXIT(&mut self) -> OpResult // an exit is a return with no value
     {
-        if let Some(outer_top_frame) = self.frames.pop()
+        let old_top_frame = self.frames.pop().unwrap();
+        if !self.frames.is_empty()
         {
-            let was_generator = self.top_frame.generator;
-            let frame_was_expr = self.top_frame.isexpr;
-            self.top_frame = outer_top_frame;
+            //self.top_frame = self.frames.last_mut().unwrap();
+            let was_generator = old_top_frame.generator;
+            let frame_was_expr = old_top_frame.isexpr;
             // exit implies no remaining value on the stack. if the outside expects a value, push it
             if frame_was_expr
             {
@@ -1132,12 +1140,13 @@ impl Interpreter
     }
     pub (crate) fn sim_RETURN(&mut self) -> OpResult
     {
-        let was_generator = self.top_frame.generator;
-        if let Some(old_frame) = self.frames.pop()
+        let inner_frame_stack_last = self.stack_pop();
+        let old_top_frame = self.frames.pop().unwrap();
+        if !self.frames.is_empty()
         {
-            let inner_frame_stack_last = self.stack_pop();
-            let frame_was_expr = self.top_frame.isexpr;
-            self.top_frame = old_frame;
+            //self.top_frame = self.frames.last_mut().unwrap();
+            let was_generator = old_top_frame.generator;
+            let frame_was_expr = old_top_frame.isexpr;
 
             if frame_was_expr
             {
@@ -1161,17 +1170,20 @@ impl Interpreter
     }
     pub (crate) fn sim_YIELD(&mut self) -> OpResult
     {
-        if !self.top_frame.generator
+        if !self.top_frame().generator
         {
             return plainerr("error: tried to yield in non-generator function; use return instead");
         }
         
-        let frame_was_expr = self.top_frame.isexpr;
-        let mut old_frame = self.frames.pop().ok_or_else(|| minierr("error: attempted to return from global code; use exit() instead"))?;
-        
+        let frame_was_expr = self.top_frame().isexpr;
         let inner_frame_stack_last = self.stack_pop();
-        std::mem::swap(&mut self.top_frame, &mut old_frame);
+        let old_frame = self.frames.pop().unwrap();
+        if self.frames.is_empty()
+        {
+            return plainerr("error: attempted to return from global code; use exit() instead");
+        }
         let new_gen_state = Box::new(GeneratorState{frame : Some(old_frame)});
+        //self.top_frame = self.frames.last_mut().unwrap();
         
         if frame_was_expr
         {

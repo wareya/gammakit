@@ -129,7 +129,7 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
 
 fn value_op_add(left : &Value, right : &Value) -> Result<Value, String>
 {
-    // TODO: string and array concatenation
+    // TODO: array concatenation
     match (left, right)
     {
         (Value::Number(left), Value::Number(right)) => Ok(Value::Number(left+right)),
