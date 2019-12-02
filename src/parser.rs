@@ -643,7 +643,7 @@ impl Parser {
             {
                 if let Some(mut error) = latesterror
                 {
-                    let mut expected : Vec<String> = error.expected.into_iter().map(|x| x.to_string()).collect();
+                    let mut expected : Vec<String> = error.expected.into_iter().map(|x| x.into_string()).collect();
                     expected.sort();
                     let onepast = error.token == tokens.len();
                     if onepast

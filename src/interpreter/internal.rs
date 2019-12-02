@@ -100,7 +100,7 @@ impl Interpreter
     
     pub (super) fn handle_func_call_or_expr(&mut self, isexpr : bool) -> OpResult
     {
-        let argcount = self.read_usize()?;
+        let argcount = self.read_usize();
         
         //eprintln!("{} args", argcount);
         

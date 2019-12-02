@@ -148,6 +148,7 @@ pub struct Interpreter {
     pub last_error: Option<String>,
     pub (crate) op_map_hits: BTreeMap<u8, u128>,
     pub (crate) op_map: BTreeMap<u8, u128>,
+    op_map_time: Option<std::time::Instant>,
     doexit: bool,
 }
 
@@ -165,6 +166,7 @@ impl Interpreter {
             last_error : None,
             op_map_hits : BTreeMap::new(),
             op_map : BTreeMap::new(),
+            op_map_time : None
         }
     }
     /// Loads new code into the interpreter.
@@ -182,6 +184,16 @@ impl Interpreter {
         self.frames = fat_vec();
         self.doexit = false;
         self.last_error = None;
+    }
+    pub fn restart_full_of_nops(&mut self, count : usize)
+    {
+        let mut code = Code::new();
+        for _ in 0..count
+        {
+            code.push_for_nop_thing_only(NOP);
+        }
+        code.push_for_nop_thing_only(EXIT);
+        self.restart(&code);
     }
     
     pub fn restart_in_place(&mut self)
@@ -219,19 +231,28 @@ impl Interpreter {
     #[inline]
     fn step_internal(&mut self) -> OpResult
     {
+        use simulation::OPTABLE;
+        let op = self.pull_single_from_code();
         if !TRACK_OP_PERFORMANCE
         {
-            self.run_next_op()?;
+            unsafe { OPTABLE[op as usize](self) }
         }
         else
         {
             use std::time::Instant;
-            let start_time = Instant::now();
-            let op = self.run_next_op()?;
+            if self.op_map_time.is_none()
+            {
+                self.op_map_time = Some(Instant::now());
+            }
+            let start_time = self.op_map_time.unwrap();
+            
+            let ret = unsafe { OPTABLE[op as usize](self) };
             *self.op_map_hits.entry(op).or_insert(0) += 1;
-            *self.op_map.entry(op).or_insert(0) += Instant::now().duration_since(start_time).as_nanos();
+            let end_time = Instant::now();
+            *self.op_map.entry(op).or_insert(0) += end_time.duration_since(start_time).as_nanos();
+            self.op_map_time = Some(end_time);
+            ret
         }
-        Ok(())
     }
     /// Steps the interpreter by a single operation.
     ///
@@ -244,7 +265,6 @@ impl Interpreter {
     /// If an error occurs, Err(String) is returned. This includes graceful exits (end of code).
     pub fn step(&mut self) -> StepResult
     {
-        let start_pc = self.get_pc();
         let ret = self.step_internal();
         if self.doexit
         {
@@ -252,13 +272,14 @@ impl Interpreter {
         }
         else if let Err(err) = &ret
         {
-            if let Some(info) = self.top_frame.code.get_debug_info(start_pc)
+            let pc = self.get_pc();
+            if let Some(info) = self.top_frame.code.get_debug_info(pc)
             {
-                self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X}", err, info.last_line, info.last_index, start_pc))
+                self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X}", err, info.last_line, info.last_index, pc));
             }
             else
             {
-                self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, start_pc, self.top_frame.code.debug))
+                self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, pc, self.top_frame.code.debug));
             }
             Err(err.to_string())
         }
@@ -269,32 +290,31 @@ impl Interpreter {
     }
     pub fn step_until_error_or_exit(&mut self) -> Result<u64, String>
     {
-        let mut steps = 0;
-        let mut start_pc = self.get_pc();
+        let mut steps = 1;
         loop
         {
             let ret = self.step_internal();
-            steps += 1;
-            if self.doexit
+            if ret.is_ok() && !self.doexit
             {
-                return Ok(steps);
-            }
-            else if ret.is_ok()
-            {
-                start_pc = self.get_pc();
+                steps += 1;
                 continue;
             }
             else if let Err(err) = ret
             {
-                if let Some(info) = self.top_frame.code.get_debug_info(start_pc)
+                let pc = self.get_pc();
+                if let Some(info) = self.top_frame.code.get_debug_info(pc)
                 {
-                    self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X}", err, info.last_line, info.last_index, start_pc))
+                    self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X} (off by one instruction)", err, info.last_line, info.last_index, pc));
                 }
                 else
                 {
-                    self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, start_pc, self.top_frame.code.debug))
+                    self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, pc, self.top_frame.code.debug));
                 }
                 return Err(err);
+            }
+            else
+            {
+                return Ok(steps);
             }
         }
     }
@@ -309,9 +329,15 @@ impl Interpreter {
     }
     pub fn print_op_perf_log(&self)
     {
-        //let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / 1_000_000.0 / (*interpreter.op_map_hits.get(k).unwrap() as f64).sqrt())).collect::<Vec<_>>();
-        //let mut op_map = interpreter.op_map.iter().map(|(k, v)| (*k, *v as f64 / *interpreter.op_map_hits.get(k).unwrap() as f64)).collect::<Vec<_>>();
-        let mut op_map = self.op_map.iter().map(|(k, v)| (*k, *v as f64 / 1_000_000_000.0)).collect::<Vec<_>>();
+        // messy per hit
+        //let mut op_map = self.op_map.iter().map(|(k, v)| (*k, *v as f64 / 1_000_000.0 / (*self.op_map_hits.get(k).unwrap() as f64).sqrt())).collect::<Vec<_>>();
+        // per hit
+        //let mut op_map = self.op_map.iter().map(|(k, v)| (*k, *v as f64 / *self.op_map_hits.get(k).unwrap() as f64)).collect::<Vec<_>>();
+        // raw
+        //let mut op_map = self.op_map.iter().map(|(k, v)| (*k, *v as f64 / 1_000_000.0)).collect::<Vec<_>>();
+        // mod (hacked together)
+        let mut op_map = self.op_map.iter().map(|(k, v)| (*k, (*v as f64 / *self.op_map_hits.get(k).unwrap() as f64 - 80.0) *  *self.op_map_hits.get(k).unwrap() as f64 / 1_000_000.0)).collect::<Vec<_>>();
+        //let mut op_map = self.op_map.iter().map(|(k, v)| (*k, (*v as f64 / *self.op_map_hits.get(k).unwrap() as f64 - 80.0))).collect::<Vec<_>>();
         op_map.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
         for (op, time) in op_map
         {

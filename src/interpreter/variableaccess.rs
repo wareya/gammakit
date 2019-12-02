@@ -60,7 +60,7 @@ pub (crate) fn return_indexed<'a>(var : ValueLoc<'a>, indexes : &[HashableValue]
     {
         return Ok(var);
     }
-    let (index, new_indexes) = (indexes.get(0).unwrap(), indexes.get(1..).unwrap());
+    let (index, new_indexes) = (&indexes[0], &indexes[1..]);
     match var
     {
         ValueLoc::<'a>::Mut(Value::Array(var)) =>

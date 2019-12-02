@@ -16,18 +16,6 @@ macro_rules! vec_pop_front_generic { ( $list:expr, $x:ident ) =>
     }
 } }
 
-macro_rules! past_end_of_code_err { ($self:expr) =>
-{
-    if cfg!(code_bounds_debugging)
-    {
-        plainerr("error: tried to access past end of code")
-    }
-    else
-    {
-        panic!("error: tried to access past end of code; {:?}", $self.top_frame);
-    }
-} }
-
 impl Interpreter
 {
     #[inline]
@@ -51,11 +39,15 @@ impl Interpreter
         self.top_frame.pc -= new;
     }
     #[inline]
-    pub (crate) fn pull_single_from_code(&mut self) -> Result<u8, String>
+    pub (crate) fn pull_single_from_code(&mut self) -> u8
     {
-        let r = self.top_frame.code[self.top_frame.pc];
+        if self.top_frame.pc >= self.top_frame.code.len()
+        {
+            panic!("hard internal error: tried to read past end of code; something is very broken")
+        }
+        let r = self.top_frame.code[self.top_frame.pc] as u8;
         self.top_frame.pc += 1;
-        Ok(r as u8)
+        r
     }
     
     pub (crate) fn vec_pop_front_instance(&mut self, args : &mut Vec<Value>) -> Option<usize>
@@ -76,18 +68,26 @@ impl Interpreter
     }
     
     #[inline]
-    pub (crate) fn read_usize(&mut self) -> Result<usize, String>
+    pub (crate) fn read_usize(&mut self) -> usize
     {
+        if self.top_frame.pc >= self.top_frame.code.len()
+        {
+            panic!("hard internal error: tried to read past end of code; something is very broken")
+        }
         let r = self.top_frame.code[self.top_frame.pc] as usize;
         self.top_frame.pc += 1;
-        Ok(r)
+        r
     }
     #[inline]
-    pub (crate) fn read_float(&mut self) -> Result<f64, String>
+    pub (crate) fn read_float(&mut self) -> f64
     {
+        if self.top_frame.pc >= self.top_frame.code.len()
+        {
+            panic!("hard internal error: tried to read past end of code; something is very broken")
+        }
         let r = f64::from_bits(self.top_frame.code[self.top_frame.pc]);
         self.top_frame.pc += 1;
-        Ok(r)
+        r
     }
     
     #[allow(clippy::ptr_arg)]
@@ -104,13 +104,13 @@ impl Interpreter
     
     pub (crate) fn read_indexed_string(&mut self) -> Result<String, String>
     {
-        let index = self.read_usize()?;
+        let index = self.read_usize();
         Ok(self.get_indexed_string(index))
     }
     pub (crate) fn read_function(&mut self, generator : bool) -> Result<FuncSpec, String>
     {
-        let argcount = self.read_usize()? as usize;
-        let bodylen = self.read_usize()?;
+        let argcount = self.read_usize();
+        let bodylen = self.read_usize();
         
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
@@ -120,7 +120,7 @@ impl Interpreter
     
     pub (crate) fn read_lambda(&mut self) -> Result<(Vec<Value>, FuncSpec), String>
     {
-        let capturecount = self.read_usize()?;
+        let capturecount = self.read_usize();
         
         if self.top_frame.stack.len() < capturecount
         {
@@ -134,8 +134,8 @@ impl Interpreter
             captures.push(val);
         }
         
-        let argcount = self.read_usize()? as usize;
-        let bodylen = self.read_usize()?;
+        let argcount = self.read_usize() as usize;
+        let bodylen = self.read_usize();
         
         let startaddr = self.get_pc();
         self.add_pc(bodylen);

@@ -97,7 +97,7 @@ impl MiniStr {
         MiniStr::Long(text.to_string())
     }
     #[allow(clippy::wrong_self_convention)]
-    pub (crate) fn to_string(self) -> String
+    pub (crate) fn into_string(self) -> String
     {
         match self
         {

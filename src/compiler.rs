@@ -58,11 +58,11 @@ impl Code
     {
         Code{code : Rc::new(Vec::new()), debug : Rc::new(BTreeMap::new())}
     }
-    fn extend<I : IntoIterator<Item = u64>>(&mut self, iter : I)
-    {
-        Rc::get_mut(&mut self.code).unwrap().extend(iter);
-    }
     fn push(&mut self, val : u64)
+    {
+        Rc::get_mut(&mut self.code).unwrap().push(val);
+    }
+    pub (crate) fn push_for_nop_thing_only(&mut self, val : u64)
     {
         Rc::get_mut(&mut self.code).unwrap().push(val);
     }
@@ -85,7 +85,7 @@ impl Code
     }
     pub (crate) fn get_debug_info(&self, pc : usize) -> Option<&DebugInfo>
     {
-        self.debug.range(..=&pc).next_back().map(|x| x.1)
+        self.debug.range(..&pc).next_back().map(|x| x.1)
     }
 }
 
@@ -813,12 +813,12 @@ impl<'a> CompilerState<'a> {
         let op = get_binop_type(ast.child(1)?.child(0)?.text.as_str()).ok_or_else(|| minierr("internal error: unhandled type of binary expression"))?;
         
         let mut rewrite_location_jumplen = 0;
-        if op == 0x10 // and
+        if op == BINOPAND as u8 // and
         {
             self.code.push(SHORTCIRCUITIFFALSE);
             rewrite_location_jumplen = self.compile_u64(0);
         }
-        else if op == 0x11 // or
+        else if op == BINOPOR as u8 // or
         {
             self.code.push(SHORTCIRCUITIFTRUE);
             rewrite_location_jumplen = self.compile_u64(0);
@@ -827,7 +827,6 @@ impl<'a> CompilerState<'a> {
         let position_1 = self.code.len();
         
         self.compile_nth_child(ast, 2)?;
-        self.code.push(BINOP);
         self.code.push(op as u64);
         
         let position_2 = self.code.len();
@@ -985,7 +984,7 @@ impl<'a> CompilerState<'a> {
                     }
                     else
                     {
-                        return Err(format!("error: redeclared identifier `{}`", varname))?;
+                        return Err(format!("error: redeclared identifier `{}`", varname));
                     }
                     var_index += 1;
                 }
@@ -1253,21 +1252,19 @@ impl<'a> CompilerState<'a> {
                         
                         self.compile_context_wrapped(Context::Lvar, &|x| x.compile_pushname(&child.child(0)?.child(0)?.text))?;
                         self.code.push(BINSTATE);
-                        self.code.push(0x00);
                     }
                     "globalvar" =>
                     {
                         let nameindex = self.get_string_index(name);
                         if self.globalstate.variables.contains_key(&nameindex)
                         {
-                            return Err(format!("error: redeclared bare global variable `{}`", name))?;
+                            return Err(format!("error: redeclared bare global variable `{}`", name));
                         }
                         self.globalstate.insert_global(nameindex);
                         
                         self.compile_nth_child(child, 2)?;
                         self.compile_pushglobal(&child.child(0)?.child(0)?.text)?;
                         self.code.push(BINSTATE);
-                        self.code.push(0x00);
                     }
                     _ => return plainerr("internal error: unknown prefix to compound variable declaration")
                 }
@@ -1287,7 +1284,7 @@ impl<'a> CompilerState<'a> {
                         let nameindex = self.get_string_index(name);
                         if self.globalstate.variables.contains_key(&nameindex)
                         {
-                            return Err(format!("error: redeclared bare global variable `{}`", name))?;
+                            return Err(format!("error: redeclared bare global variable `{}`", name));
                         }
                         self.globalstate.insert_global(nameindex);
                     }
@@ -1304,7 +1301,7 @@ impl<'a> CompilerState<'a> {
         let nameindex = self.get_string_index(name);
         if self.globalstate.barevariables.contains_key(&nameindex)
         {
-            return Err(format!("error: redeclared bare global variable `{}`", name))?;
+            return Err(format!("error: redeclared bare global variable `{}`", name));
         }
         self.globalstate.insert_bare_global(nameindex);
         
@@ -1320,7 +1317,6 @@ impl<'a> CompilerState<'a> {
         
         self.compile_nth_child(ast, 2)?;
         self.compile_nth_child(ast, 0)?;
-        self.code.push(BINSTATE);
         self.code.push(op as u64);
         
         Ok(())
@@ -1330,11 +1326,10 @@ impl<'a> CompilerState<'a> {
         let operator = &ast.child(1)?.child(0)?.text;
         
         self.compile_nth_child(ast, 0)?;
-        self.code.push(UNSTATE);
         match operator.as_str()
         {
-            "++" => self.code.push(0x00),
-            "--" => self.code.push(0x01),
+            "++" => self.code.push(UNSTATEINCR),
+            "--" => self.code.push(UNSTATEDECR),
             _ => return Err(format!("internal error: unhandled or unsupported type of unary statement {}", operator))
         }
         
@@ -1357,7 +1352,6 @@ impl<'a> CompilerState<'a> {
         let operator = &ast.child(0)?.child(0)?.text;
         
         self.compile_nth_child(ast, 1)?;
-        self.code.push(UNOP);
         
         let op = get_unop_type(slice(&operator, 0, 1).as_str()).ok_or_else(|| minierr("internal error: unhandled type of unary expression"))?;
         self.code.push(op as u64);

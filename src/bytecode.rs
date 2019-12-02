@@ -26,20 +26,40 @@ pub (crate) const PUSHOBJ : u64 = 0x1D;
 pub (crate) const PUSHSELF : u64 = 0x1E;
 pub (crate) const PUSHOTHER : u64 = 0x1F;
 
-pub (crate) const BINOP : u64 = 0x20;
-pub (crate) const UNOP : u64 = 0x21;
-pub (crate) const FUNCEXPR : u64 = 0x22;
-pub (crate) const INVOKEEXPR : u64 = 0x28;
+pub (crate) const BINOPAND : u64 = 0x20;
+pub (crate) const BINOPOR : u64 = 0x21;
+pub (crate) const BINOPEQ : u64 = 0x22;
+pub (crate) const BINOPNEQ : u64 = 0x23;
+pub (crate) const BINOPGEQ : u64 = 0x24;
+pub (crate) const BINOPLEQ : u64 = 0x24;
+pub (crate) const BINOPG : u64 = 0x25;
+pub (crate) const BINOPL : u64 = 0x26;
+pub (crate) const BINOPADD : u64 = 0x27;
+pub (crate) const BINOPSUB : u64 = 0x28;
+pub (crate) const BINOPMUL : u64 = 0x29;
+pub (crate) const BINOPDIV : u64 = 0x2A;
+pub (crate) const BINOPMOD : u64 = 0x2B;
+
+pub (crate) const UNOPNEG : u64 = 0x2E;
+pub (crate) const UNOPNOT : u64 = 0x2F;
 
 pub (crate) const NEWVAR : u64 = 0x30;
 pub (crate) const UNSCOPE : u64 = 0x31;
+pub (crate) const FUNCEXPR : u64 = 0x32;
+pub (crate) const INVOKEEXPR : u64 = 0x33;
+
+pub (crate) const FUNCCALL : u64 = 0x38;
+pub (crate) const INVOKE : u64 = 0x39;
+pub (crate) const INVOKECALL : u64 = 0x3A;
 
 pub (crate) const BINSTATE : u64 = 0x40;
-pub (crate) const UNSTATE : u64 = 0x41;
-pub (crate) const SETBAREGLOBAL : u64 = 0x42;
-pub (crate) const FUNCCALL : u64 = 0x48;
-pub (crate) const INVOKE : u64 = 0x4E;
-pub (crate) const INVOKECALL : u64 = 0x4F;
+pub (crate) const BINSTATEADD : u64 = 0x41;
+pub (crate) const BINSTATESUB : u64 = 0x42;
+pub (crate) const BINSTATEMUL : u64 = 0x43;
+pub (crate) const BINSTATEDIV : u64 = 0x44;
+pub (crate) const UNSTATEINCR : u64 = 0x48;
+pub (crate) const UNSTATEDECR : u64 = 0x49;
+pub (crate) const SETBAREGLOBAL : u64 = 0x4F;
 
 pub (crate) const EVALUATEVAR : u64 = 0x50;
 pub (crate) const EVALUATEBAREGLOBAL : u64 = 0x51;
@@ -94,41 +114,40 @@ pub (crate) const YIELD : u64 = 0xF2;
 pub (crate) fn get_assignment_type(optext : &str) -> Option<u8>
 {
     match optext
-    { "="  => Some(0x00),
-      "+=" => Some(0x30),
-      "-=" => Some(0x31),
-      "*=" => Some(0x40),
-      "/=" => Some(0x41),
+    { "="  => Some(BINSTATE as u8),
+      "+=" => Some(BINSTATEADD as u8),
+      "-=" => Some(BINSTATESUB as u8),
+      "*=" => Some(BINSTATEMUL as u8),
+      "/=" => Some(BINSTATEDIV as u8),
       _ => None
     }
 }
 pub (crate) fn get_binop_type(optext : &str) -> Option<u8>
 {
     match optext
-    { "and" => Some(0x10),
-      "&&"  => Some(0x10),
-      "or"  => Some(0x11),
-      "||"  => Some(0x11),
-      "=="  => Some(0x20),
-      "!="  => Some(0x21),
-      ">="  => Some(0x22),
-      "<="  => Some(0x23),
-      ">"   => Some(0x24),
-      "<"   => Some(0x25),
-      "+"   => Some(0x30),
-      "-"   => Some(0x31),
-      "*"   => Some(0x40),
-      "/"   => Some(0x41),
-      "%"   => Some(0x42),
+    { "and" |
+      "&&"  => Some(BINOPAND as u8),
+      "or"  |
+      "||"  => Some(BINOPOR as u8),
+      "=="  => Some(BINOPEQ as u8),
+      "!="  => Some(BINOPNEQ as u8),
+      ">="  => Some(BINOPGEQ as u8),
+      "<="  => Some(BINOPLEQ as u8),
+      ">"   => Some(BINOPG as u8),
+      "<"   => Some(BINOPL as u8),
+      "+"   => Some(BINOPADD as u8),
+      "-"   => Some(BINOPSUB as u8),
+      "*"   => Some(BINOPMUL as u8),
+      "/"   => Some(BINOPDIV as u8),
+      "%"   => Some(BINOPMOD as u8),
       _ => None
     }
 }
 pub (crate) fn get_unop_type(optext : &str) -> Option<u8>
 {
     match optext
-    { "-" => Some(0x10),
-      "+" => Some(0x11),
-      "!" => Some(0x20),
+    { "-" => Some(UNOPNEG as u8),
+      "!" => Some(UNOPNOT as u8),
       _ => None
     }
 }

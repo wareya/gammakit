@@ -61,14 +61,14 @@ pub (crate) enum Controller {
 #[derive(Debug, Clone)]
 pub (crate) struct Frame {
     pub (super) code: Code,
+    pub (super) stack: Vec<StackValue>,
+    pub (super) variables: Vec<Value>,
+    pub (super) instancestack: Vec<usize>,
+    pub (super) controlstack: Vec<Controller>,
     pub (super) startpc: usize,
     pub (super) pc: usize,
     pub (super) endpc: usize,
     pub (super) currline: usize,
-    pub (super) variables: Vec<Value>,
-    pub (super) instancestack: Vec<usize>,
-    pub (super) controlstack: Vec<Controller>,
-    pub (super) stack: Vec<StackValue>,
     pub (super) isexpr: bool,
     pub (super) generator: bool,
 }

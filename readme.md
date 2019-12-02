@@ -121,28 +121,35 @@ If you use with() while inside of an instance scope, then "other" will dereferen
 # Roadmap
 
 TODO:
-- various helpful string and array functions
-- a way to sort arrays
+ - various helpful string and array functions (e.g. array sorting, substring finding, etc)
 - inheritance? how would it work? like func_super()?
-- replace parent/text AST node stuff with enum
 - extend metaprogramming with argument lists, function type (generator, etc), captures
+
 - bitwise operators, bit shifting
 - hex literals, binary literals, intrusive ' and _ characters mid numeric literal
+
 - add a module system; instead of feeding the compiler/interpreter a file, you have to feed it a module tree; in return you get a set of compiled modules
+- profiling (after modules)
+- loading compiled bytecode (with debugging data, etc)
+
 - make generator state variables opaque pointers (which means shared underlying value)
 - `generator_state()` as syntactical sugar for `invoke generator_state`
 - `generator_state->clone()` or `generator_state->fork()` or something (naming things is hard)
-- "finalize" command for generators so that the next yield acts like a return instead of a yield
-- "string formatting" of some kind
-- a pointer type that sorta, kinda acts like an instance with just the property "value" (function `pointer_create()` etc) (use reference counting? use a `pointer_kill()` function?)
+
+- a pointer type that sorta, kinda acts like an instance with just the property "value" (function `pointer_create()` etc) (use reference counting? use a `pointer_kill()` function? BOTH?)
+
 - queue, deque data structures
-- profiling (after modules)
-- loading compiled bytecode (with debugging data, etc)
+
+TODO (later):
 - multi line string literals
 - work in no_std
+- "string formatting" of some kind
+- "finalize" command for generators so that the next yield acts like a return instead of a yield
+- replace parent/text AST node stuff with enum
+
 
 TODO (sanitation/low-priority):
-- a "defer" statement?
+- a "defer" statement? 
 - replace instances of "as" with instances of "from"
 - make keys() iterate over dict/set elements in insertion order
 - make sure format_val does the same as the above

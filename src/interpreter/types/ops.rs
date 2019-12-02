@@ -1,19 +1,6 @@
 use super::*;
 use crate::interpreter::variableaccess::ValueLoc;
 
-#[inline]
-fn compiler_bytecode_desync_error<S : ToString>(text : S) -> String
-{
-    if cfg!(compiler_bytecode_desync_debugging)
-    {
-        text.to_string()
-    }
-    else
-    {
-        panic!(text.to_string())
-    }
-}
-
 pub (crate) fn format_val(val : &Value) -> Option<String>
 {
     match val
@@ -127,7 +114,8 @@ pub (crate) fn format_val(val : &Value) -> Option<String>
     }
 }
 
-fn value_op_add(left : &Value, right : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn value_op_add(left : &Value, right : &Value) -> Result<Value, String>
 {
     // TODO: string and array concatenation
     match (left, right)
@@ -137,7 +125,8 @@ fn value_op_add(left : &Value, right : &Value) -> Result<Value, String>
         _ => Err("types incompatible with addition".to_string())
     }
 }
-fn value_op_subtract(left : &Value, right : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn value_op_subtract(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -145,7 +134,8 @@ fn value_op_subtract(left : &Value, right : &Value) -> Result<Value, String>
         _ => Err("types incompatible with subtraction".to_string())
     }
 }
-fn value_op_multiply(left : &Value, right : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn value_op_multiply(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -154,7 +144,8 @@ fn value_op_multiply(left : &Value, right : &Value) -> Result<Value, String>
         _ => Err("types incompatible with multiplication".to_string())
     }
 }
-fn value_op_divide(left : &Value, right : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn value_op_divide(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -162,7 +153,8 @@ fn value_op_divide(left : &Value, right : &Value) -> Result<Value, String>
         _ => Err("types incompatible with division".to_string())
     }
 }
-fn value_op_modulo(left : &Value, right : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn value_op_modulo(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -180,15 +172,18 @@ fn value_op_modulo(left : &Value, right : &Value) -> Result<Value, String>
         _ => Err("types incompatible with modulo".to_string())
     }
 }
+#[inline]
 pub (crate) fn float_booly(f : f64) -> bool
 {
     f >= 0.5 // FIXME do we want to replicate this or can we get away with using f.round() != 0.0 instead?
 }
+#[inline]
 pub (crate) fn bool_floaty(b : bool) -> f64
 {
     if b {1.0} else {0.0}
 }
 
+#[inline]
 pub (crate) fn value_equal(left : &Value, right : &Value) -> Result<bool, String>
 {
     macro_rules! if_then_return_false { ( $x:expr ) => { if $x { return Ok(false); } } }
@@ -248,15 +243,18 @@ pub (crate) fn value_equal(left : &Value, right : &Value) -> Result<bool, String
 }
 // FIXME string/array/dict/generator/etc comparison
 
-fn value_op_equal(left : &Value, right : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn value_op_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     Ok(Value::Number(bool_floaty(value_equal(left, right)?)))
 }
-fn value_op_not_equal(left : &Value, right : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn value_op_not_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     Ok(Value::Number(bool_floaty(!value_equal(left, right)?)))
 }
-fn value_op_greater_or_equal(left : &Value, right : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn value_op_greater_or_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -265,7 +263,8 @@ fn value_op_greater_or_equal(left : &Value, right : &Value) -> Result<Value, Str
         _ => value_op_equal(left, right)
     }
 }
-fn value_op_less_or_equal(left : &Value, right : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn value_op_less_or_equal(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -274,7 +273,8 @@ fn value_op_less_or_equal(left : &Value, right : &Value) -> Result<Value, String
         _ => value_op_equal(left, right)
     }
 }
-fn value_op_greater(left : &Value, right : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn value_op_greater(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -283,7 +283,8 @@ fn value_op_greater(left : &Value, right : &Value) -> Result<Value, String>
         _ => Ok(Value::Number(0.0))
     }
 }
-fn value_op_less(left : &Value, right : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn value_op_less(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -293,7 +294,8 @@ fn value_op_less(left : &Value, right : &Value) -> Result<Value, String>
     }
 }
 
-fn value_op_and(left : &Value, right : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn value_op_and(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -301,7 +303,8 @@ fn value_op_and(left : &Value, right : &Value) -> Result<Value, String>
         _ => Err("types incompatible with logical and".to_string())
     }
 }
-fn value_op_or(left : &Value, right : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn value_op_or(left : &Value, right : &Value) -> Result<Value, String>
 {
     match (left, right)
     {
@@ -310,7 +313,8 @@ fn value_op_or(left : &Value, right : &Value) -> Result<Value, String>
     }
 }
 
-fn inplace_value_op_add(mut left : ValueLoc, right : &Value) -> Result<(), String>
+#[inline]
+pub (crate) fn inplace_value_op_add(mut left : ValueLoc, right : &Value) -> Result<(), String>
 {
     // TODO: string and array.as_ref() concatenation
     match (left.as_mut()?, right)
@@ -330,7 +334,8 @@ fn inplace_value_op_add(mut left : ValueLoc, right : &Value) -> Result<(), Strin
         _ => Err("types incompatible with addition".to_string())
     }
 }
-fn inplace_value_op_subtract(mut left : ValueLoc, right : &Value) -> Result<(), String>
+#[inline]
+pub (crate) fn inplace_value_op_subtract(mut left : ValueLoc, right : &Value) -> Result<(), String>
 {
     match (left.as_mut()?, right)
     {
@@ -343,7 +348,8 @@ fn inplace_value_op_subtract(mut left : ValueLoc, right : &Value) -> Result<(), 
         _ => Err("types incompatible with subtraction".to_string())
     }
 }
-fn inplace_value_op_multiply(mut left : ValueLoc, right : &Value) -> Result<(), String>
+#[inline]
+pub (crate) fn inplace_value_op_multiply(mut left : ValueLoc, right : &Value) -> Result<(), String>
 {
     match (left.as_mut()?, right)
     {
@@ -362,7 +368,8 @@ fn inplace_value_op_multiply(mut left : ValueLoc, right : &Value) -> Result<(), 
         _ => Err("types incompatible with multiplication".to_string())
     }
 }
-fn inplace_value_op_divide(mut left : ValueLoc, right : &Value) -> Result<(), String>
+#[inline]
+pub (crate) fn inplace_value_op_divide(mut left : ValueLoc, right : &Value) -> Result<(), String>
 {
     match (left.as_mut()?, right)
     {
@@ -375,7 +382,9 @@ fn inplace_value_op_divide(mut left : ValueLoc, right : &Value) -> Result<(), St
         _ => Err("types incompatible with division".to_string())
     }
 }
-fn inplace_value_op_modulo(mut left : ValueLoc, right : &Value) -> Result<(), String>
+#[allow(unused)]
+#[inline]
+pub (crate) fn inplace_value_op_modulo(mut left : ValueLoc, right : &Value) -> Result<(), String>
 {
     match (left.as_mut()?, right)
     {
@@ -395,58 +404,9 @@ fn inplace_value_op_modulo(mut left : ValueLoc, right : &Value) -> Result<(), St
     }
 }
 
-/*
-BINOP_TYPES = \
-{ 0x10: "&&" , # this is not an endorsement of using && instead of and in code
-  0x11: "||" , # likewise for || and or
-  0x20: "==" ,
-  0x21: "!=" ,
-  0x22: ">=" ,
-  0x23: "<=" ,
-  0x24: ">"  ,
-  0x25: "<"  ,
-  0x30: "+"  ,
-  0x31: "-"  ,
-  0x40: "*"  ,
-  0x41: "/"  ,
-  0x42: "%"  ,
-}
-*/
 
-pub (crate) fn do_binop_function(op : u8, left : &Value, right : &Value) -> Result<Value, String>
-{
-    match op
-    {
-        0x10 => value_op_and(left, right),
-        0x11 => value_op_or(left, right),
-        0x20 => value_op_equal(left, right),
-        0x21 => value_op_not_equal(left, right),
-        0x22 => value_op_greater_or_equal(left, right),
-        0x23 => value_op_less_or_equal(left, right),
-        0x24 => value_op_greater(left, right),
-        0x25 => value_op_less(left, right),
-        0x30 => value_op_add(left, right),
-        0x31 => value_op_subtract(left, right),
-        0x40 => value_op_multiply(left, right),
-        0x41 => value_op_divide(left, right),
-        0x42 => value_op_modulo(left, right),
-        _ => Err(compiler_bytecode_desync_error(format!("internal error: unknown binary operation 0x{:02X}", op)))
-    }
-}
-pub (crate) fn do_binstate_function(op : u8, left : ValueLoc, right : &Value) -> Result<(), String>
-{
-    match op
-    {
-        0x30 => inplace_value_op_add(left, right),
-        0x31 => inplace_value_op_subtract(left, right),
-        0x40 => inplace_value_op_multiply(left, right),
-        0x41 => inplace_value_op_divide(left, right),
-        0x42 => inplace_value_op_modulo(left, right),
-        _ => Err(compiler_bytecode_desync_error(format!("internal error: unknown in-place binary operation 0x{:02X}", op)))
-    }
-}
-
-fn value_op_negative(value : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn do_value_op_negative(value : &Value) -> Result<Value, String>
 {
     match value
     {
@@ -454,15 +414,8 @@ fn value_op_negative(value : &Value) -> Result<Value, String>
         _ => Err("type incompatible with negation".to_string())
     }
 }
-fn value_op_positive(value : &Value) -> Result<Value, String>
-{
-    match value
-    {
-        Value::Number(value) => Ok(Value::Number(*value)),
-        _ => Err("type incompatible with positive".to_string())
-    }
-}
-fn value_op_not(value : &Value) -> Result<Value, String>
+#[inline]
+pub (crate) fn do_value_op_not(value : &Value) -> Result<Value, String>
 {
     match value
     {
@@ -471,19 +424,8 @@ fn value_op_not(value : &Value) -> Result<Value, String>
     }
 }
 
-pub (crate) fn do_unop_function(op : u8, val : &Value) -> Result<Value, String>
-{
-    match op
-    {
-        0x10 => value_op_negative(val),
-        0x11 => value_op_positive(val),
-        0x20 => value_op_not(val),
-        // TODO: add "bitwise not"?
-        _ => Err(compiler_bytecode_desync_error(format!("internal error: unknown unary operation 0x{:02X}", op)))
-    }
-}
-
-fn inplace_value_op_increment(mut value : ValueLoc) -> Result<(), String>
+#[inline]
+pub (crate) fn do_inplace_value_op_increment(mut value : ValueLoc) -> Result<(), String>
 {
     match value.as_mut()?
     {
@@ -495,7 +437,8 @@ fn inplace_value_op_increment(mut value : ValueLoc) -> Result<(), String>
         _ => Err("type incompatible with incrementation".to_string())
     }
 }
-fn inplace_value_op_decrement(mut value : ValueLoc) -> Result<(), String>
+#[inline]
+pub (crate) fn do_inplace_value_op_decrement(mut value : ValueLoc) -> Result<(), String>
 {
     match value.as_mut()?
     {
@@ -505,15 +448,6 @@ fn inplace_value_op_decrement(mut value : ValueLoc) -> Result<(), String>
             Ok(())
         }
         _ => Err("type incompatible with decrementation".to_string())
-    }
-}
-pub (crate) fn do_unstate_function(op : u8,  val : ValueLoc) -> Result<(), String>
-{
-    match op
-    {
-        0x00 => inplace_value_op_increment(val),
-        0x01 => inplace_value_op_decrement(val),
-        _ => Err(compiler_bytecode_desync_error(format!("internal error: unknown unary state operator 0x{:02X}", op)))
     }
 }
 
