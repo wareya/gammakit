@@ -291,31 +291,29 @@ impl Interpreter {
     pub fn step_until_error_or_exit(&mut self) -> Result<u64, String>
     {
         let mut steps = 1;
-        loop
+        
+        let mut ret = self.step_internal();
+        while ret.is_ok() && !self.doexit
         {
-            let ret = self.step_internal();
-            if ret.is_ok() && !self.doexit
+            steps += 1;
+            ret = self.step_internal();
+        }
+        if let Err(err) = ret
+        {
+            let pc = self.get_pc();
+            if let Some(info) = self.top_frame.code.get_debug_info(pc)
             {
-                steps += 1;
-                continue;
-            }
-            else if let Err(err) = ret
-            {
-                let pc = self.get_pc();
-                if let Some(info) = self.top_frame.code.get_debug_info(pc)
-                {
-                    self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X} (off by one instruction)", err, info.last_line, info.last_index, pc));
-                }
-                else
-                {
-                    self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, pc, self.top_frame.code.debug));
-                }
-                return Err(err);
+                self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X} (off by one instruction)", err, info.last_line, info.last_index, pc));
             }
             else
             {
-                return Ok(steps);
+                self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, pc, self.top_frame.code.debug));
             }
+            return Err(err);
+        }
+        else
+        {
+            return Ok(steps);
         }
     }
     pub fn dump_code(&self) -> Vec<u8>
