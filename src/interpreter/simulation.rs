@@ -5,7 +5,7 @@ use crate::interpreter::*;
 #[inline]
 fn stack_access_err<S : ToString>(text : S) -> String
 {
-    if cfg!(stack_access_debugging)
+    if true//cfg!(stack_access_debugging)
     {
         text.to_string()
     }
@@ -17,7 +17,7 @@ fn stack_access_err<S : ToString>(text : S) -> String
 #[inline]
 fn stack_access_err_err<S : ToString>(text : S) -> Result<(), String>
 {
-    if cfg!(stack_access_debugging)
+    if true//cfg!(stack_access_debugging)
     {
         Err(text.to_string())
     }
@@ -29,7 +29,7 @@ fn stack_access_err_err<S : ToString>(text : S) -> Result<(), String>
 #[inline]
 fn strange_err_plain<S : ToString>(text : S) -> Result<(), String>
 {
-    if cfg!(broken_compiler_debugging)
+    if true//cfg!(broken_compiler_debugging)
     {
         Err(text.to_string())
     }
@@ -41,7 +41,7 @@ fn strange_err_plain<S : ToString>(text : S) -> Result<(), String>
 #[inline]
 fn strange_err<S : ToString>(text : S) -> String
 {
-    if cfg!(broken_compiler_debugging)
+    if true//cfg!(broken_compiler_debugging)
     {
         text.to_string()
     }
@@ -509,14 +509,6 @@ impl Interpreter
     }
     pub (crate) fn sim_FOREACH(&mut self) -> OpResult
     {
-        #[cfg(feature = "stack_len_debugging")]
-        {
-            if self.stack_len() < 1
-            {
-                return Err(format!("internal error: FOREACH instruction requires 1 values on the stack but found {}", self.stack_len()));
-            }
-        }
-        
         let mut val = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: foreach loop was fed a variable of some sort, instead of a value, for what to loop over"))?;
         
         let list : ForEachValues = match val
@@ -921,13 +913,6 @@ impl Interpreter
     pub (crate) fn sim_COLLECTARRAY(&mut self) -> OpResult
     {
         let numvals = self.read_usize() as usize;
-        #[cfg(feature = "stack_len_debugging")]
-        {
-            if self.stack_len() < numvals
-            {
-                return Err(format!("internal error: not enough values on stack for COLLECTARRAY instruction to build array (need {}, have {})", numvals, self.stack_len()));
-            }
-        }
         let mut myarray = Vec::with_capacity(numvals);
         for _ in 0..numvals
         {
@@ -935,6 +920,7 @@ impl Interpreter
             myarray.push(val);
         }
         myarray.reverse();
+        println!("collected array {:?}", myarray);
         self.stack_push_val(Value::Array(Box::new(myarray)));
         Ok(())
     }
@@ -1186,10 +1172,12 @@ impl Interpreter
                     }
                 }
             {
+                println!("FOREACHHEAD: doing nothing");
                 self.top_frame.variables.push(value);
             }
             else
             {
+                println!("FOREACHHEAD: exiting to {:?}", dest);
                 self.set_pc(dest);
                 self.top_frame.controlstack.pop();
             }

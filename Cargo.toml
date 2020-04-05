@@ -41,14 +41,12 @@ debug-assertions = false
 debug = 0
 incremental = false
 overflow-checks = false
-panic = "abort"
 
 [profile.dev]
 opt-level = 1
 debug = true
 incremental = false
 overflow-checks = true
-panic = "abort"
 
 [profile.bench]
 opt-level = 3

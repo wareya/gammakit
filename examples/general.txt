@@ -368,6 +368,11 @@ for(thing in test_dict)
 for(thing in test_set)
     print(thing);
 
+print("blank thing:");
+
+for(nothing in [1])
+    print("this should execute once!");
+
 for(nothing in [])
     print("oops! this shouldn't execute!");
 

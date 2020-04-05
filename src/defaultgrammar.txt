@@ -27,6 +27,9 @@ funcargs:
 arrayindex:
 [ $expr$ ]
 
+globaldirection:
+global . $name$
+
 indirection:
 . $name$
 
@@ -43,11 +46,22 @@ $arrayindex$
 $indirection$
 $dictindex$
 
+rhunexpr_rightlv:
+$arrayindex$
+$indirection$
+$dictindex$
+
+lvrhunexpr:
+$globaldirection$ $rhunexpr_rightlv$*
+$supersimplexpr$ $rhunexpr_rightlv$*
+
 rhunexpr:
+$globaldirection$ $rhunexpr_right$*
 $supersimplexpr$ $rhunexpr_right$+
 
 funccall:
-$supersimplexpr$ $rhunexpr_right$+
+$globaldirection$ $rhunexpr_right$* $funcargs$
+$supersimplexpr$ $rhunexpr_right$* $funcargs$
 
 unusedcomma:
 ,
@@ -105,7 +119,7 @@ rvar:
 $rhunexpr$
 
 lvar:
-$rhunexpr$
+$lvrhunexpr$
 $name$
 
 expr:

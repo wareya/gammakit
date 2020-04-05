@@ -564,68 +564,26 @@ impl<'a> CompilerState<'a> {
     }
     fn compile_funccall(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        if ast.last_child()?.child(0)?.text.as_str() != "funcargs"
+        if ast.children.len() > 2
         {
-            return match ast.last_child()?.child(0)?.text.as_str()
-            {
-                "dismember" => plainerr("error: tried to use a -> expression as a statement"),
-                "arrayindex" => plainerr("error: tried to use a [] expression as a statement"),
-                "indirection" => plainerr("error: tried to use a . expression as a statement"),
-                _ => plainerr("internal error: tried to use an unknown form of expression as a statement")
-            };
-        }
-        
-        if ast.child(0)?.text == "name" && ast.child(0)?.child(0)?.text == "global" && ast.child(1)?.child(0)?.text == "indirection"
-        {
-            let need_mutable_context = matches!(self.context, Context::Lvar) || (ast.children.len() >= 3 && !matches!(ast.child(2)?.child(0)?.text.as_str(), "funcargs" | "indirection"));
-            if need_mutable_context
-            {
-                self.compile_pushglobal(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
-            }
-            else
-            {
-                self.compile_pushglobalval(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
-            }
-            if ast.children.len() > 2
-            {
-                for child in ast.child_slice(2, -1)?
-                {
-                    self.compile_context_wrapped(Context::Lvar, &|x|
-                    {
-                        if child.text == "name"
-                        {
-                            x.compile_pushname(&child.child(0)?.text)
-                        }
-                        else
-                        {
-                            x.compile_any(child)
-                        }
-                    })?;
-                }
-                self.compile_context_wrapped(Context::Statement, &|x| x.compile_last_child(ast))?;
-            }
-            Ok(())
+            self.compile_rhunexpr(ast)?;
         }
         else
         {
-            for child in ast.child_slice(0, -1)?
+            let child = ast.child(0);
+            self.compile_context_wrapped(Context::Lvar, &|x|
             {
-                // FIXME detect if next is indirection; if yes, don't wrap in Lvar context
-                self.compile_context_wrapped(Context::Lvar, &|x|
+                if child.text == "name"
                 {
-                    if child.text == "name"
-                    {
-                        x.compile_pushname(&child.child(0)?.text)
-                    }
-                    else
-                    {
-                        x.compile_any(child)
-                    }
-                })?;
-            }
-            self.compile_context_wrapped(Context::Statement, &|x| x.compile_last_child(ast))
+                    x.compile_pushname(&child.child(0)?.text)
+                }
+                else
+                {
+                    x.compile_any(child)
+                }
+            })?;
         }
-        
+        self.compile_last_child(ast)
     }
     fn compile_indirection(&mut self, ast : &ASTNode) -> Result<(), String>
     {
@@ -1607,8 +1565,8 @@ impl<'a> CompilerState<'a> {
             x.compile_nth_child(ast, 6)?;
             
             x.code.push(FOREACHLOOP);
-            
             let position_2 = x.code.len();
+            
             let block_len = position_2 - position_1;
             x.rewrite_code_word(block_len_rewrite_pos, pack_u64(block_len as u64))
         })
@@ -1666,7 +1624,7 @@ impl<'a> CompilerState<'a> {
         {
             self.compile_u64(0);
         }
-        let block_count_rewrite_pos = self.code.len() - 8*(num_case_blocks+1);
+        let block_count_rewrite_pos = self.code.len() - (num_case_blocks+1);
         
         for (i, node) in cases.iter().enumerate()
         {
@@ -1686,7 +1644,7 @@ impl<'a> CompilerState<'a> {
         }
         for (i, position) in case_block_positions.iter().enumerate()
         {
-            self.rewrite_code_word(block_count_rewrite_pos + i*8, pack_u64(*position as u64))?;
+            self.rewrite_code_word(block_count_rewrite_pos + i, pack_u64(*position as u64))?;
         }
         Ok(())
     }

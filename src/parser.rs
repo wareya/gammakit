@@ -337,15 +337,30 @@ impl Parser {
             return Ok((None, 0, None));
         }
         
-        let mut nodes : Vec<ASTNode> = Vec::new();
-        let mut totalconsumed : usize = 0;
+        let mut nodes = Vec::new();
+        let mut totalconsumed = 0;
         
-        let mut latesterror : Option<ParseError> = None;
+        let mut latesterror = None;
         
-        let mut defaultreturn : (Option<Vec<ASTNode>>, usize) = (None, 0);
+        let mut defaultreturn = (None, 0);
         
-        for part in &form.tokens
+        let mut checkpoint : (Option<Vec<_>>, usize, usize, usize, Option<_>) = (None, 0, 0, 0, None);
+        
+        let mut i = 0;
+        while i < form.tokens.len()
         {
+            macro_rules! check_checkpoint { () => {
+                if checkpoint.0.is_some() && checkpoint.1 < checkpoint.2
+                {
+                    i = checkpoint.3-1;
+                    nodes = checkpoint.0.as_ref().unwrap().clone();
+                    totalconsumed = checkpoint.1;
+                    latesterror = checkpoint.4.clone();
+                    continue;
+                }
+            } };
+            let part = &form.tokens[i];
+            i += 1;
             match part
             {
                 GrammarToken::Name(text) =>
@@ -361,6 +376,7 @@ impl Parser {
                     }
                     else
                     {
+                        check_checkpoint!();
                         return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
                 }
@@ -372,8 +388,10 @@ impl Parser {
                     build_best_error(&mut latesterror, error);
                     if bit.is_none()
                     {
+                        check_checkpoint!();
                         return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
+                    let start_consumed = totalconsumed;
                     while let Some(node) = bit
                     {
                         nodes.push(node);
@@ -384,8 +402,14 @@ impl Parser {
                         consumed = tuple.1;
                         error = tuple.2;
                         
+                        if checkpoint.0.is_some() && totalconsumed + consumed >= checkpoint.2 && checkpoint.3 == i
+                        {
+                            break;
+                        }
+                        
                         build_best_error(&mut latesterror, error);
                     }
+                    checkpoint = (Some(nodes.clone()), start_consumed, totalconsumed, i, latesterror.clone());
                 }
                 GrammarToken::OptionalName(text) =>
                 {
@@ -405,8 +429,14 @@ impl Parser {
                     
                     let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, kind)?;
                     build_best_error(&mut latesterror, error);
+                    let start_consumed = totalconsumed;
                     while let Some(node) = bit
                     {
+                        if checkpoint.0.is_some() && totalconsumed + consumed >= checkpoint.2 && checkpoint.3 == i
+                        {
+                            break;
+                        }
+                        
                         nodes.push(node);
                         totalconsumed += consumed;
                         
@@ -417,6 +447,7 @@ impl Parser {
                         
                         build_best_error(&mut latesterror, error);
                     }
+                    checkpoint = (Some(nodes.clone()), start_consumed, totalconsumed, i, latesterror.clone());
                 }
                 GrammarToken::SeparatorNameList{text, separator} =>
                 {
@@ -426,6 +457,7 @@ impl Parser {
                     build_best_error(&mut latesterror, error);
                     if bit.is_none()
                     {
+                        check_checkpoint!();
                         return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
                     while let Some(node) = bit
@@ -468,6 +500,7 @@ impl Parser {
                             continue;
                         }
                     }
+                    check_checkpoint!();
                     build_new_error(&mut latesterror, index+totalconsumed, &text);
                     return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
@@ -482,6 +515,7 @@ impl Parser {
                             continue;
                         }
                     }
+                    check_checkpoint!();
                     build_new_error(&mut latesterror, index+totalconsumed, formname.unwrap_or(&text));
                     return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
@@ -597,7 +631,7 @@ impl Parser {
             }
             
             // TODO move this to the compiler    
-            if ast.text == "funccall" && ast.last_child()?.child(0)?.text != "funcargs"
+            if ast.text == "funccall" && ast.last_child()?.text != "funcargs"
             {
                 return plainerr("error: tried to use non-function expression as a funccall statement");
             }
