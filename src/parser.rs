@@ -195,7 +195,6 @@ impl Parser {
                     match token
                     {
                         GrammarToken::Name(text) |
-                        GrammarToken::NameList(text) |
                         GrammarToken::OptionalName(text) |
                         GrammarToken::OptionalNameList(text) |
                         GrammarToken::SeparatorNameList{text, ..} => text.clone(),
@@ -344,21 +343,9 @@ impl Parser {
         
         let mut defaultreturn = (None, 0);
         
-        let mut checkpoint : (Option<Vec<_>>, usize, usize, usize, Option<_>) = (None, 0, 0, 0, None);
-        
         let mut i = 0;
         while i < form.tokens.len()
         {
-            macro_rules! check_checkpoint { () => {
-                if checkpoint.0.is_some() && checkpoint.1 < checkpoint.2
-                {
-                    i = checkpoint.3-1;
-                    nodes = checkpoint.0.as_ref().unwrap().clone();
-                    totalconsumed = checkpoint.1;
-                    latesterror = checkpoint.4.clone();
-                    continue;
-                }
-            } };
             let part = &form.tokens[i];
             i += 1;
             match part
@@ -376,40 +363,8 @@ impl Parser {
                     }
                     else
                     {
-                        check_checkpoint!();
                         return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
-                }
-                GrammarToken::NameList(text) =>
-                {
-                    let kind = self.nodetypemap.get(text).ok_or_else(|| minierr(&format!("internal error: failed to find node type {} used by some grammar form", text)))?;
-                    
-                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, kind)?;
-                    build_best_error(&mut latesterror, error);
-                    if bit.is_none()
-                    {
-                        check_checkpoint!();
-                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
-                    }
-                    let start_consumed = totalconsumed;
-                    while let Some(node) = bit
-                    {
-                        nodes.push(node);
-                        totalconsumed += consumed;
-                        
-                        let tuple = self.parse(&tokens, index+totalconsumed, kind)?;
-                        bit = tuple.0;
-                        consumed = tuple.1;
-                        error = tuple.2;
-                        
-                        if checkpoint.0.is_some() && totalconsumed + consumed >= checkpoint.2 && checkpoint.3 == i
-                        {
-                            break;
-                        }
-                        
-                        build_best_error(&mut latesterror, error);
-                    }
-                    checkpoint = (Some(nodes.clone()), start_consumed, totalconsumed, i, latesterror.clone());
                 }
                 GrammarToken::OptionalName(text) =>
                 {
@@ -429,14 +384,9 @@ impl Parser {
                     
                     let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, kind)?;
                     build_best_error(&mut latesterror, error);
-                    let start_consumed = totalconsumed;
+                    
                     while let Some(node) = bit
                     {
-                        if checkpoint.0.is_some() && totalconsumed + consumed >= checkpoint.2 && checkpoint.3 == i
-                        {
-                            break;
-                        }
-                        
                         nodes.push(node);
                         totalconsumed += consumed;
                         
@@ -447,7 +397,32 @@ impl Parser {
                         
                         build_best_error(&mut latesterror, error);
                     }
-                    checkpoint = (Some(nodes.clone()), start_consumed, totalconsumed, i, latesterror.clone());
+                }
+                GrammarToken::SpecialNameList{text, subtype} =>
+                {
+                    let kind = self.nodetypemap.get(text).ok_or_else(|| minierr(&format!("internal error: failed to find node type {} used by some grammar form", text)))?;
+                    
+                    let (mut bit, mut consumed, mut error) = self.parse(&tokens, index+totalconsumed, kind)?;
+                    build_best_error(&mut latesterror, error);
+                    
+                    while let Some(node) = bit
+                    {
+                        nodes.push(node);
+                        totalconsumed += consumed;
+                        
+                        let tuple = self.parse(&tokens, index+totalconsumed, kind)?;
+                        bit = tuple.0;
+                        consumed = tuple.1;
+                        error = tuple.2;
+                        
+                        build_best_error(&mut latesterror, error);
+                    }
+                    
+                    if nodes.len() == 0 || nodes.last().unwrap().child(0).unwrap().text != *subtype
+                    {
+                        println!("{:#?}", nodes.last().unwrap());
+                        return Ok((defaultreturn.0, defaultreturn.1, latesterror));
+                    }
                 }
                 GrammarToken::SeparatorNameList{text, separator} =>
                 {
@@ -457,7 +432,6 @@ impl Parser {
                     build_best_error(&mut latesterror, error);
                     if bit.is_none()
                     {
-                        check_checkpoint!();
                         return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                     }
                     while let Some(node) = bit
@@ -500,7 +474,6 @@ impl Parser {
                             continue;
                         }
                     }
-                    check_checkpoint!();
                     build_new_error(&mut latesterror, index+totalconsumed, &text);
                     return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
@@ -515,7 +488,6 @@ impl Parser {
                             continue;
                         }
                     }
-                    check_checkpoint!();
                     build_new_error(&mut latesterror, index+totalconsumed, formname.unwrap_or(&text));
                     return Ok((defaultreturn.0, defaultreturn.1, latesterror));
                 }
@@ -622,7 +594,7 @@ impl Parser {
             {
                 ast.children.pop();
             }
-            while (ast.text.starts_with("binexpr_") || ast.text == "simplexpr" || ast.text == "supersimplexpr") && ast.children.len() == 1
+            while (ast.text.starts_with("binexpr_") || ast.text == "simplexpr" || ast.text == "supersimplexpr" || ast.text == "expr" || ast.text == "lhunop") && ast.children.len() == 1
             {
                 let mut temp = Vec::new();
                 std::mem::swap(&mut temp, &mut ast.children);
@@ -630,15 +602,60 @@ impl Parser {
                 std::mem::swap(ast, dummy);
             }
             
-            // TODO move this to the compiler    
-            if ast.text == "funccall" && ast.last_child()?.text != "funcargs"
+            for mut child in &mut ast.children
             {
-                return plainerr("error: tried to use non-function expression as a funccall statement");
+                self.parse_tweak_ast(&mut child)?;
+            }
+        }
+        Ok(())
+    }
+    fn parse_tweak_ast_pass_2(&self, mut ast : &mut ASTNode) -> Result<(), String>
+    {
+        if ast.isparent
+        {
+            if ast.text == "rhunexpr" || ast.text == "funccall" || ast.text == "lvrhunexpr"
+            {
+                if ast.children.len() <= 1
+                {
+                    let mut temp = Vec::new();
+                    std::mem::swap(&mut temp, &mut ast.children);
+                    let dummy = temp.get_mut(0).ok_or_else(|| minierr("internal error: could not access child that was supposed to be there in expression summarization"))?;
+                    std::mem::swap(ast, dummy);
+                }
+                else
+                {
+                    for child in &mut ast.children
+                    {
+                        if child.text == "rhunexpr_right" || child.text == "rhunexpr_rightlv"
+                        {
+                            let mut temp = Vec::new();
+                            std::mem::swap(&mut temp, &mut child.children);
+                            let dummy = temp.get_mut(0).ok_or_else(|| minierr("internal error: could not access child that was supposed to be there in expression summarization"))?;
+                            std::mem::swap(child, dummy);
+                        }
+                    }
+                    let ast_right = ast.children.pop().ok_or_else(|| minierr("internal error: failed to access last element of right-hand unary expansion expression"))?;
+                    let mut ast_left = ASTNode
+                    {
+                        text: format!("{}_head", ast_right.text),
+                        line: ast.line,
+                        position: ast.position,
+                        isparent: true,
+                        children: Vec::new(),
+                        precedence: None
+                    };
+                    if ast.text == "funccall" && ast_left.text == "funcargs_head"
+                    {
+                        ast_left.text = "funccall_head".to_string();
+                    }
+                    std::mem::swap(&mut ast_left, ast);
+                    ast.children = vec!(ast_left, ast_right);
+                }
             }
             
             for mut child in &mut ast.children
             {
-                self.parse_tweak_ast(&mut child)?;
+                self.parse_tweak_ast_pass_2(&mut child)?;
             }
         }
         Ok(())
@@ -753,6 +770,7 @@ impl Parser {
                     println!("tweaking AST...");
                 }
                 self.parse_tweak_ast(&mut ast)?;
+                self.parse_tweak_ast_pass_2(&mut ast)?;
                 
                 if !silent
                 {

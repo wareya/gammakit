@@ -12,9 +12,9 @@ pub struct ASTNode {
     pub (crate) text: String,
     pub (crate) line: usize,
     pub (crate) position: usize,
-    pub (crate) isparent: bool,
     pub (crate) children: Vec<ASTNode>,
     pub (crate) precedence: Option<u64>,
+    pub (crate) isparent: bool,
 }
 
 impl ASTNode {

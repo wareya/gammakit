@@ -1,5 +1,5 @@
 var PI = 3.141592653589793;
-bare globalvar SOLAR_MASS = PI*PI*4;
+const SOLAR_MASS = PI*PI*4;
 var DAYS_PER_YEAR = 365.24;
 
 var bodies = [];
@@ -55,7 +55,9 @@ bodies->push({
     "mass": 5.15138902046611451e-05 * SOLAR_MASS
 });
 
-bare globalvar NUM_BODIES = bodies->len();
+print("pushed all");
+
+const NUM_BODIES = bodies->len();
 print("num bodies:");
 print(NUM_BODIES);
 

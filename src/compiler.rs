@@ -360,11 +360,11 @@ impl<'a> CompilerState<'a> {
         self.add_hook(&"program", CompilerState::compile_program);
         self.add_hook(&"blankstatement", CompilerState::compile_nop);
         self.add_hook(&"statement", CompilerState::compile_statement);
-        self.add_hook(&"funccall", CompilerState::compile_funccall);
         self.add_hook(&"null", CompilerState::compile_null);
         self.add_hook(&"name", CompilerState::compile_name);
-        self.add_hook(&"rhunexpr_right", CompilerState::compile_children);
         self.add_hook(&"funcargs", CompilerState::compile_funcargs);
+        self.add_hook(&"funcargs_head", CompilerState::compile_funcargs_head);
+        self.add_hook(&"funccall_head", CompilerState::compile_funccall_head);
         self.add_hook(&"expr", CompilerState::compile_children);
         self.add_hook(&"lhunop", CompilerState::compile_children);
         self.add_hook(&"simplexpr", CompilerState::compile_children);
@@ -390,10 +390,11 @@ impl<'a> CompilerState<'a> {
         self.add_hook(&"unstate", CompilerState::compile_unstate);
         self.add_hook(&"lvar", CompilerState::compile_lvar);
         self.add_hook(&"rvar", CompilerState::compile_rvar);
-        self.add_hook(&"rhunexpr", CompilerState::compile_rhunexpr);
         self.add_hook(&"unary", CompilerState::compile_unary);
         self.add_hook(&"indirection", CompilerState::compile_indirection);
+        self.add_hook(&"indirection_head", CompilerState::compile_indirection_head);
         self.add_hook(&"dictindex", CompilerState::compile_dictindex);
+        self.add_hook(&"dictindex_head", CompilerState::compile_dictindex_head);
         self.add_hook(&"binexpr_0", CompilerState::compile_binexpr);
         self.add_hook(&"binexpr_1", CompilerState::compile_binexpr);
         self.add_hook(&"binexpr_2", CompilerState::compile_binexpr);
@@ -401,8 +402,10 @@ impl<'a> CompilerState<'a> {
         self.add_hook(&"lambda", CompilerState::compile_lambda);
         self.add_hook(&"arraybody", CompilerState::compile_arraybody);
         self.add_hook(&"arrayindex", CompilerState::compile_arrayindex);
+        self.add_hook(&"arrayindex_head", CompilerState::compile_arrayindex_head);
         self.add_hook(&"ifcondition", CompilerState::compile_ifcondition);
         self.add_hook(&"dismember", CompilerState::compile_dismember);
+        self.add_hook(&"dismember_head", CompilerState::compile_dismember_head);
         self.add_hook(&"dictbody", CompilerState::compile_dictbody);
         self.add_hook(&"forcondition", CompilerState::compile_forcondition);
         self.add_hook(&"forheaderstatement", CompilerState::compile_children);
@@ -509,81 +512,48 @@ impl<'a> CompilerState<'a> {
         self.compile_nth_child(ast, 0)
     }
     
-    fn compile_rhunexpr(&mut self, ast : &ASTNode) -> Result<(), String>
+    fn compile_funcargs_head(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        if ast.child(0)?.text == "name" && ast.child(0)?.child(0)?.text == "global" && ast.child(1)?.child(0)?.text == "indirection"
+        self.compile_context_wrapped(Context::Unknown, &|x| x.compile_children(ast))
+    }
+    fn compile_funccall_head(&mut self, ast : &ASTNode) -> Result<(), String>
+    {
+        self.compile_context_wrapped(Context::Unknown, &|x| x.compile_nth_child(ast, 0))?;
+        self.compile_context_wrapped(Context::Statement, &|x| x.compile_nth_child(ast, 1))
+    }
+    fn compile_indirection_head(&mut self, ast : &ASTNode) -> Result<(), String>
+    {
+        if ast.child(0)?.text == "name" && ast.child(0)?.child(0)?.text == "global"
         {
-            let need_mutable_context = matches!(self.context, Context::Lvar) || (ast.children.len() >= 3 && !matches!(ast.child(2)?.child(0)?.text.as_str(), "funcargs" | "indirection"));
-            if need_mutable_context
+            if !matches!(self.context, Context::Lvar)
             {
-                self.compile_pushglobal(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
+                self.compile_pushglobalval(&ast.child(1)?.child(1)?.child(0)?.text)
             }
             else
             {
-                self.compile_pushglobalval(&ast.child(1)?.child(0)?.child(1)?.child(0)?.text)?;
+                self.compile_pushglobal(&ast.child(1)?.child(1)?.child(0)?.text)
             }
-            if ast.children.len() > 2
-            {
-                for child in ast.child_slice(2, -1)?
-                {
-                    self.compile_context_wrapped(Context::Lvar, &|x|
-                    {
-                        if child.text == "name"
-                        {
-                            x.compile_pushname(&child.child(0)?.text)
-                        }
-                        else
-                        {
-                            x.compile_any(child)
-                        }
-                    })?;
-                }
-                self.compile_last_child(ast)?;
-            }
-            Ok(())
         }
         else
         {
-            for child in ast.child_slice(0, -1)?
-            {
-                // FIXME detect if next is indirection; if yes, don't wrap in Lvar context
-                self.compile_context_wrapped(Context::Lvar, &|x|
-                {
-                    if child.text == "name"
-                    {
-                        x.compile_pushname(&child.child(0)?.text)
-                    }
-                    else
-                    {
-                        x.compile_any(child)
-                    }
-                })?;
-            }
-            self.compile_last_child(ast)
+            self.compile_context_wrapped(Context::Unknown, &|x| x.compile_nth_child(ast, 0))?;
+            self.compile_nth_child(ast, 1)
         }
     }
-    fn compile_funccall(&mut self, ast : &ASTNode) -> Result<(), String>
+    fn compile_dismember_head(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        if ast.children.len() > 2
-        {
-            self.compile_rhunexpr(ast)?;
-        }
-        else
-        {
-            let child = ast.child(0);
-            self.compile_context_wrapped(Context::Lvar, &|x|
-            {
-                if child.text == "name"
-                {
-                    x.compile_pushname(&child.child(0)?.text)
-                }
-                else
-                {
-                    x.compile_any(child)
-                }
-            })?;
-        }
-        self.compile_last_child(ast)
+        self.compile_context_wrapped(Context::Lvar, &|x| x.compile_nth_child(ast, 0))?;
+        self.compile_nth_child(ast, 1)
+    }
+    fn compile_dictindex_head(&mut self, ast : &ASTNode) -> Result<(), String>
+    {
+        self.compile_context_wrapped(Context::Lvar, &|x| x.compile_nth_child(ast, 0))?;
+        self.compile_nth_child(ast, 1)
+    }
+    fn compile_arrayindex_head(&mut self, ast : &ASTNode) -> Result<(), String>
+    {
+        self.compile_context_wrapped(Context::Lvar, &|x| x.compile_nth_child(ast, 0))?;
+        self.compile_nth_child(ast, 1)
     }
     fn compile_indirection(&mut self, ast : &ASTNode) -> Result<(), String>
     {
@@ -1255,7 +1225,7 @@ impl<'a> CompilerState<'a> {
     fn compile_bareglobaldec(&mut self, ast : &ASTNode) -> Result<(), String>
     {
         // does not allow reassignment, so there's only one syntax, and it requires an expression
-        let name = &ast.child(2)?.child(0)?.text;
+        let name = &ast.child(1)?.child(0)?.text;
         let nameindex = self.get_string_index(name);
         if self.globalstate.barevariables.contains_key(&nameindex)
         {
@@ -1263,9 +1233,9 @@ impl<'a> CompilerState<'a> {
         }
         self.globalstate.insert_bare_global(nameindex);
         
-        self.compile_nth_child(ast, 4)?;
+        self.compile_nth_child(ast, 3)?;
         self.code.push(SETBAREGLOBAL);
-        self.compile_string_index(&ast.child(2)?.child(0)?.text);
+        self.compile_string_index(&ast.child(1)?.child(0)?.text);
         Ok(())
     }
     fn compile_binstate(&mut self, ast : &ASTNode) -> Result<(), String>
@@ -1295,10 +1265,7 @@ impl<'a> CompilerState<'a> {
     }
     fn compile_lvar(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.compile_context_wrapped(Context::Lvar, &|x|
-        {
-            x.compile_nth_child(ast, 0)
-        })
+        self.compile_context_wrapped(Context::Lvar, &|x| x.compile_nth_child(ast, 0))
     }
 
     fn compile_rvar(&mut self, ast : &ASTNode) -> Result<(), String>

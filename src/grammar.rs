@@ -4,9 +4,9 @@ use super::parser::Parser;
 #[derive(Clone)]
 pub (crate) enum GrammarToken {
     Name(String),
-    NameList(String),
     OptionalName(String),
     OptionalNameList(String),
+    SpecialNameList{text: String, subtype: String},
     SeparatorNameList{text: String, separator: String},
     Plain(String),
     Regex(String),
@@ -79,13 +79,21 @@ impl GrammarForm
                     return plainerr("error: separator-list separator is not a symbol");
                 }
             }
-            else if re.is_exact(r"\$.+\$\+", token)
-            {
-                ret.tokens.push(GrammarToken::NameList(slice(token, 1, -2)));
-            }
             else if re.is_exact(r"\$.+\$\*", token)
             {
                 ret.tokens.push(GrammarToken::OptionalNameList(slice(token, 1, -2)));
+            }
+            else if re.is_exact(r"\$.+\$\+", token)
+            {
+                ret.tokens.push(GrammarToken::Name(slice(token, 1, -2)));
+                ret.tokens.push(GrammarToken::OptionalNameList(slice(token, 1, -2)));
+            }
+            else if re.is_exact(r"\$.+\$\+\.\.\(\$.+\$\)", token)
+            {
+                let captures = re.captures(r"\$(.+)\$\+\.\.\(\$(.+)\$\)", token).unwrap();
+                let text = captures.get(1).unwrap().as_str().to_string();
+                let subtype = captures.get(2).unwrap().as_str().to_string();
+                ret.tokens.push(GrammarToken::SpecialNameList{text, subtype});
             }
             else if re.is_exact(r"\$.+\$\?", token)
             {
