@@ -364,7 +364,6 @@ impl<'a> CompilerState<'a> {
         self.add_hook(&"name", CompilerState::compile_name);
         self.add_hook(&"funcargs", CompilerState::compile_funcargs);
         self.add_hook(&"funcargs_head", CompilerState::compile_funcargs_head);
-        self.add_hook(&"funccall_head", CompilerState::compile_funccall_head);
         self.add_hook(&"expr", CompilerState::compile_children);
         self.add_hook(&"lhunop", CompilerState::compile_children);
         self.add_hook(&"simplexpr", CompilerState::compile_children);
@@ -509,17 +508,20 @@ impl<'a> CompilerState<'a> {
     }
     fn compile_statement(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.compile_nth_child(ast, 0)
+        if ast.child(0)?.text == "funcargs_head"
+        {
+            self.compile_context_wrapped(Context::Statement, &|x| x.compile_nth_child(ast, 0))
+        }
+        else
+        {
+            self.compile_nth_child(ast, 0)
+        }
     }
     
     fn compile_funcargs_head(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.compile_context_wrapped(Context::Unknown, &|x| x.compile_children(ast))
-    }
-    fn compile_funccall_head(&mut self, ast : &ASTNode) -> Result<(), String>
-    {
         self.compile_context_wrapped(Context::Unknown, &|x| x.compile_nth_child(ast, 0))?;
-        self.compile_context_wrapped(Context::Statement, &|x| x.compile_nth_child(ast, 1))
+        self.compile_nth_child(ast, 1)
     }
     fn compile_indirection_head(&mut self, ast : &ASTNode) -> Result<(), String>
     {

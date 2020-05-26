@@ -644,10 +644,6 @@ impl Parser {
                         children: Vec::new(),
                         precedence: None
                     };
-                    if ast.text == "funccall" && ast_left.text == "funcargs_head"
-                    {
-                        ast_left.text = "funccall_head".to_string();
-                    }
                     std::mem::swap(&mut ast_left, ast);
                     ast.children = vec!(ast_left, ast_right);
                 }

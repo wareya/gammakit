@@ -920,7 +920,6 @@ impl Interpreter
             myarray.push(val);
         }
         myarray.reverse();
-        println!("collected array {:?}", myarray);
         self.stack_push_val(Value::Array(Box::new(myarray)));
         Ok(())
     }
@@ -1172,12 +1171,10 @@ impl Interpreter
                     }
                 }
             {
-                println!("FOREACHHEAD: doing nothing");
                 self.top_frame.variables.push(value);
             }
             else
             {
-                println!("FOREACHHEAD: exiting to {:?}", dest);
                 self.set_pc(dest);
                 self.top_frame.controlstack.pop();
             }
