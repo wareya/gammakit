@@ -871,7 +871,7 @@ impl<'a> CompilerState<'a> {
                 match ast.children.len()
                 {
                     2 => self.compile_nth_child(ast, 1)?,
-                    1 => self.compile_push_float(0.0),
+                    1 => self.code.push(PUSHNULL),
                     _ => return plainerr("internal error: broken return/yield instruction")
                 }
                 match ast.child(0)?.text.as_str()
@@ -1279,9 +1279,11 @@ impl<'a> CompilerState<'a> {
         let operator = &ast.child(0)?.child(0)?.text;
         
         self.compile_nth_child(ast, 1)?;
-        
-        let op = get_unop_type(slice(&operator, 0, 1).as_str()).ok_or_else(|| minierr("internal error: unhandled type of unary expression"))?;
-        self.code.push(op as u64);
+        if operator != "+"
+        {
+            let op = get_unop_type(operator.as_str()).ok_or_else(|| minierr("internal error: unhandled type of unary expression"))?;
+            self.code.push(op as u64);
+        }
         
         Ok(())
     }
