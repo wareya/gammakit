@@ -2,7 +2,7 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
-    pub (crate) fn jump_to_function(&mut self, function : &FuncSpec, mut args : Vec<Value>, isexpr : bool, funcdata : &FuncVal) -> OpResult
+    pub (crate) fn jump_to_function(&mut self, function : &FuncSpec, mut args : Vec<Value>, isexpr : bool, funcdata : &FuncVal) -> Result<(), String>
     {
         if function.generator
         {
@@ -13,7 +13,7 @@ impl Interpreter
             return plainerr("error: provided wrong number of arguments to function");
         }
         
-        self.push_new_frame(Frame::new_from_call(&function.code, function.startaddr, function.endaddr, isexpr, false))?;
+        self.push_new_frame(Frame::new_from_call(&function.code, function.startaddr, isexpr, false))?;
         
         self.top_frame.variables.push(Value::Func(Box::new(funcdata.clone())));
         
@@ -28,14 +28,14 @@ impl Interpreter
         
         Ok(())
     }
-    pub (crate) fn push_new_frame(&mut self, mut new_frame : Frame) -> OpResult
+    pub (crate) fn push_new_frame(&mut self, mut new_frame : Frame) -> Result<(), String>
     {
         std::mem::swap(&mut new_frame, &mut self.top_frame);
         self.frames.push(new_frame);
         
         Ok(())
     }
-    pub (crate) fn call_internal_function(&mut self, funcdata : InternalFuncVal, args : Vec<Value>, isexpr : bool) -> OpResult
+    pub (crate) fn call_internal_function(&mut self, funcdata : InternalFuncVal, args : Vec<Value>, isexpr : bool) -> Result<(), String>
     {
         let name = funcdata.nameindex;
         
@@ -80,7 +80,7 @@ impl Interpreter
         }
         Ok(())
     }
-    pub (crate) fn call_function(&mut self, funcdata : Box<FuncVal>, mut args : Vec<Value>, isexpr : bool) -> OpResult
+    pub (crate) fn call_function(&mut self, funcdata : Box<FuncVal>, mut args : Vec<Value>, isexpr : bool) -> Result<(), String>
     {
         let defdata = &funcdata.userdefdata;
         
@@ -92,7 +92,7 @@ impl Interpreter
                 {
                     return plainerr("error: provided wrong number of arguments to function");
                 }
-                let mut new_frame = Frame::new_from_call(&defdata.code, defdata.startaddr, defdata.endaddr, true, true);
+                let mut new_frame = Frame::new_from_call(&defdata.code, defdata.startaddr, true, true);
                 
                 new_frame.variables.push(Value::Func(funcdata.clone()));
                 

@@ -22,8 +22,7 @@ impl std::fmt::Debug for DebugInfo {
     }
 }
 
-pub struct Code
-{
+pub struct Code {
     pub (crate) code : Rc<Vec<u64>>,
     pub (crate) debug : Rc<BTreeMap<usize, DebugInfo>>
 }
@@ -45,7 +44,8 @@ impl std::cmp::PartialEq for Code
 }
 impl Eq for Code {}
 
-impl std::fmt::Debug for Code {
+impl std::fmt::Debug for Code
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result
     {
         write!(f, "Code {{ <redacted> }}")

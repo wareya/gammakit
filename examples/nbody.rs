@@ -34,6 +34,8 @@ fn main() -> Result<(), String>
     println!("steps {:?}", steps);
     println!("{:?} steps per second", steps as f64 / (duration.as_millis() as f64 / 1000.0));
     println!("{:?} nanoseconds per step", duration.as_millis() as f64 * 1000_000.0 / steps as f64);
+    
+    #[cfg(feature = "track_op_performance")]
     interpreter.print_op_perf_log();
     
     if let Some(err) = &interpreter.last_error

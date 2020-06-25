@@ -40,7 +40,7 @@ impl Interpreter
         self.top_frame.push(stackvalue)
     }
     
-    fn call_arrow_function(&mut self, subfuncval : SubFuncVal, args : Vec<Value>, isexpr : bool) -> OpResult
+    fn call_arrow_function(&mut self, subfuncval : SubFuncVal, args : Vec<Value>, isexpr : bool) -> Result<(), String>
     {
         if let Some(binding) = self.get_trivial_arrow_binding(subfuncval.name)
         {
@@ -98,7 +98,7 @@ impl Interpreter
         Ok(())
     }
     
-    pub (super) fn handle_func_call_or_expr(&mut self, isexpr : bool) -> OpResult
+    pub (super) fn handle_func_call_or_expr(&mut self, isexpr : bool) -> Result<(), String>
     {
         let argcount = self.read_usize();
         

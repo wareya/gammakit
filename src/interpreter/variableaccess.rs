@@ -156,7 +156,7 @@ impl Interpreter
             NonArrayVariable::Global(globalvar) =>
                 return_indexed(self.evaluate_of_global(globalvar)?, &arrayvar.indexes),
             NonArrayVariable::ActualArray(array) =>
-                return_indexed(ValueLoc::Static(Value::Array(array)), &arrayvar.indexes),
+                return_indexed(ValueLoc::Static(Value::Array(*array)), &arrayvar.indexes),
             NonArrayVariable::ActualDict(dict) =>
                 return_indexed(ValueLoc::Static(Value::Dict(dict)), &arrayvar.indexes),
             NonArrayVariable::ActualText(string) =>

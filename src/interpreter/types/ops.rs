@@ -321,8 +321,7 @@ pub (crate) fn inplace_value_op_add(mut left : ValueLoc, right : &Value) -> Resu
     {
         (Value::Number(ref mut left), Value::Number(right)) =>
         {
-            let newval = *left+right;
-            *left = newval;
+            *left += right;
             Ok(())
         }
         (Value::Text(left), Value::Text(right)) =>
@@ -341,8 +340,7 @@ pub (crate) fn inplace_value_op_subtract(mut left : ValueLoc, right : &Value) ->
     {
         (Value::Number(ref mut left), Value::Number(right)) =>
         {
-            let newval = *left-right;
-            *left = newval;
+            *left -= right;
             Ok(())
         }
         _ => Err("types incompatible with subtraction".to_string())

@@ -5,50 +5,38 @@ use crate::interpreter::*;
 #[inline]
 fn stack_access_err<S : ToString>(text : S) -> String
 {
-    if true//cfg!(stack_access_debugging)
+    #[cfg(feature = "stack_access_debugging")]
     {
-        text.to_string()
+        return text.to_string();
     }
-    else
-    {
-        panic!(text.to_string())
-    }
+    panic!(text.to_string())
 }
 #[inline]
-fn stack_access_err_err<S : ToString>(text : S) -> Result<(), String>
+fn stack_access_err_err<A, S : ToString>(text : S) -> Result<A, String>
 {
-    if true//cfg!(stack_access_debugging)
+    #[cfg(feature = "stack_access_debugging")]
     {
-        Err(text.to_string())
+        return Err(text.to_string());
     }
-    else
-    {
-        panic!(text.to_string())
-    }
+    panic!(text.to_string())
 }
 #[inline]
-fn strange_err_plain<S : ToString>(text : S) -> Result<(), String>
+fn strange_err_plain<A, S : ToString>(text : S) -> Result<A, String>
 {
-    if true//cfg!(broken_compiler_debugging)
+    #[cfg(feature = "broken_compiler_debugging")]
     {
-        Err(text.to_string())
+        return Err(text.to_string());
     }
-    else
-    {
-        panic!(text.to_string())
-    }
+    panic!(text.to_string())
 }
 #[inline]
 fn strange_err<S : ToString>(text : S) -> String
 {
-    if true//cfg!(broken_compiler_debugging)
+    #[cfg(feature = "broken_compiler_debugging")]
     {
-        text.to_string()
+        return text.to_string();
     }
-    else
-    {
-        panic!(text.to_string())
-    }
+    panic!(text.to_string())
 }
 
 pub (crate) static mut OPTABLE : [OpFunc; 256] = [Interpreter::sim_INVALID as OpFunc; 256];
@@ -142,7 +130,7 @@ pub (crate) fn build_opfunc_table()
 
 impl Interpreter
 {
-    pub (crate) fn sim_INVALID(&mut self) -> OpResult
+    pub (crate) fn sim_INVALID(&mut self) -> StepResult
     {
         self.sub_pc(1);
         #[cfg(feature = "compiler_invalid_execution_debugging")]
@@ -152,124 +140,124 @@ impl Interpreter
         panic!(format!("internal error: no such operation 0x{:02X}", self.pull_single_from_code()))
     }
     
-    pub (crate) fn sim_NOP(&mut self) -> OpResult
+    pub (crate) fn sim_NOP(&mut self) -> StepResult
     {
         //plainerr("NOP")
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_PUSHFLT(&mut self) -> OpResult
+    pub (crate) fn sim_PUSHFLT(&mut self) -> StepResult
     {
         let value = self.read_float();
         self.stack_push_val(Value::Number(value));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_PUSHSTR(&mut self) -> OpResult
+    pub (crate) fn sim_PUSHSTR(&mut self) -> StepResult
     {
         let text = self.read_indexed_string()?;
         self.stack_push_val(Value::Text(text));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_PUSHNULL(&mut self) -> OpResult
+    pub (crate) fn sim_PUSHNULL(&mut self) -> StepResult
     {
         self.stack_push_val(Value::Null);
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_PUSHVAR(&mut self) -> OpResult
+    pub (crate) fn sim_PUSHVAR(&mut self) -> StepResult
     {
         let index = self.read_usize();
         self.stack_push_var(Variable::Direct(index));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_EVALUATEVAR(&mut self) -> OpResult
+    pub (crate) fn sim_EVALUATEVAR(&mut self) -> StepResult
     {
         let index = self.read_usize();
         let val = self.top_frame.variables.get(index).ok_or_else(|| strange_err("internal error: variable stack out-of-bounds access"))?.clone();
         self.stack_push_val(val);
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_PUSHINSTVAR(&mut self) -> OpResult
+    pub (crate) fn sim_PUSHINSTVAR(&mut self) -> StepResult
     {
         let instance_id = *self.top_frame.instancestack.last().ok_or_else(|| strange_err("internal error: tried to access instance variable when not executing within instance scope"))?;
         let index = self.read_usize();
         self.stack_push_var(Variable::from_indirection(instance_id, index));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_EVALUATEINSTVAR(&mut self) -> OpResult
+    pub (crate) fn sim_EVALUATEINSTVAR(&mut self) -> StepResult
     {
         let instance_id = *self.top_frame.instancestack.last().ok_or_else(|| strange_err("internal error: tried to access instance variable when not executing within instance scope"))?;
         let index = self.read_usize();
         
         self.stack_push_val(self.evaluate_of_indirect_simple(instance_id, index)?);
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_PUSHBIND(&mut self) -> OpResult
+    pub (crate) fn sim_PUSHBIND(&mut self) -> StepResult
     {
         let nameindex = self.read_usize();
         self.stack_push_val(Value::InternalFunc(InternalFuncVal{nameindex}));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_PUSHOBJ(&mut self) -> OpResult
+    pub (crate) fn sim_PUSHOBJ(&mut self) -> StepResult
     {
         let nameindex = self.read_usize();
         self.stack_push_val(Value::Object(nameindex));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_PUSHGLOBAL(&mut self) -> OpResult
+    pub (crate) fn sim_PUSHGLOBAL(&mut self) -> StepResult
     {
         let index = self.read_usize();
         self.stack_push_var(Variable::Global(index));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_PUSHGLOBALVAL(&mut self) -> OpResult
+    pub (crate) fn sim_PUSHGLOBALVAL(&mut self) -> StepResult
     {
         let index = self.read_usize();
         let val = self.global.variables.get(&index).ok_or_else(|| format!("error: tried to access global variable `{}` that doesn't exist", self.get_indexed_string(index)))?.clone();
         self.stack_push_val(val);
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_PUSHGLOBALFUNC(&mut self) -> OpResult
+    pub (crate) fn sim_PUSHGLOBALFUNC(&mut self) -> StepResult
     {
         let index = self.read_usize();
         let val = self.global.functions.get(&index).ok_or_else(|| format!("error: tried to access global function `{}` that doesn't exist", self.get_indexed_string(index)))?.clone();
         self.stack_push_val(val);
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_PUSHBAREGLOBAL(&mut self) -> OpResult
+    pub (crate) fn sim_PUSHBAREGLOBAL(&mut self) -> StepResult
     {
         let index = self.read_usize();
         self.stack_push_var(Variable::BareGlobal(index));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_EVALUATEBAREGLOBAL(&mut self) -> OpResult
+    pub (crate) fn sim_EVALUATEBAREGLOBAL(&mut self) -> StepResult
     {
         let index = self.read_usize();
         let val = self.global.barevariables.get(&index).ok_or_else(|| format!("internal error: tried to access bare global variable `{}` that doesn't exist", self.get_indexed_string(index)))?.clone();
         self.stack_push_val(val);
-        Ok(())
+        default_step_result()
     }
     
-    pub (crate) fn sim_PUSHSELF(&mut self) -> OpResult
+    pub (crate) fn sim_PUSHSELF(&mut self) -> StepResult
     {
         let instance_id = *self.top_frame.instancestack.last().ok_or_else(|| strange_err("internal error: tried to access `self` when not executing within instance scope"))?;
         self.stack_push_val(Value::Instance(instance_id));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_PUSHOTHER(&mut self) -> OpResult
+    pub (crate) fn sim_PUSHOTHER(&mut self) -> StepResult
     {
         let loc = self.top_frame.instancestack.len()-2;
         let instance_id = *self.top_frame.instancestack.get_mut(loc).ok_or_else(|| "error: tried to access `other` while not inside of at least two instance scopes".to_string())?;
         self.stack_push_val(Value::Instance(instance_id));
-        Ok(())
+        default_step_result()
     }
     
-    pub (crate) fn sim_NEWVAR(&mut self) -> OpResult
+    pub (crate) fn sim_NEWVAR(&mut self) -> StepResult
     {
         self.top_frame.variables.push(Value::default());
         
-        Ok(())
+        default_step_result()
     }
     
-    pub (crate) fn sim_INDIRECTION(&mut self) -> OpResult
+    pub (crate) fn sim_INDIRECTION(&mut self) -> StepResult
     {
         #[cfg(feature = "stack_len_debugging")]
         {
@@ -302,9 +290,9 @@ impl Interpreter
             _ => return plainerr("error: tried to use indirection on a type that doesn't support it (only instances, dictionaries, and 'special' values are allowed)")
         }
         
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_EVALUATEINDIRECTION(&mut self) -> OpResult
+    pub (crate) fn sim_EVALUATEINDIRECTION(&mut self) -> StepResult
     {
         #[cfg(feature = "stack_len_debugging")]
         {
@@ -337,9 +325,9 @@ impl Interpreter
             _ => return plainerr("error: tried to use eval indirection on a type that doesn't support it (only instances, dictionaries, and 'special' values are allowed)")
         }
         
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_DISMEMBER(&mut self) -> OpResult
+    pub (crate) fn sim_DISMEMBER(&mut self) -> StepResult
     {
         #[cfg(feature = "stack_len_debugging")]
         {
@@ -352,17 +340,19 @@ impl Interpreter
         let source = self.stack_pop().ok_or_else(|| stack_access_err("internal error: failed to get source from stack in DISMEMBER operation"))?;
         
         self.stack_push_val(Value::SubFunc(Box::new(SubFuncVal{source, name})));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_FUNCCALL(&mut self) -> OpResult
+    pub (crate) fn sim_FUNCCALL(&mut self) -> StepResult
     {
-        self.handle_func_call_or_expr(false)
+        self.handle_func_call_or_expr(false)?;
+        default_step_result()
     }
-    pub (crate) fn sim_FUNCEXPR(&mut self) -> OpResult
+    pub (crate) fn sim_FUNCEXPR(&mut self) -> StepResult
     {
-        self.handle_func_call_or_expr(true)
+        self.handle_func_call_or_expr(true)?;
+        default_step_result()
     }
-    pub (crate) fn sim_INVOKE(&mut self) -> OpResult
+    pub (crate) fn sim_INVOKE(&mut self) -> StepResult
     {
         let var = self.stack_pop_var().ok_or_else(|| stack_access_err("internal error: not enough variables on stack to run instruction INVOKE"))?;
         let val = self.evaluate_value(var.clone())?;
@@ -378,9 +368,9 @@ impl Interpreter
             return Err(format!("error: tried to invoke a non-generator ({:?})", val));
         }
         
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_INVOKECALL(&mut self) -> OpResult
+    pub (crate) fn sim_INVOKECALL(&mut self) -> StepResult
     {
         #[cfg(feature = "stack_len_debugging")]
         {
@@ -395,9 +385,9 @@ impl Interpreter
         
         self.evaluate(var)?.assign(generator)?;
         
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_INVOKEEXPR(&mut self) -> OpResult
+    pub (crate) fn sim_INVOKEEXPR(&mut self) -> StepResult
     {
         #[cfg(feature = "stack_len_debugging")]
         {
@@ -414,17 +404,17 @@ impl Interpreter
         
         self.stack_push_val(yielded);
         
-        Ok(())
+        default_step_result()
     }
     
-    pub (crate) fn sim_UNSCOPE(&mut self) -> OpResult
+    pub (crate) fn sim_UNSCOPE(&mut self) -> StepResult
     {
         let immediate = self.read_usize();
         
         self.drain_vars(immediate as u64);
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_BREAK(&mut self) -> OpResult
+    pub (crate) fn sim_BREAK(&mut self) -> StepResult
     {
         self.pop_controlstack_until_loop();
         
@@ -441,9 +431,9 @@ impl Interpreter
         self.set_pc(destination);
         self.top_frame.controlstack.pop();
         
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_CONTINUE(&mut self) -> OpResult
+    pub (crate) fn sim_CONTINUE(&mut self) -> StepResult
     {
         self.pop_controlstack_until_loop();
         
@@ -459,9 +449,9 @@ impl Interpreter
         self.drain_vars(variables);
         self.set_pc(destination);
         
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_IF(&mut self) -> OpResult
+    pub (crate) fn sim_IF(&mut self) -> StepResult
     {
         #[cfg(feature = "stack_len_debugging")]
         {
@@ -477,9 +467,9 @@ impl Interpreter
             self.add_pc(codelen);
         }
         
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_WHILE(&mut self) -> OpResult
+    pub (crate) fn sim_WHILE(&mut self) -> StepResult
     {
         let exprlen = self.read_usize();
         let codelen = self.read_usize();
@@ -490,9 +480,9 @@ impl Interpreter
             loop_start : current_pc+exprlen,
             loop_end : current_pc+exprlen+codelen
         }));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_FOR(&mut self) -> OpResult
+    pub (crate) fn sim_FOR(&mut self) -> StepResult
     {
         let postlen = self.read_usize();
         let exprlen = self.read_usize();
@@ -505,16 +495,16 @@ impl Interpreter
             loop_end : current_pc+postlen+exprlen+codelen
         }));
         self.add_pc(postlen);
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_FOREACH(&mut self) -> OpResult
+    pub (crate) fn sim_FOREACH(&mut self) -> StepResult
     {
         let mut val = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: foreach loop was fed a variable of some sort, instead of a value, for what to loop over"))?;
         
         let list : ForEachValues = match val
         {
             Value::Array(ref mut list) => ForEachValues::List(list.drain(..).rev().collect()),
-            Value::Dict(ref mut dict)  => ForEachValues::List(dict.drain().map(|(k, v)| Value::Array(Box::new(vec!(hashval_to_val(k), v)))).collect()),
+            Value::Dict(ref mut dict)  => ForEachValues::List(dict.drain().map(|(k, v)| Value::Array(vec!(hashval_to_val(k), v))).collect()),
             Value::Set(ref mut set)    => ForEachValues::List(set.drain().map(hashval_to_val).collect()),
             Value::Generator(_) => ForEachValues::Gen(GeneratorState{frame : None}),
             _ => return plainerr("error: value fed to for-each loop must be an array, dictionary, set, or generatorstate")
@@ -535,9 +525,9 @@ impl Interpreter
             self.push_new_frame(frame)?;
         }
         
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_WITH(&mut self) -> OpResult
+    pub (crate) fn sim_WITH(&mut self) -> StepResult
     {
         let object_id = self.read_usize();
         let codelen = self.read_usize();
@@ -560,9 +550,9 @@ impl Interpreter
             self.add_pc(codelen as usize);
         }
         
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_WITHAS(&mut self) -> OpResult
+    pub (crate) fn sim_WITHAS(&mut self) -> StepResult
     {
         #[cfg(feature = "stack_len_debugging")]
         {
@@ -590,9 +580,9 @@ impl Interpreter
             instances : Vec::new()
         }));
         
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_SWITCH(&mut self) -> OpResult
+    pub (crate) fn sim_SWITCH(&mut self) -> StepResult
     {
         //eprintln!("hit sim_switch");
         #[cfg(feature = "stack_len_debugging")]
@@ -624,9 +614,9 @@ impl Interpreter
         //eprintln!("end of sim_switch");
         //eprintln!("{:?}", self.top_frame.controlstack.last().unwrap());
         
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_SWITCHCASE(&mut self) -> OpResult
+    pub (crate) fn sim_SWITCHCASE(&mut self) -> StepResult
     {
         #[cfg(feature = "stack_len_debugging")]
         {
@@ -648,35 +638,35 @@ impl Interpreter
             self.set_pc(dest);
         }
         
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_SWITCHDEFAULT(&mut self) -> OpResult
+    pub (crate) fn sim_SWITCHDEFAULT(&mut self) -> StepResult
     {
         let which_case = self.read_usize();
         let switchdata : &SwitchData = match_or_err!(self.top_frame.controlstack.last(), Some(Controller::Switch(ref x)) => x, strange_err("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
         let dest = *switchdata.blocks.get(which_case as usize).ok_or_else(|| strange_err("internal error: which_case in SWITCHDEFAULT was too large"))?;
         self.set_pc(dest);
         
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_SWITCHEXIT(&mut self) -> OpResult
+    pub (crate) fn sim_SWITCHEXIT(&mut self) -> StepResult
     {
         let switchdata = match_or_err!(self.top_frame.controlstack.pop(), Some(Controller::Switch(x)) => x, strange_err("internal error: SWITCHDEFAULT instruction outside of switch statement"))?;
         self.set_pc(switchdata.exit);
         
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_FUNCDEF(&mut self) -> OpResult
+    pub (crate) fn sim_FUNCDEF(&mut self) -> StepResult
     {
         let myfuncspec = self.read_function(false)?;
         self.top_frame.variables.push(Value::new_funcval(None, myfuncspec));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_GENERATORDEF(&mut self) -> OpResult
+    pub (crate) fn sim_GENERATORDEF(&mut self) -> StepResult
     {
         let myfuncspec = self.read_function(true)?;
         self.top_frame.variables.push(Value::new_funcval(None, myfuncspec));
-        Ok(())
+        default_step_result()
     }
     
     #[inline]
@@ -693,37 +683,37 @@ impl Interpreter
         Ok((self.evaluate(var)?, value))
     }
     
-    pub (crate) fn sim_BINSTATE(&mut self) -> OpResult
+    pub (crate) fn sim_BINSTATE(&mut self) -> StepResult
     {
         let (mut var, value) = self.binstate_prep()?;
         var.assign(value)?;
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_BINSTATEADD(&mut self) -> OpResult
+    pub (crate) fn sim_BINSTATEADD(&mut self) -> StepResult
     {
         let (var, value) = self.binstate_prep()?;
         inplace_value_op_add(var, &value)?;
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_BINSTATESUB(&mut self) -> OpResult
+    pub (crate) fn sim_BINSTATESUB(&mut self) -> StepResult
     {
         let (var, value) = self.binstate_prep()?;
         inplace_value_op_subtract(var, &value)?;
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_BINSTATEMUL(&mut self) -> OpResult
+    pub (crate) fn sim_BINSTATEMUL(&mut self) -> StepResult
     {
         let (var, value) = self.binstate_prep()?;
         inplace_value_op_multiply(var, &value)?;
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_BINSTATEDIV(&mut self) -> OpResult
+    pub (crate) fn sim_BINSTATEDIV(&mut self) -> StepResult
     {
         let (var, value) = self.binstate_prep()?;
         inplace_value_op_divide(var, &value)?;
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_UNSTATEINCR(&mut self) -> OpResult
+    pub (crate) fn sim_UNSTATEINCR(&mut self) -> StepResult
     {
         if self.stack_len() < 1
         {
@@ -732,9 +722,9 @@ impl Interpreter
         let var = self.stack_pop_var().ok_or_else(|| stack_access_err("internal error: argument to UNSTATEINCR could not be found or was not a variable"))?;
         let val = self.evaluate(var)?;
         do_inplace_value_op_increment(val)?;
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_UNSTATEDECR(&mut self) -> OpResult
+    pub (crate) fn sim_UNSTATEDECR(&mut self) -> StepResult
     {
         if self.stack_len() < 1
         {
@@ -743,9 +733,9 @@ impl Interpreter
         let var = self.stack_pop_var().ok_or_else(|| stack_access_err("internal error: argument to UNSTATEDECR could not be found or was not a variable"))?;
         let val = self.evaluate(var)?;
         do_inplace_value_op_decrement(val)?;
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_SETBAREGLOBAL(&mut self) -> OpResult
+    pub (crate) fn sim_SETBAREGLOBAL(&mut self) -> StepResult
     {
         if self.stack_len() < 1
         {
@@ -758,7 +748,7 @@ impl Interpreter
         
         self.global.barevariables.insert(nameindex, value);
         
-        Ok(())
+        default_step_result()
     }
     
     #[inline]
@@ -777,73 +767,86 @@ impl Interpreter
         Ok((left, right))
     }
     
-    pub (crate) fn sim_BINOPAND(&mut self) -> OpResult
+    pub (crate) fn sim_BINOPAND(&mut self) -> StepResult
     {
         let (left, right) = self.binop_prep()?;
-        Ok(self.stack_push_val(value_op_and(&left, &right)?))
+        self.stack_push_val(value_op_and(&left, &right)?);
+        default_step_result()
     }
-    pub (crate) fn sim_BINOPOR(&mut self) -> OpResult
+    pub (crate) fn sim_BINOPOR(&mut self) -> StepResult
     {
         let (left, right) = self.binop_prep()?;
-        Ok(self.stack_push_val(value_op_or(&left, &right)?))
+        self.stack_push_val(value_op_or(&left, &right)?);
+        default_step_result()
     }
-    pub (crate) fn sim_BINOPEQ(&mut self) -> OpResult
+    pub (crate) fn sim_BINOPEQ(&mut self) -> StepResult
     {
         let (left, right) = self.binop_prep()?;
-        Ok(self.stack_push_val(value_op_equal(&left, &right)?))
+        self.stack_push_val(value_op_equal(&left, &right)?);
+        default_step_result()
     }
-    pub (crate) fn sim_BINOPNEQ(&mut self) -> OpResult
+    pub (crate) fn sim_BINOPNEQ(&mut self) -> StepResult
     {
         let (left, right) = self.binop_prep()?;
-        Ok(self.stack_push_val(value_op_not_equal(&left, &right)?))
+        self.stack_push_val(value_op_not_equal(&left, &right)?);
+        default_step_result()
     }
-    pub (crate) fn sim_BINOPGEQ(&mut self) -> OpResult
+    pub (crate) fn sim_BINOPGEQ(&mut self) -> StepResult
     {
         let (left, right) = self.binop_prep()?;
-        Ok(self.stack_push_val(value_op_greater_or_equal(&left, &right)?))
+        self.stack_push_val(value_op_greater_or_equal(&left, &right)?);
+        default_step_result()
     }
-    pub (crate) fn sim_BINOPLEQ(&mut self) -> OpResult
+    pub (crate) fn sim_BINOPLEQ(&mut self) -> StepResult
     {
         let (left, right) = self.binop_prep()?;
-        Ok(self.stack_push_val(value_op_less_or_equal(&left, &right)?))
+        self.stack_push_val(value_op_less_or_equal(&left, &right)?);
+        default_step_result()
     }
-    pub (crate) fn sim_BINOPG(&mut self) -> OpResult
+    pub (crate) fn sim_BINOPG(&mut self) -> StepResult
     {
         let (left, right) = self.binop_prep()?;
-        Ok(self.stack_push_val(value_op_greater(&left, &right)?))
+        self.stack_push_val(value_op_greater(&left, &right)?);
+        default_step_result()
     }
-    pub (crate) fn sim_BINOPL(&mut self) -> OpResult
+    pub (crate) fn sim_BINOPL(&mut self) -> StepResult
     {
         let (left, right) = self.binop_prep()?;
-        Ok(self.stack_push_val(value_op_less(&left, &right)?))
+        self.stack_push_val(value_op_less(&left, &right)?);
+        default_step_result()
     }
-    pub (crate) fn sim_BINOPADD(&mut self) -> OpResult
+    pub (crate) fn sim_BINOPADD(&mut self) -> StepResult
     {
         let (left, right) = self.binop_prep()?;
-        Ok(self.stack_push_val(value_op_add(&left, &right)?))
+        self.stack_push_val(value_op_add(&left, &right)?);
+        default_step_result()
     }
-    pub (crate) fn sim_BINOPSUB(&mut self) -> OpResult
+    pub (crate) fn sim_BINOPSUB(&mut self) -> StepResult
     {
         let (left, right) = self.binop_prep()?;
-        Ok(self.stack_push_val(value_op_subtract(&left, &right)?))
+        self.stack_push_val(value_op_subtract(&left, &right)?);
+        default_step_result()
     }
-    pub (crate) fn sim_BINOPMUL(&mut self) -> OpResult
+    pub (crate) fn sim_BINOPMUL(&mut self) -> StepResult
     {
         let (left, right) = self.binop_prep()?;
-        Ok(self.stack_push_val(value_op_multiply(&left, &right)?))
+        self.stack_push_val(value_op_multiply(&left, &right)?);
+        default_step_result()
     }
-    pub (crate) fn sim_BINOPDIV(&mut self) -> OpResult
+    pub (crate) fn sim_BINOPDIV(&mut self) -> StepResult
     {
         let (left, right) = self.binop_prep()?;
-        Ok(self.stack_push_val(value_op_divide(&left, &right)?))
+        self.stack_push_val(value_op_divide(&left, &right)?);
+        default_step_result()
     }
-    pub (crate) fn sim_BINOPMOD(&mut self) -> OpResult
+    pub (crate) fn sim_BINOPMOD(&mut self) -> StepResult
     {
         let (left, right) = self.binop_prep()?;
-        Ok(self.stack_push_val(value_op_modulo(&left, &right)?))
+        self.stack_push_val(value_op_modulo(&left, &right)?);
+        default_step_result()
     }
     
-    fn handle_short_circuit(&mut self, truthiness : bool) -> OpResult
+    fn handle_short_circuit(&mut self, truthiness : bool) -> StepResult
     {
         #[cfg(feature = "stack_len_debugging")]
         {
@@ -867,14 +870,14 @@ impl Interpreter
         {
             self.stack_push_val(val);
         }
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_SHORTCIRCUITIFTRUE(&mut self) -> OpResult
+    pub (crate) fn sim_SHORTCIRCUITIFTRUE(&mut self) -> StepResult
     {
         self.handle_short_circuit(true)
     }
     
-    pub (crate) fn sim_SHORTCIRCUITIFFALSE(&mut self) -> OpResult
+    pub (crate) fn sim_SHORTCIRCUITIFFALSE(&mut self) -> StepResult
     {
         self.handle_short_circuit(false)
     }
@@ -892,38 +895,37 @@ impl Interpreter
         self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: not enough values on stack to run instruction UNOP (this error should be inaccessible!)"))
     }
     
-    pub (crate) fn sim_UNOPNEG(&mut self) -> OpResult
+    pub (crate) fn sim_UNOPNEG(&mut self) -> StepResult
     {
         let value = self.unop_prep()?;
         self.stack_push_val(do_value_op_negative(&value)?);
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_UNOPNOT(&mut self) -> OpResult
+    pub (crate) fn sim_UNOPNOT(&mut self) -> StepResult
     {
         let value = self.unop_prep()?;
         self.stack_push_val(do_value_op_not(&value)?);
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_LAMBDA(&mut self) -> OpResult
+    pub (crate) fn sim_LAMBDA(&mut self) -> StepResult
     {
         let (captures, myfuncspec) = self.read_lambda()?;
         self.stack_push_val(Value::new_funcval(Some(captures), myfuncspec));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_COLLECTARRAY(&mut self) -> OpResult
+    pub (crate) fn sim_COLLECTARRAY(&mut self) -> StepResult
     {
         let numvals = self.read_usize() as usize;
-        let mut myarray = Vec::with_capacity(numvals);
-        for _ in 0..numvals
+        let mut myarray = vec!(Value::Null; numvals);
+        for i in numvals-1..=0
         {
             let val = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: COLLECTARRAY instruction failed to collect values from stack (this error should be unreachable!)"))?;
-            myarray.push(val);
+            myarray[i] = val;
         }
-        myarray.reverse();
-        self.stack_push_val(Value::Array(Box::new(myarray)));
-        Ok(())
+        self.stack_push_val(Value::Array(myarray));
+        default_step_result()
     }
-    pub (crate) fn sim_COLLECTDICT(&mut self) -> OpResult
+    pub (crate) fn sim_COLLECTDICT(&mut self) -> StepResult
     {
         let numvals = self.read_usize() as usize;
         #[cfg(feature = "stack_len_debugging")]
@@ -947,9 +949,9 @@ impl Interpreter
             }
         }
         self.stack_push_val(Value::Dict(Box::new(mydict)));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_COLLECTSET(&mut self) -> OpResult
+    pub (crate) fn sim_COLLECTSET(&mut self) -> StepResult
     {
         let numvals = self.read_usize() as usize;
         #[cfg(feature = "stack_len_debugging")]
@@ -967,9 +969,9 @@ impl Interpreter
             myset.insert(val_to_hashval(val)?);
         }
         self.stack_push_val(Value::Set(Box::new(myset)));
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_ARRAYEXPR(&mut self) -> OpResult
+    pub (crate) fn sim_ARRAYEXPR(&mut self) -> StepResult
     {
         #[cfg(feature = "stack_len_debugging")]
         {
@@ -995,7 +997,7 @@ impl Interpreter
             StackValue::Var(Variable::Global(globalvar)) =>
                 self.stack_push_var(Variable::Array(ArrayVar::new(NonArrayVariable::Global(globalvar), vec!(index)))),
             StackValue::Val(Value::Array(array)) =>
-                self.stack_push_var(Variable::Array(ArrayVar::new(NonArrayVariable::ActualArray(array), vec!(index)))),
+                self.stack_push_var(Variable::Array(ArrayVar::new(NonArrayVariable::ActualArray(Box::new(array)), vec!(index)))),
             StackValue::Val(Value::Dict(dict)) =>
                 self.stack_push_var(Variable::Array(ArrayVar::new(NonArrayVariable::ActualDict(dict), vec!(index)))),
             StackValue::Val(Value::Text(string)) =>
@@ -1003,9 +1005,9 @@ impl Interpreter
             _ =>
                 return plainerr("error: tried to use array indexing on a non-indexable value"),
         }
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_EVALUATEARRAYEXPR(&mut self) -> OpResult
+    pub (crate) fn sim_EVALUATEARRAYEXPR(&mut self) -> StepResult
     {
         #[cfg(feature = "stack_len_debugging")]
         {
@@ -1062,9 +1064,9 @@ impl Interpreter
             _ =>
                 return plainerr("error: tried to use array indexing on a non-indexable value"),
         }
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_WHILETEST(&mut self) -> OpResult
+    pub (crate) fn sim_WHILETEST(&mut self) -> StepResult
     {
         if let Some(Controller::While(ref data)) = self.top_frame.controlstack.last()
         {
@@ -1077,11 +1079,11 @@ impl Interpreter
                 self.drain_vars(todrain);
                 self.top_frame.controlstack.pop();
             }
-            return Ok(());
+            return default_step_result();
         }
         plainerr("internal error: WHILELOOP instruction when immediate controller is not a while controller")
     }
-    pub (crate) fn sim_WHILELOOP(&mut self) -> OpResult
+    pub (crate) fn sim_WHILELOOP(&mut self) -> StepResult
     {
         if let Some(Controller::While(ref data)) = self.top_frame.controlstack.last()
         {
@@ -1089,11 +1091,11 @@ impl Interpreter
             let todrain = data.variables;
             self.set_pc(dest);
             self.drain_vars(todrain);
-            return Ok(());
+            return default_step_result();
         }
         plainerr("internal error: WHILELOOP instruction when immediate controller is not a while controller")
     }
-    pub (crate) fn sim_WITHLOOP(&mut self) -> OpResult
+    pub (crate) fn sim_WITHLOOP(&mut self) -> StepResult
     {
         self.top_frame.instancestack.pop();
         
@@ -1116,11 +1118,11 @@ impl Interpreter
             {
                 self.top_frame.controlstack.pop();
             }
-            return Ok(());
+            return default_step_result();
         }
         strange_err_plain("internal error: WITHLOOP instruction when immediate controller is not a with controller")
     }
-    pub (crate) fn sim_FOREACHLOOP(&mut self) -> OpResult
+    pub (crate) fn sim_FOREACHLOOP(&mut self) -> StepResult
     {
         if let Some(Controller::ForEach(ref mut data)) = self.top_frame.controlstack.last_mut()
         {
@@ -1145,11 +1147,11 @@ impl Interpreter
                 self.set_pc(dest);
                 self.drain_vars(todrain);
             }
-            return Ok(());
+            return default_step_result();
         }
         strange_err_plain("internal error: FOREACHLOOP instruction when immediate controller is not a foreach controller")
     }
-    pub (crate) fn sim_FOREACHHEAD(&mut self) -> OpResult
+    pub (crate) fn sim_FOREACHHEAD(&mut self) -> StepResult
     {
         if let Some(Controller::ForEach(ref mut data)) = self.top_frame.controlstack.last_mut()
         {
@@ -1178,17 +1180,17 @@ impl Interpreter
                 self.set_pc(dest);
                 self.top_frame.controlstack.pop();
             }
-            return Ok(());
+            return default_step_result();
         }
         strange_err_plain("internal error: FOREACHHEAD instruction when immediate controller is not a foreach controller")
     }
-    pub (crate) fn sim_JUMPRELATIVE(&mut self) -> OpResult
+    pub (crate) fn sim_JUMPRELATIVE(&mut self) -> StepResult
     {
         let rel = self.read_usize();
         self.add_pc(rel);
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_EXIT(&mut self) -> OpResult // an exit is a return with no value
+    pub (crate) fn sim_EXIT(&mut self) -> StepResult // an exit is a return with no value
     {
         if let Some(outer_top_frame) = self.frames.pop()
         {
@@ -1211,11 +1213,11 @@ impl Interpreter
         }
         else
         {
-            self.doexit = true;
+            return Ok(true)
         }
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_RETURN(&mut self) -> OpResult
+    pub (crate) fn sim_RETURN(&mut self) -> StepResult
     {
         let was_generator = self.top_frame.generator;
         if let Some(old_frame) = self.frames.pop()
@@ -1240,11 +1242,11 @@ impl Interpreter
         }
         else
         {
-            self.doexit = true;
+            return Ok(true)
         }
-        Ok(())
+        default_step_result()
     }
-    pub (crate) fn sim_YIELD(&mut self) -> OpResult
+    pub (crate) fn sim_YIELD(&mut self) -> StepResult
     {
         if !self.top_frame.generator
         {
@@ -1268,6 +1270,6 @@ impl Interpreter
         {
             return strange_err_plain("internal error: generators must always return into an expression");
         }
-        Ok(())
+        default_step_result()
     }
 }

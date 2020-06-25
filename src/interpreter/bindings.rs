@@ -59,7 +59,7 @@ pub (crate) fn ast_to_dict(ast : &ASTNode) -> Value
     
     let children : Vec<Value> = ast.children.iter().map(|child| ast_to_dict(child)).collect();
     
-    astdict.insert(to_key!("children"), Value::Array(Box::new(children)));
+    astdict.insert(to_key!("children"), Value::Array(children));
     
     if let Some(precedence) = ast.precedence
     {
@@ -636,8 +636,8 @@ impl Interpreter
         
         Ok(match myself.as_ref()
         {
-            Value::Array(ref array) => Value::Array(Box::new((0..array.len()).map(|i| Value::Number(i as f64)).collect())),
-            Value::Dict(ref dict) => Value::Array(Box::new(dict.iter().map(|(key, _)| hashval_to_val(key.clone())).collect())),
+            Value::Array(ref array) => Value::Array((0..array.len()).map(|i| Value::Number(i as f64)).collect()),
+            Value::Dict(ref dict) => Value::Array(dict.iter().map(|(key, _)| hashval_to_val(key.clone())).collect()),
             _ => return plainerr("error: tried to take length of lengthless type")
         })
     }
@@ -655,7 +655,7 @@ impl Interpreter
         Ok(match myself.as_ref()
         {
             Value::Text(ref string) => slice_any(&string.chars().collect::<Vec<char>>(), start, end).map(|array| Value::Text(array.iter().cloned().collect())).ok_or_else(|| minierr("error: slice() on string went out of range"))?,
-            Value::Array(ref array) => slice_any(&array, start, end).map(|array| Value::Array(Box::new(array.to_vec()))).ok_or_else(|| minierr("error: slice() on array went out of range"))?,
+            Value::Array(ref array) => slice_any(&array, start, end).map(|array| Value::Array(array.to_vec())).ok_or_else(|| minierr("error: slice() on array went out of range"))?,
             _ => return plainerr("error: tried to slice lengthless type")
         })
     }

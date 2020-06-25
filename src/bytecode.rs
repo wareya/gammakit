@@ -109,6 +109,115 @@ pub (crate) const EXIT : u64 = 0xF0;
 pub (crate) const RETURN : u64 = 0xF1;
 pub (crate) const YIELD : u64 = 0xF2;
 
+#[allow(dead_code)]
+pub (crate) fn op_to_name(op : u8) -> &'static str
+{
+    match op
+    {
+        0x00 => "NOP",
+        
+        0x10 => "PUSHFLT",
+        0x11 => "PUSHSTR",
+        0x12 => "PUSHNULL",
+        
+        0x15 => "PUSHVAR",
+        0x16 => "PUSHGLOBAL",
+        0x17 => "PUSHGLOBALVAL",
+        0x18 => "PUSHGLOBALFUNC",
+        0x19 => "PUSHBAREGLOBAL",
+        0x1A => "PUSHINSTVAR",
+        0x1C => "PUSHBIND",
+        0x1D => "PUSHOBJ",
+        0x1E => "PUSHSELF",
+        0x1F => "PUSHOTHER",
+        
+        0x20 => "BINOPAND",
+        0x21 => "BINOPOR",
+        0x22 => "BINOPEQ",
+        0x23 => "BINOPNEQ",
+        0x24 => "BINOPGEQ",
+        0x25 => "BINOPLEQ",
+        0x26 => "BINOPG",
+        0x27 => "BINOPL",
+        0x28 => "BINOPADD",
+        0x29 => "BINOPSUB",
+        0x2A => "BINOPMUL",
+        0x2B => "BINOPDIV",
+        0x2C => "BINOPMOD",
+        
+        0x2E => "UNOPNEG",
+        0x2F => "UNOPNOT",
+        
+        0x30 => "NEWVAR",
+        0x31 => "UNSCOPE",
+        0x32 => "FUNCEXPR",
+        0x33 => "INVOKEEXPR",
+        
+        0x38 => "FUNCCALL",
+        0x39 => "INVOKE",
+        0x3A => "INVOKECALL",
+        
+        0x40 => "BINSTATE",
+        0x41 => "BINSTATEADD",
+        0x42 => "BINSTATESUB",
+        0x43 => "BINSTATEMUL",
+        0x44 => "BINSTATEDIV",
+        0x48 => "UNSTATEINCR",
+        0x49 => "UNSTATEDECR",
+        0x4F => "SETBAREGLOBAL",
+        
+        0x50 => "EVALUATEVAR",
+        0x51 => "EVALUATEBAREGLOBAL",
+        0x52 => "EVALUATEINSTVAR",
+        
+        0x60 => "SWITCHCASE",
+        0x61 => "SWITCHDEFAULT",
+        0x62 => "SWITCHEXIT",
+        
+        0x70 => "COLLECTARRAY",
+        0x71 => "COLLECTDICT",
+        0x72 => "COLLECTSET",
+        
+        0x80 => "IF",
+        0x82 => "WHILE",
+        0x83 => "FOR",
+        0x84 => "WITH",
+        0x85 => "WITHAS",
+        0x86 => "FOREACH",
+        0x87 => "SWITCH",
+        
+        0x90 => "BREAK",
+        0x91 => "CONTINUE",
+        
+        0xA0 => "INDIRECTION",
+        0xA2 => "ARRAYEXPR",
+        0xA3 => "DISMEMBER",
+        
+        0xAE => "EVALUATEINDIRECTION",
+        0xAF => "EVALUATEARRAYEXPR",
+        
+        0xB0 => "FUNCDEF",
+        0xB1 => "LAMBDA",
+        0xB2 => "GENERATORDEF",
+        
+        0xC0 => "WHILETEST",
+        0xC1 => "WHILELOOP",
+        0xC2 => "WITHLOOP",
+        0xC3 => "FOREACHLOOP",
+        0xC4 => "FOREACHHEAD",
+        
+        0xD0 => "JUMPRELATIVE",
+        0xD8 => "SHORTCIRCUITIFTRUE",
+        0xD9 => "SHORTCIRCUITIFFALSE",
+        
+        0xF0 => "EXIT",
+        0xF1 => "RETURN",
+        0xF2 => "YIELD",
+        
+        _ => "___UNKNOWN",
+    }
+}
+
 
 
 pub (crate) fn get_assignment_type(optext : &str) -> Option<u8>

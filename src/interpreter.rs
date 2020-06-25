@@ -17,7 +17,10 @@ use variableaccess::ValueLoc;
 
 /// Returned by the step() method of an interpreter.
 pub type StepResult = Result<bool, String>;
-type OpResult = Result<(), String>;
+pub fn default_step_result() -> StepResult
+{
+    Ok(false)
+}
 /// Type signature of functions to be registered as bindings.
 pub type Binding = dyn FnMut(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
 /// For trivial bindings.
@@ -46,54 +49,57 @@ fn fat_vec<T>() -> Vec<T>
 
 // global interpreter data
 pub struct GlobalState {
-    string_index: usize,
-    string_table : HashMap<String, usize>,
-    string_table_reverse : BTreeMap<usize, String>,
-    
     instance_id: usize,
-    instances: BTreeMap<usize, Instance>,
-    pub (crate) instances_by_type: BTreeMap<usize, BTreeSet<usize>>,
+    pub (crate) instances: BTreeMap<usize, Instance>,
+    pub (crate) instances_by_type: Box<BTreeMap<usize, BTreeSet<usize>>>,
     
-    pub (crate) objects: BTreeMap<usize, ObjSpec>,
+    pub (crate) objects: Box<BTreeMap<usize, ObjSpec>>,
     pub (crate) variables: BTreeMap<usize, Value>, // accessed as global.varname
     pub (crate) barevariables: BTreeMap<usize, Value>, // accessed as varname
     pub (crate) functions: BTreeMap<usize, Value>, // accessed as funcname
     
-    pub (crate) bindings: BTreeMap<usize, Rc<RefCell<Binding>>>,
-    pub (crate) trivial_bindings: BTreeMap<usize, TrivialBinding>,
-    pub (crate) simple_bindings: BTreeMap<usize, Rc<RefCell<SimpleBinding>>>,
-    pub (crate) trivial_simple_bindings: BTreeMap<usize, TrivialSimpleBinding>,
-    pub (crate) arrow_bindings: BTreeMap<usize, Rc<RefCell<ArrowBinding>>>,
-    pub (crate) trivial_arrow_bindings: BTreeMap<usize, TrivialArrowBinding>,
+    // TODO: same map
+    pub (crate) bindings: Box<BTreeMap<usize, Rc<RefCell<Binding>>>>,
+    pub (crate) trivial_bindings: Box<BTreeMap<usize, TrivialBinding>>,
+    pub (crate) simple_bindings: Box<BTreeMap<usize, Rc<RefCell<SimpleBinding>>>>,
+    pub (crate) trivial_simple_bindings: Box<BTreeMap<usize, TrivialSimpleBinding>>,
     
-    parser: Parser,
+    // TODO: same map
+    pub (crate) arrow_bindings: Box<BTreeMap<usize, Rc<RefCell<ArrowBinding>>>>,
+    pub (crate) trivial_arrow_bindings: Box<BTreeMap<usize, TrivialArrowBinding>>,
+    
+    string_index: usize,
+    string_table : Box<HashMap<String, usize>>,
+    string_table_reverse : Box<BTreeMap<usize, String>>,
+    
+    parser: Box<Parser>,
 }
 
 impl GlobalState {
     fn new(parser : Parser) -> GlobalState
     {
         GlobalState {
-            string_index : 1,
-            string_table : HashMap::new(),
-            string_table_reverse : BTreeMap::new(),
-            
             instance_id : 1,
             instances : BTreeMap::new(),
-            instances_by_type : BTreeMap::new(),
+            instances_by_type : Box::new(BTreeMap::new()),
             
-            objects : BTreeMap::new(),
+            objects : Box::new(BTreeMap::new()),
             variables : BTreeMap::new(),
             barevariables : BTreeMap::new(),
             functions : BTreeMap::new(),
             
-            bindings : BTreeMap::new(),
-            trivial_bindings : BTreeMap::new(),
-            simple_bindings : BTreeMap::new(),
-            trivial_simple_bindings : BTreeMap::new(),
-            arrow_bindings : BTreeMap::new(),
-            trivial_arrow_bindings : BTreeMap::new(),
+            bindings : Box::new(BTreeMap::new()),
+            trivial_bindings : Box::new(BTreeMap::new()),
+            simple_bindings : Box::new(BTreeMap::new()),
+            trivial_simple_bindings : Box::new(BTreeMap::new()),
+            arrow_bindings : Box::new(BTreeMap::new()),
+            trivial_arrow_bindings : Box::new(BTreeMap::new()),
             
-            parser,
+            parser : Box::new(parser),
+            
+            string_index : 1,
+            string_table : Box::new(HashMap::new()),
+            string_table_reverse : Box::new(BTreeMap::new()),
         }
     }
     #[allow(clippy::ptr_arg)]
@@ -134,9 +140,8 @@ impl GlobalState {
     }
 }
 
-type OpFunc = fn(&mut Interpreter) -> OpResult;
+type OpFunc = fn(&mut Interpreter) -> StepResult;
 
-const TRACK_OP_PERFORMANCE : bool = false;
 
 // interpreter state
 /// Interprets compiled bytecode.
@@ -146,27 +151,32 @@ pub struct Interpreter {
     global: GlobalState,
     /// Last error returned by step(). Gets cleared (reset to None) when step() runs without returning an error.
     pub last_error: Option<String>,
-    pub (crate) op_map_hits: BTreeMap<u8, u128>,
-    pub (crate) op_map: BTreeMap<u8, u128>,
-    op_map_time: Option<std::time::Instant>,
-    doexit: bool,
 }
 
+#[cfg(feature = "track_op_performance")]
+static mut OP_MAP_HITS : [u128; 256] = [0; 256];
+#[cfg(feature = "track_op_performance")]
+static mut OP_MAP : [u128; 256] = [0; 256];
 
 impl Interpreter {
     /// Creates a new interpreter 
     pub fn new(parser : Parser) -> Interpreter
     {
+        println!("- sizeof Value {}", std::mem::size_of::<Value>());
+        println!("- sizeof Variable {}", std::mem::size_of::<Variable>());
+        println!("- sizeof FuncSpec {}", std::mem::size_of::<FuncSpec>());
+        println!("- sizeof Frame {}", std::mem::size_of::<Frame>());
+        println!("- sizeof Vec<StackValue> {}", std::mem::size_of::<Vec<StackValue>>());
+        println!("- sizeof HashMap<HashableValue, Value> {}", std::mem::size_of::<HashMap<HashableValue, Value>>());
+        println!("- sizeof NonArrayVariable {}", std::mem::size_of::<NonArrayVariable>());
+        println!("- sizeof Interpreter {}", std::mem::size_of::<Interpreter>());
+        println!("- sizeof GlobalState {}", std::mem::size_of::<GlobalState>());
         simulation::build_opfunc_table();
         Interpreter {
             top_frame : Frame::new_root(&Code::new()),
             frames : fat_vec(),
-            doexit : false,
             global : GlobalState::new(parser),
             last_error : None,
-            op_map_hits : BTreeMap::new(),
-            op_map : BTreeMap::new(),
-            op_map_time : None
         }
     }
     /// Loads new code into the interpreter.
@@ -182,7 +192,6 @@ impl Interpreter {
     {
         self.top_frame = Frame::new_root(code);
         self.frames = fat_vec();
-        self.doexit = false;
         self.last_error = None;
     }
     pub fn restart_full_of_nops(&mut self, count : usize)
@@ -229,28 +238,30 @@ impl Interpreter {
         self.global = GlobalState::new(parser);
     }
     #[inline]
-    fn step_internal(&mut self) -> OpResult
+    fn step_internal(&mut self) -> StepResult
     {
-        use simulation::OPTABLE;
-        let op = self.pull_single_from_code();
-        if !TRACK_OP_PERFORMANCE
+        #[cfg(not(feature = "track_op_performance"))]
         {
-            unsafe { OPTABLE[op as usize](self) }
+            unsafe { simulation::OPTABLE[self.pull_single_from_code() as usize](self) }
         }
-        else
+        #[cfg(feature = "track_op_performance")]
         {
-            use std::time::Instant;
-            if self.op_map_time.is_none()
-            {
-                self.op_map_time = Some(Instant::now());
-            }
-            let start_time = self.op_map_time.unwrap();
+            let op = self.pull_single_from_code();
             
-            let ret = unsafe { OPTABLE[op as usize](self) };
-            *self.op_map_hits.entry(op).or_insert(0) += 1;
+            use std::time::Instant;
+            
+            let test_time = Instant::now();
+            let start_time = Instant::now();
+            let ret = unsafe { simulation::OPTABLE[op as usize](self) };
             let end_time = Instant::now();
-            *self.op_map.entry(op).or_insert(0) += end_time.duration_since(start_time).as_nanos();
-            self.op_map_time = Some(end_time);
+            
+            let reference_time = start_time.duration_since(test_time).as_nanos();
+            let real_time = end_time.duration_since(start_time).as_nanos();
+            let adjusted_time = real_time - reference_time;
+            //let adjusted_time = real_time;
+            
+            unsafe { OP_MAP_HITS[op as usize] += 1 };
+            unsafe { OP_MAP[op as usize] += adjusted_time };
             ret
         }
     }
@@ -258,34 +269,30 @@ impl Interpreter {
     ///
     /// Handles flow control after stepping, not before.
     ///
-    /// If execution can continue, Ok(true) is returned. Stepping the interpreter past this point will trigger an error.
+    /// If execution can continue, Ok(false) is returned. Stepping the interpreter past this point will trigger an error.
     ///
-    /// If execution has exited normally, Ok(false) is returned.
+    /// If execution has exited normally, Ok(true) is returned.
     ///
     /// If an error occurs, Err(String) is returned. This includes graceful exits (end of code).
     pub fn step(&mut self) -> StepResult
     {
         let ret = self.step_internal();
-        if self.doexit
+        match ret
         {
-            Ok(false)
-        }
-        else if let Err(err) = &ret
-        {
-            let pc = self.get_pc();
-            if let Some(info) = self.top_frame.code.get_debug_info(pc)
+            Ok(r) => Ok(r),
+            Err(err) =>
             {
-                self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X}", err, info.last_line, info.last_index, pc));
+                let pc = self.get_pc();
+                if let Some(info) = self.top_frame.code.get_debug_info(pc)
+                {
+                    self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X}", err, info.last_line, info.last_index, pc));
+                }
+                else
+                {
+                    self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, pc, self.top_frame.code.debug));
+                }
+                Err(err.to_string())
             }
-            else
-            {
-                self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, pc, self.top_frame.code.debug));
-            }
-            Err(err.to_string())
-        }
-        else
-        {
-            Ok(true)
         }
     }
     pub fn step_until_error_or_exit(&mut self) -> Result<u64, String>
@@ -293,7 +300,7 @@ impl Interpreter {
         let mut steps = 1;
         
         let mut ret = self.step_internal();
-        while ret.is_ok() && !self.doexit
+        while matches!(ret, Ok(false))
         {
             steps += 1;
             ret = self.step_internal();
@@ -325,21 +332,26 @@ impl Interpreter {
         }
         out
     }
+    
+    #[cfg(feature = "track_op_performance")]
     pub fn print_op_perf_log(&self)
     {
+        let op_map = unsafe { OP_MAP.iter().enumerate().filter(|(k, _v)| OP_MAP_HITS[*k] != 0).map(|(k, v)| (k, if *v > u128::MAX >> 2 { 0 } else { *v } )) };
         // messy per hit
-        //let mut op_map = self.op_map.iter().map(|(k, v)| (*k, *v as f64 / 1_000_000.0 / (*self.op_map_hits.get(k).unwrap() as f64).sqrt())).collect::<Vec<_>>();
+        //let op_map = op_map.map(|(k, v)| (k, *v as f64 / 1_000_000.0 / (self.op_map_hits[k] as f64).sqrt())).collect::<Vec<_>>();
         // per hit
-        //let mut op_map = self.op_map.iter().map(|(k, v)| (*k, *v as f64 / *self.op_map_hits.get(k).unwrap() as f64)).collect::<Vec<_>>();
+        let op_map = unsafe { op_map.map(|(k, v)| (k, v as f64 / OP_MAP_HITS[k] as f64)) };
         // raw
-        //let mut op_map = self.op_map.iter().map(|(k, v)| (*k, *v as f64 / 1_000_000.0)).collect::<Vec<_>>();
+        //let op_map = op_map.map(|(k, v)| (k, v as f64 / 1_000_000.0));
         // mod (hacked together)
-        let mut op_map = self.op_map.iter().map(|(k, v)| (*k, (*v as f64 / *self.op_map_hits.get(k).unwrap() as f64 - 80.0) *  *self.op_map_hits.get(k).unwrap() as f64 / 1_000_000.0)).collect::<Vec<_>>();
-        //let mut op_map = self.op_map.iter().map(|(k, v)| (*k, (*v as f64 / *self.op_map_hits.get(k).unwrap() as f64 - 80.0))).collect::<Vec<_>>();
+        // let op_map = op_map.map(|(k, v)| (k, (*v as f64 / *self.op_map_hits.get(k).unwrap() as f64 - 80.0) *  *self.op_map_hits.get(k).unwrap() as f64 / 1_000_000.0)).collect::<Vec<_>>();
+        //let op_map = op_map.map(|(k, v)| (k, (*v as f64 / *self.op_map_hits.get(k).unwrap() as f64 - 80.0))).collect::<Vec<_>>();
+        let mut op_map = op_map.collect::<Vec<_>>();
+        op_map.retain(|x| !x.1.is_nan());
         op_map.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
         for (op, time) in op_map
         {
-            println!("{:02X}:{}", op, time);
+            println!("{:05.05}:\t{}", time, crate::bytecode::op_to_name(op as u8));
         }
     }
 }

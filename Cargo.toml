@@ -24,6 +24,8 @@ compiler_invalid_execution_debugging = []
 broken_compiler_debugging = []
 code_bounds_debugging = []
 stack_access_debugging = []
+track_op_performance = []
+track_op_steps = []
 debugging = ["compiler_bytecode_desync_debugging", "stack_len_debugging", "compiler_invalid_execution_debugging", "broken_compiler_debugging", "code_bounds_debugging", "stack_access_debugging"]
 
 
@@ -38,9 +40,11 @@ features = ["std"]
 [profile.release]
 opt-level = 3
 debug-assertions = false
-debug = 0
+debug = true
 incremental = false
 overflow-checks = false
+lto = "fat"
+panic = "abort"
 
 [profile.dev]
 opt-level = 1
@@ -51,9 +55,10 @@ overflow-checks = true
 [profile.bench]
 opt-level = 3
 debug-assertions = false
-debug = 0
+debug = true
 incremental = false
 overflow-checks = false
+lto = "fat"
 
 [profile.test]
 opt-level = 1

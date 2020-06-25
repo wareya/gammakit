@@ -63,12 +63,9 @@ pub (crate) struct Frame {
     pub (super) code: Code,
     pub (super) stack: Vec<StackValue>,
     pub (super) variables: Vec<Value>,
-    pub (super) instancestack: Vec<usize>,
     pub (super) controlstack: Vec<Controller>,
-    pub (super) startpc: usize,
+    pub (super) instancestack: Box<Vec<usize>>,
     pub (super) pc: usize,
-    pub (super) endpc: usize,
-    pub (super) currline: usize,
     pub (super) isexpr: bool,
     pub (super) generator: bool,
 }
@@ -187,7 +184,7 @@ pub enum Value {
     Null,
     Number(f64),
     Text(String),
-    Array(Box<Vec<Value>>),
+    Array(Vec<Value>),
     Dict(Box<HashMap<HashableValue, Value>>),
     Set(Box<HashSet<HashableValue>>),
     InternalFunc(InternalFuncVal),
@@ -226,12 +223,11 @@ pub enum HashableValue {
 impl Frame {
     pub (super) fn new_root(code : &Code) -> Frame
     {
-        let codelen = code.len();
-        Frame { code : code.clone(), startpc : 0, pc : 0, endpc : codelen, variables : fat_vec(), instancestack : Vec::new(), controlstack : fat_vec(), stack : fat_vec(), isexpr : false, currline : 0, generator: false }
+        Frame { code : code.clone(), pc : 0, variables : Vec::with_capacity(4), instancestack : Box::new(Vec::new()), controlstack : Vec::with_capacity(4), stack : Vec::with_capacity(64), isexpr : false, generator: false }
     }
-    pub (super) fn new_from_call(code : &Code, startpc : usize, endpc : usize, isexpr : bool, generator : bool) -> Frame
+    pub (super) fn new_from_call(code : &Code, startpc : usize, isexpr : bool, generator : bool) -> Frame
     {
-        Frame { code : code.clone(), startpc, pc : startpc, endpc, variables : fat_vec(), instancestack : Vec::new(), controlstack : fat_vec(), stack : fat_vec(), isexpr, currline : 0, generator }
+        Frame { code : code.clone(), pc : startpc, variables : Vec::with_capacity(4), instancestack : Box::new(Vec::new()), controlstack : Vec::with_capacity(4), stack : Vec::with_capacity(64), isexpr, generator }
     }
     pub (super) fn len(&mut self) -> usize
     {
