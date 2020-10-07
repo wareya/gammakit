@@ -1527,7 +1527,7 @@ impl<'a> CompilerState<'a> {
     {
         if !ast.child(2)?.isparent || ast.child(2)?.text != "name"
         {
-            return plainerr("error: child index 2 of `foreach` must be a `name`");
+            return plainerr("internal error: child index 2 of `foreach` must be a `name`");
         }
         
         self.compile_scope_wrapped(&|x|
@@ -1555,7 +1555,7 @@ impl<'a> CompilerState<'a> {
     {
         if !ast.isparent || !matches!(ast.text.as_str(), "switchcase" | "switchdefault")
         {
-            return plainerr("error: tried to compile a non-switchcase/switchdefault ast node as a switch case")
+            return plainerr("internal error: tried to compile a non-switchcase/switchdefault ast node as a switch case")
         }
         for node in ast.child_slice(1, -2)? // implicitly causes switchdefault to have 0 labels
         {
@@ -1575,7 +1575,7 @@ impl<'a> CompilerState<'a> {
     {
         if !ast.isparent || !matches!(ast.text.as_str(), "switchcase" | "switchdefault")
         {
-            return plainerr("error: tried to compile a non-switchcase/switchdefault ast node as a switch case")
+            return plainerr("internal error: tried to compile a non-switchcase/switchdefault ast node as a switch case")
         }
         self.compile_last_child(ast)?;
         self.code.push_op(SWITCHEXIT);

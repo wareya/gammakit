@@ -154,9 +154,12 @@ pub struct Interpreter {
 }
 
 #[cfg(feature = "track_op_performance")]
-static mut OP_MAP_HITS : [u128; 256] = [0; 256];
+static mut OP_MAP_HITS : [u64; 256] = [0; 256];
 #[cfg(feature = "track_op_performance")]
-static mut OP_MAP : [u128; 256] = [0; 256];
+static mut OP_MAP : [u64; 256] = [0; 256];
+#[cfg(feature = "track_op_performance")]
+static mut LAST_TIME : u64 = 0;
+
 
 impl Interpreter {
     /// Creates a new interpreter 
@@ -248,14 +251,16 @@ impl Interpreter {
         {
             let op = self.pull_single_from_code();
             
-            let start_time = std::time::Instant::now();
             let ret = unsafe { simulation::OPTABLE[op as usize](self) };
-            let end_time = std::time::Instant::now();
             
-            let real_time = end_time.duration_since(start_time).as_nanos();
-            
-            unsafe { OP_MAP_HITS[op as usize] += 1 };
-            unsafe { OP_MAP[op as usize] += real_time };
+            unsafe
+            {
+                let end_time = core::arch::x86_64::_rdtsc();
+                let real_time = end_time - LAST_TIME;
+                LAST_TIME = end_time;
+                OP_MAP_HITS[op as usize] += 1;
+                OP_MAP[op as usize] += real_time;
+            };
             ret
         }
     }
@@ -270,6 +275,9 @@ impl Interpreter {
     /// If an error occurs, Err(String) is returned. This includes graceful exits (end of code).
     pub fn step(&mut self) -> StepResult
     {
+        #[cfg(feature = "track_op_performance")]
+        unsafe { LAST_TIME = core::arch::x86_64::_rdtsc() };
+        
         let ret = self.step_internal();
         match ret
         {
@@ -294,13 +302,15 @@ impl Interpreter {
     }
     pub fn step_until_error_or_exit(&mut self) -> Result<u64, String>
     {
-        let mut steps = 1;
+        #[cfg(feature = "track_op_performance")]
+        unsafe { LAST_TIME = core::arch::x86_64::_rdtsc() };
         
-        let mut ret = self.step_internal();
+        let mut steps = 0;
+        let mut ret = Ok(());
         while ret.is_ok()
         {
-            steps += 1;
             ret = self.step_internal();
+            steps += 1;
         }
         if let Err(err) = ret
         {
@@ -344,7 +354,6 @@ impl Interpreter {
         }
     }
     
-    #[inline]
     pub fn step_cached(&mut self) -> StepResult
     {
         let f : OpFunc = unsafe { std::mem::transmute(self.top_frame.code[self.top_frame.pc] as *const OpFunc) };
@@ -359,18 +368,16 @@ impl Interpreter {
             let op = f as *const OpFunc as usize;
             let op = * unsafe { simulation::REVERSE_OPTABLE.as_ref().unwrap().get(&op).unwrap() };
             
-            //let test_time = Instant::now();
-            let start_time = std::time::Instant::now();
             let ret = f(self);
-            let end_time = std::time::Instant::now();
             
-            //let reference_time = start_time.duration_since(test_time).as_nanos();
-            let real_time = end_time.duration_since(start_time).as_nanos();
-            //let adjusted_time = real_time - reference_time;
-            //let adjusted_time = real_time;
-            
-            unsafe { OP_MAP_HITS[op as usize] += 1 };
-            unsafe { OP_MAP[op as usize] += real_time };
+            unsafe
+            {
+                let end_time = core::arch::x86_64::_rdtsc();
+                let real_time = end_time - LAST_TIME;
+                LAST_TIME = end_time;
+                OP_MAP_HITS[op as usize] += 1;
+                OP_MAP[op as usize] += real_time;
+            };
             
             ret
         }
@@ -397,12 +404,15 @@ impl Interpreter {
             }
         }
         
-        let mut steps = 1;
-        let mut ret = self.step_cached();
+        #[cfg(feature = "track_op_performance")]
+        unsafe { LAST_TIME = core::arch::x86_64::_rdtsc() };
+        
+        let mut steps = 0;
+        let mut ret = Ok(());
         while ret.is_ok()
         {
-            steps += 1;
             ret = self.step_cached();
+            steps += 1;
         }
         if let Err(err) = ret
         {
@@ -441,13 +451,14 @@ impl Interpreter {
     #[cfg(feature = "track_op_performance")]
     pub fn print_op_perf_log(&self)
     {
-        let op_map = unsafe { OP_MAP.iter().enumerate().filter(|(k, _v)| OP_MAP_HITS[*k] != 0).map(|(k, v)| (k, if *v > u128::MAX >> 2 { 0 } else { *v } )) };
+        let op_map = unsafe { OP_MAP.iter().enumerate().filter(|(k, _v)| OP_MAP_HITS[*k] != 0).map(|(k, v)| (k, if *v > u64::MAX >> 2 { 0 } else { *v } )) };
         // messy per hit
         //let op_map = op_map.map(|(k, v)| (k, *v as f64 / 1_000_000.0 / (self.op_map_hits[k] as f64).sqrt())).collect::<Vec<_>>();
         // per hit
         //let op_map = unsafe { op_map.map(|(k, v)| (k, v as f64 / OP_MAP_HITS[k] as f64)) };
         // raw
-        let op_map = op_map.map(|(k, v)| (k, v as f64 / 1_000.0));
+        let op_map = op_map.map(|(k, v)| (k, v as f64 / 3.3 / 1_000.0));
+        //let op_map = op_map.map(|(k, v)| (k, v as f64 / 1_000.0));
         // mod (hacked together)
         // let op_map = op_map.map(|(k, v)| (k, (*v as f64 / *self.op_map_hits.get(k).unwrap() as f64 - 80.0) *  *self.op_map_hits.get(k).unwrap() as f64 / 1_000_000.0)).collect::<Vec<_>>();
         //let op_map = op_map.map(|(k, v)| (k, (*v as f64 / *self.op_map_hits.get(k).unwrap() as f64 - 80.0))).collect::<Vec<_>>();
@@ -460,6 +471,7 @@ impl Interpreter {
             println!("{:05.05}:\t{} / {}", time, crate::bytecode::op_to_name(op as u8), unsafe { OP_MAP_HITS[op] });
             total_time += time;
         }
-        println!("total time: {:05.05}", total_time/1_000.0);
+        println!("total time: {:05.05}", total_time/1_000_000.0);
+        println!("(units may vary)");
     }
 }

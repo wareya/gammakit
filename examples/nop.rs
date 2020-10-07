@@ -10,9 +10,6 @@ fn main() -> Result<(), String>
     interpreter.insert_default_bindings();
     interpreter.restart_full_of_nops(100_000_000);
     
-    interpreter.step_cached_until_error_or_exit().unwrap_or(0);
-    interpreter.restart_in_place();
-    
     let start_time = Instant::now();
     
     let steps = interpreter.step_cached_until_error_or_exit().unwrap_or(0);
