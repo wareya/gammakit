@@ -26,6 +26,7 @@ pub struct Code {
     pub (crate) code : Rc<Vec<u64>>,
     pub (crate) debug : Rc<BTreeMap<usize, DebugInfo>>,
     pub (crate) booklet : Rc<Vec<usize>>,
+    pub (crate) root_vars : usize,
     pub (crate) cached : bool
 }
 
@@ -33,7 +34,7 @@ impl std::clone::Clone for Code
 {
     fn clone(&self) -> Code
     {
-        Code{code : Rc::clone(&self.code), debug : Rc::clone(&self.debug), booklet : self.booklet.clone(), cached : self.cached}
+        Code{code : Rc::clone(&self.code), debug : Rc::clone(&self.debug), booklet : self.booklet.clone(), root_vars : self.root_vars, cached : self.cached}
     }
 }
 
@@ -58,7 +59,7 @@ impl Code
 {
     pub (crate) fn new() -> Code
     {
-        Code{code : Rc::new(Vec::new()), debug : Rc::new(BTreeMap::new()), booklet : Rc::new(Vec::new()), cached : false}
+        Code{code : Rc::new(Vec::new()), debug : Rc::new(BTreeMap::new()), booklet : Rc::new(Vec::new()), root_vars : 0, cached : false}
     }
     fn push_op(&mut self, val : u64)
     {
@@ -186,6 +187,7 @@ impl Scope {
 }
 
 struct Frame {
+    identifier_count : usize,
     scopes : Vec<Scope>,
     objects : Vec<ObjSpec>,
 }
@@ -193,12 +195,13 @@ struct Frame {
 impl Frame {
     fn new() -> Frame
     {
-        Frame { scopes : vec!(Scope::new(0)), objects : vec!() }
+        Frame { identifier_count : 0, scopes : vec!(Scope::new(0)), objects : vec!() }
     }
     fn total_size(&self) -> usize
     {
-        let asdf = self.scopes.last().unwrap();
-        asdf.parent_size + asdf.size
+        //let asdf = self.scopes.last().unwrap();
+        //asdf.parent_size + asdf.size
+        self.identifier_count
     }
     fn add_scope(&mut self)
     {
@@ -211,6 +214,7 @@ impl Frame {
     }
     fn add_identifier(&mut self, name : usize, isfunction : bool) -> Option<usize>
     {
+        self.identifier_count += 1;
         self.scopes.last_mut().unwrap().add_identifier(name, isfunction)
     }
     fn find_identifier(&self, name : usize) -> Option<IdenLocation>
@@ -451,12 +455,6 @@ impl<'a> CompilerState<'a> {
         self.compile_string_index(text);
     }
 
-    fn compile_unscope(&mut self, var_stack_length : usize) -> Result<(), String>
-    {
-        self.code.push_op(UNSCOPE);
-        self.compile_u64(var_stack_length as u64);
-        Ok(())
-    }
     fn compile_context_wrapped(&mut self, context : Context, fun : &dyn Fn(&mut CompilerState) -> Result<(), String>) -> Result<(), String>
     {
         let old_context = self.context;
@@ -474,8 +472,8 @@ impl<'a> CompilerState<'a> {
         
         fun(self)?;
         
-        let var_stack_length = self.pop_scope();
-        self.compile_unscope(var_stack_length)
+        self.pop_scope();
+        Ok(())
     }
     fn compile_any(&mut self, ast : &ASTNode) -> Result<(), String>
     {
@@ -495,6 +493,7 @@ impl<'a> CompilerState<'a> {
     fn compile_program(&mut self, ast : &ASTNode) -> Result<(), String>
     {
         self.compile_children(ast)?;
+        self.code.root_vars = self.frames.first().unwrap().total_size();
         self.code.push_op(EXIT);
         Ok(())
     }
@@ -945,6 +944,7 @@ impl<'a> CompilerState<'a> {
                     startaddr : 0,
                     endaddr : 0,
                     code : Code::new(),
+                    varcount : 0,
                     argcount,
                     parentobj : nameindex,
                     forcecontext : 0,
@@ -993,6 +993,7 @@ impl<'a> CompilerState<'a> {
                 }
                 self.code.push_op(EXIT);
                 
+                let identifier_count = self.frames.last().unwrap().total_size();
                 self.close_frame();
                 let funccode = self.code.clone();
                 self.code = oldcode;
@@ -1001,6 +1002,7 @@ impl<'a> CompilerState<'a> {
                     startaddr : 0,
                     endaddr : funccode.code.len(),
                     code : funccode,
+                    varcount : identifier_count,
                     argcount,
                     parentobj : nameindex,
                     forcecontext : 0,
@@ -1042,8 +1044,8 @@ impl<'a> CompilerState<'a> {
         self.code.push_op(prefix);
         
         self.compile_u64(ast.child(3)?.children.len() as u64);
-        
         let body_len_position = self.compile_u64(0 as u64);
+        let varcount_position = self.compile_u64(0 as u64);
         
         let position_1 = self.code.len();
         
@@ -1061,6 +1063,7 @@ impl<'a> CompilerState<'a> {
         }
         self.code.push_op(EXIT);
         
+        let identifier_count = self.frames.last().unwrap().total_size();
         self.close_frame();
         
         let position_2 = self.code.len();
@@ -1068,6 +1071,7 @@ impl<'a> CompilerState<'a> {
         let body_len = position_2 - position_1;
         
         self.rewrite_code_word(body_len_position, pack_u64(body_len as u64))?;
+        self.rewrite_code_word(varcount_position, pack_u64(identifier_count as u64))?;
         
         Ok(())
     }
@@ -1098,6 +1102,7 @@ impl<'a> CompilerState<'a> {
         }
         self.code.push_op(EXIT);
         
+        let identifier_count = self.frames.last().unwrap().total_size();
         self.close_frame();
         let funccode = self.code.clone();
         self.code = oldcode;
@@ -1106,6 +1111,7 @@ impl<'a> CompilerState<'a> {
             startaddr : 0,
             endaddr : funccode.code.len(),
             code : funccode,
+            varcount : identifier_count,
             argcount,
             parentobj : 0,
             forcecontext : 0,
@@ -1186,7 +1192,6 @@ impl<'a> CompilerState<'a> {
                         self.compile_nth_child(child, 2)?;
                         
                         self.add_variable(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
-                        self.code.push_op(NEWVAR);
                         
                         self.compile_context_wrapped(Context::Lvar, &|x| x.compile_pushname(&child.child(0)?.child(0)?.text))?;
                         self.code.push_op(BINSTATE);
@@ -1215,7 +1220,6 @@ impl<'a> CompilerState<'a> {
                     "var" =>
                     {
                         self.add_variable(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
-                        self.code.push_op(NEWVAR);
                     }
                     "globalvar" =>
                     {
@@ -1320,7 +1324,8 @@ impl<'a> CompilerState<'a> {
             self.add_variable(capture_name).ok_or_else(|| format!("error: redeclared identifier `{}`", capture_name))?;
         }
         self.compile_u64(args.len() as u64);
-        let len_position = self.compile_u64(0 as u64);
+        let body_len_position = self.compile_u64(0 as u64);
+        let varcount_position = self.compile_u64(0 as u64);
           
         for arg in args
         {
@@ -1337,12 +1342,14 @@ impl<'a> CompilerState<'a> {
                 
         self.code.push_op(EXIT);
         
+        let identifier_count = self.frames.last().unwrap().total_size();
         self.close_frame();
         
         let position_2 = self.code.len();
         let body_len = position_2 - position_1;
         
-        self.rewrite_code_word(len_position, pack_u64(body_len as u64))
+        self.rewrite_code_word(body_len_position, pack_u64(body_len as u64))?;
+        self.rewrite_code_word(varcount_position, pack_u64(identifier_count as u64))
     }
     fn compile_arraybody(&mut self, ast : &ASTNode) -> Result<(), String>
     {
@@ -1492,8 +1499,7 @@ impl<'a> CompilerState<'a> {
         // for loops need an extra layer of scope around them if they have an init statement
         if init_exists
         {
-            let var_stack_length = self.pop_scope();
-            self.compile_unscope(var_stack_length)?;
+            self.pop_scope();
         }
         Ok(())
     }
@@ -1535,11 +1541,13 @@ impl<'a> CompilerState<'a> {
             x.compile_nth_child(ast, 4)?;
             
             x.code.push_op(FOREACH);
+            let var_index_pos = x.compile_u64(0);
             let block_len_rewrite_pos = x.compile_u64(0);
             let position_1 = x.code.len();
             
             x.code.push_op(FOREACHHEAD);
-            x.add_variable(&ast.child(2)?.child(0)?.text);
+            let name = &ast.child(2)?.child(0)?.text;
+            let index = x.add_variable(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
             
             x.compile_nth_child(ast, 6)?;
             
@@ -1547,7 +1555,8 @@ impl<'a> CompilerState<'a> {
             let position_2 = x.code.len();
             
             let block_len = position_2 - position_1;
-            x.rewrite_code_word(block_len_rewrite_pos, pack_u64(block_len as u64))
+            x.rewrite_code_word(block_len_rewrite_pos, pack_u64(block_len as u64))?;
+            x.rewrite_code_word(var_index_pos, pack_u64(index as u64))
         })
     }
     

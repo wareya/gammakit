@@ -111,11 +111,12 @@ impl Interpreter
     {
         let argcount = self.read_usize();
         let bodylen = self.read_usize();
+        let varcount = self.read_usize();
         
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        Ok(FuncSpec { argcount, code : self.top_frame.code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, generator })
+        Ok(FuncSpec { argcount, varcount, code : self.top_frame.code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, generator })
     }
     
     pub (crate) fn read_lambda(&mut self) -> Result<(Vec<Value>, FuncSpec), String>
@@ -136,18 +137,14 @@ impl Interpreter
         
         let argcount = self.read_usize() as usize;
         let bodylen = self.read_usize();
+        let varcount = self.read_usize();
         
         let startaddr = self.get_pc();
         self.add_pc(bodylen);
         
-        Ok((captures, FuncSpec { argcount, code : self.top_frame.code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, generator : false }))
+        Ok((captures, FuncSpec { argcount, varcount, code : self.top_frame.code.clone(), startaddr, endaddr : startaddr + bodylen, fromobj : false, parentobj : 0, forcecontext : 0, generator : false }))
     }
     
-    #[inline]
-    pub (crate) fn drain_vars(&mut self, desired_count : u64)
-    {
-        self.top_frame.variables.truncate(desired_count as usize);
-    }
     #[inline]
     pub (crate) fn pop_controlstack_until_loop(&mut self)
     {

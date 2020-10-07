@@ -534,12 +534,12 @@ impl Interpreter
         let ast = dict_to_ast(&dict)?;
         let code = compile_bytecode(&ast, &mut self.global)?;
         
-        // endaddr at the start because Rc::new() moves `code`
         Ok
         ( Value::new_funcval
           ( None,
             FuncSpec
-            { endaddr : code.len(), // must be before code : Rc::new(code)
+            { endaddr : code.len(),
+              varcount : code.root_vars,
               argcount : 0,
               code,
               startaddr : 0,
@@ -561,12 +561,12 @@ impl Interpreter
         let ast = dict_to_ast(&dict)?;
         let code = compile_bytecode(&ast, &mut self.global)?;
         
-        // endaddr at the start because Rc::new() moves `code`
         Ok
         ( Value::new_funcval
           ( None,
             FuncSpec
-            { endaddr : code.len(), // must be before code : Rc::new(code)
+            { endaddr : code.len(),
+              varcount : code.root_vars,
               argcount : 0,
               code,
               startaddr : 0,
@@ -594,12 +594,12 @@ impl Interpreter
         
         let code = compile_bytecode(&ast, &mut self.global)?;
         
-        // endaddr at the start because Rc::new() moves `code`
         Ok
         ( Value::new_funcval
           ( None,
             FuncSpec
-            { endaddr : code.len(), // must be before code : Rc::new(code)
+            { endaddr : code.len(),
+              varcount : code.root_vars,
               argcount : 0,
               code,
               startaddr : 0,

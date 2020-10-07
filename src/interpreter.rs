@@ -173,7 +173,7 @@ impl Interpreter {
         println!("- sizeof GlobalState {}", std::mem::size_of::<GlobalState>());
         simulation::build_opfunc_table();
         Interpreter {
-            top_frame : Frame::new_root(&Code::new()),
+            top_frame : Frame::new_root(Code::new()),
             frames : fat_vec(),
             global : GlobalState::new(parser),
             last_error : None,
@@ -190,7 +190,8 @@ impl Interpreter {
     /// Does not reset global state (objects/instances).
     pub fn restart(&mut self, code: &Code)
     {
-        self.top_frame = Frame::new_root(code);
+        self.top_frame = Frame::new_root(code.clone());
+        self.top_frame.variables = vec![Value::default(); code.root_vars];
         self.frames = fat_vec();
         self.last_error = None;
     }

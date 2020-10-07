@@ -43,10 +43,8 @@ pub (crate) const BINOPMOD : u64 = 0x2C;
 pub (crate) const UNOPNEG : u64 = 0x2E;
 pub (crate) const UNOPNOT : u64 = 0x2F;
 
-pub (crate) const NEWVAR : u64 = 0x30;
-pub (crate) const UNSCOPE : u64 = 0x31;
-pub (crate) const FUNCEXPR : u64 = 0x32;
-pub (crate) const INVOKEEXPR : u64 = 0x33;
+pub (crate) const FUNCEXPR : u64 = 0x30;
+pub (crate) const INVOKEEXPR : u64 = 0x31;
 
 pub (crate) const FUNCCALL : u64 = 0x38;
 pub (crate) const INVOKE : u64 = 0x39;

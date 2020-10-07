@@ -14,7 +14,6 @@ use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
 pub (crate) struct WhileData {
-    pub (super) variables: u64,
     pub (super) expr_start: usize, // continue destination
     pub (super) loop_start: usize,
     pub (super) loop_end: usize, // continue from here
@@ -22,7 +21,6 @@ pub (crate) struct WhileData {
 
 #[derive(Debug, Clone)]
 pub (crate) struct WithData {
-    pub (super) variables: u64,
     pub (super) loop_start: usize,
     pub (super) loop_end: usize,
     pub (super) instances: Vec<Value>,
@@ -36,7 +34,7 @@ pub (crate) enum ForEachValues {
 
 #[derive(Debug, Clone)]
 pub (crate) struct ForEachData {
-    pub (super) variables: u64,
+    pub (super) varindex: usize,
     pub (super) loop_start: usize,
     pub (super) loop_end: usize,
     pub (super) values: ForEachValues,
@@ -44,7 +42,6 @@ pub (crate) struct ForEachData {
 
 #[derive(Debug, Clone)]
 pub (crate) struct SwitchData {
-    pub (super) variables: u64,
     pub (super) blocks: Vec<usize>,
     pub (super) exit: usize,
     pub (super) value: Value,
@@ -78,6 +75,7 @@ pub (crate) struct FuncSpec {
     pub (crate) startaddr: usize,
     pub (crate) endaddr: usize,
     pub (crate) argcount: usize,
+    pub (crate) varcount: usize,
     pub (crate) parentobj: usize,
     pub (crate) forcecontext: usize, // the instance to use as context when executing an object function
     pub (crate) fromobj: bool, // function is associated with an object type and must be placed in the context of an instance to be used
@@ -221,7 +219,7 @@ pub enum HashableValue {
 // implementations
 
 impl Frame {
-    pub (super) fn new_root(code : &Code) -> Frame
+    pub (super) fn new_root(code : Code) -> Frame
     {
         Frame { code : code.clone(), pc : 0, variables : Vec::with_capacity(4), instancestack : Box::new(Vec::new()), controlstack : Vec::with_capacity(4), stack : Vec::with_capacity(64), isexpr : false, generator: false }
     }

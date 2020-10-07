@@ -2,7 +2,7 @@ use crate::interpreter::*;
 
 impl Interpreter
 {
-    pub (crate) fn jump_to_function(&mut self, function : &FuncSpec, mut args : Vec<Value>, isexpr : bool, funcdata : &FuncVal) -> Result<(), String>
+    pub (crate) fn jump_to_function(&mut self, function : &FuncSpec, args : Vec<Value>, isexpr : bool, funcdata : &FuncVal) -> Result<(), String>
     {
         if function.generator
         {
@@ -15,16 +15,27 @@ impl Interpreter
         
         self.push_new_frame(Frame::new_from_call(&function.code, function.startaddr, isexpr, false))?;
         
-        self.top_frame.variables.push(Value::Func(Box::new(funcdata.clone())));
+        self.top_frame.variables = vec![Value::default(); function.varcount];
+        self.top_frame.variables[0] = Value::Func(Box::new(funcdata.clone()));
+        
         
         // copy lambda's universe, if there is one
+        let mut i = 1;
         if let Some(ref universe) = funcdata.predefined
         {
-            self.top_frame.variables.extend(universe.clone());
+            for var in universe
+            {
+                self.top_frame.variables[i] = var.clone();
+                i += 1;
+            }
         }
         self.set_pc(function.startaddr);
         
-        self.top_frame.variables.append(&mut args);
+        for var in args
+        {
+            self.top_frame.variables[i] = var;
+            i += 1;
+        }
         
         Ok(())
     }
@@ -94,11 +105,11 @@ impl Interpreter
                 }
                 let mut new_frame = Frame::new_from_call(&defdata.code, defdata.startaddr, true, true);
                 
-                new_frame.variables.push(Value::Func(funcdata.clone()));
+                new_frame.variables[0] = Value::Func(funcdata.clone());
                 
-                for _ in 0..defdata.argcount
+                for i in 0..defdata.argcount
                 {
-                    new_frame.variables.push(args.pop().unwrap());
+                    new_frame.variables[i+1] = args.pop().unwrap();
                 }
                 
                 self.stack_push_val(Value::Generator(Box::new(GeneratorState{frame: Some(new_frame)})));

@@ -63,7 +63,6 @@ pub (crate) fn build_opfunc_table()
     set!(PUSHGLOBALVAL, sim_PUSHGLOBALVAL);
     set!(PUSHSELF, sim_PUSHSELF);
     set!(PUSHOTHER, sim_PUSHOTHER);
-    set!(NEWVAR, sim_NEWVAR);
     set!(BINSTATE, sim_BINSTATE);
     set!(BINSTATEADD, sim_BINSTATEADD);
     set!(BINSTATESUB, sim_BINSTATESUB);
@@ -115,7 +114,6 @@ pub (crate) fn build_opfunc_table()
     set!(SWITCHCASE, sim_SWITCHCASE);
     set!(SWITCHDEFAULT, sim_SWITCHDEFAULT);
     set!(SWITCHEXIT, sim_SWITCHEXIT);
-    set!(UNSCOPE, sim_UNSCOPE);
     set!(WITH, sim_WITH);
     set!(WITHAS, sim_WITHAS);
     set!(WHILETEST, sim_WHILETEST);
@@ -263,13 +261,6 @@ impl Interpreter
         let loc = self.top_frame.instancestack.len()-2;
         let instance_id = *self.top_frame.instancestack.get_mut(loc).ok_or_else(|| "error: tried to access `other` while not inside of at least two instance scopes".to_string())?;
         self.stack_push_val(Value::Instance(instance_id));
-        default_step_result()
-    }
-    
-    pub (crate) fn sim_NEWVAR(&mut self) -> StepResult
-    {
-        self.top_frame.variables.push(Value::default());
-        
         default_step_result()
     }
     
@@ -423,27 +414,19 @@ impl Interpreter
         default_step_result()
     }
     
-    pub (crate) fn sim_UNSCOPE(&mut self) -> StepResult
-    {
-        let immediate = self.read_usize();
-        
-        self.drain_vars(immediate as u64);
-        default_step_result()
-    }
     pub (crate) fn sim_BREAK(&mut self) -> StepResult
     {
         self.pop_controlstack_until_loop();
         
         let controller = self.top_frame.controlstack.last().ok_or_else(|| minierr("error: break instruction not inside of loop"))?;
         
-        let (variables, destination) =
+        let destination =
         match controller
         {
-            Controller::While(data) => (data.variables, data.loop_end),
+            Controller::While(data) => data.loop_end,
             _ => return plainerr("FIXME: unimplemented BREAK out from non-for/while loop")
         };
         
-        self.drain_vars(variables);
         self.set_pc(destination);
         self.top_frame.controlstack.pop();
         
@@ -455,14 +438,13 @@ impl Interpreter
         
         let controller = self.top_frame.controlstack.last().ok_or_else(|| minierr("error: continue instruction not inside of loop"))?;
         
-        let (variables, destination) =
+        let destination =
         match controller
         {
-            Controller::While(data) => (data.variables, data.expr_start),
+            Controller::While(data) => data.expr_start,
             _ => return plainerr("FIXME: unimplemented CONTINUE out from non-for/while loop")
         };
         
-        self.drain_vars(variables);
         self.set_pc(destination);
         
         default_step_result()
@@ -491,7 +473,6 @@ impl Interpreter
         let codelen = self.read_usize();
         let current_pc = self.get_pc();
         self.top_frame.controlstack.push(Controller::While(WhileData{
-            variables : self.top_frame.variables.len() as u64,
             expr_start : current_pc,
             loop_start : current_pc+exprlen,
             loop_end : current_pc+exprlen+codelen
@@ -505,7 +486,6 @@ impl Interpreter
         let codelen = self.read_usize();
         let current_pc = self.get_pc();
         self.top_frame.controlstack.push(Controller::While(WhileData{
-            variables : self.top_frame.variables.len() as u64,
             expr_start : current_pc,
             loop_start : current_pc+postlen+exprlen,
             loop_end : current_pc+postlen+exprlen+codelen
@@ -526,10 +506,11 @@ impl Interpreter
             _ => return plainerr("error: value fed to for-each loop must be an array, dictionary, set, or generatorstate")
         };
         
+        let varindex = self.read_usize();
         let codelen = self.read_usize();
         let current_pc = self.get_pc();
         self.top_frame.controlstack.push(Controller::ForEach(ForEachData{
-            variables : self.top_frame.variables.len() as u64,
+            varindex,
             loop_start : current_pc,
             loop_end : current_pc+codelen,
             values : list
@@ -554,7 +535,6 @@ impl Interpreter
         {
             self.top_frame.instancestack.push(*first);
             self.top_frame.controlstack.push(Controller::With(WithData{
-                variables : self.top_frame.variables.len() as u64,
                 loop_start : current_pc,
                 loop_end : current_pc + codelen,
                 instances : instance_id_list.get(1..).unwrap().iter().rev().map(|id| Value::Number(*id as f64)).collect()
@@ -590,7 +570,6 @@ impl Interpreter
         self.top_frame.instancestack.push(instance_id);
         
         self.top_frame.controlstack.push(Controller::With(WithData{
-            variables : self.top_frame.variables.len() as u64,
             loop_start : current_pc,
             loop_end : current_pc + codelen,
             instances : Vec::new()
@@ -621,7 +600,6 @@ impl Interpreter
         let exit = current_pc + self.read_usize();
         
         self.top_frame.controlstack.push(Controller::Switch(SwitchData{
-            variables : self.top_frame.variables.len() as u64,
             blocks : case_block_addresses,
             exit,
             value
@@ -675,13 +653,15 @@ impl Interpreter
     pub (crate) fn sim_FUNCDEF(&mut self) -> StepResult
     {
         let myfuncspec = self.read_function(false)?;
-        self.top_frame.variables.push(Value::new_funcval(None, myfuncspec));
+        let which_id = self.read_usize();
+        self.top_frame.variables[which_id] = Value::new_funcval(None, myfuncspec);
         default_step_result()
     }
     pub (crate) fn sim_GENERATORDEF(&mut self) -> StepResult
     {
         let myfuncspec = self.read_function(true)?;
-        self.top_frame.variables.push(Value::new_funcval(None, myfuncspec));
+        let which_id = self.read_usize();
+        self.top_frame.variables[which_id] = Value::new_funcval(None, myfuncspec);
         default_step_result()
     }
     
@@ -1087,12 +1067,10 @@ impl Interpreter
         if let Some(Controller::While(ref data)) = self.top_frame.controlstack.last()
         {
             let dest = data.loop_end;
-            let todrain = data.variables;
             let testval = self.stack_pop_val().ok_or_else(|| stack_access_err("internal error: failed to find value on stack while handling WHILE controller"))?;
             if !value_truthy(self, &testval)
             {
                 self.set_pc(dest);
-                self.drain_vars(todrain);
                 self.top_frame.controlstack.pop();
             }
             return default_step_result();
@@ -1104,9 +1082,7 @@ impl Interpreter
         if let Some(Controller::While(ref data)) = self.top_frame.controlstack.last()
         {
             let dest = data.expr_start;
-            let todrain = data.variables;
             self.set_pc(dest);
-            self.drain_vars(todrain);
             return default_step_result();
         }
         plainerr("internal error: WHILELOOP instruction when immediate controller is not a while controller")
@@ -1142,7 +1118,6 @@ impl Interpreter
     {
         if let Some(Controller::ForEach(ref mut data)) = self.top_frame.controlstack.last_mut()
         {
-            let todrain = data.variables;
             let dest = data.loop_start;
             
             if let ForEachValues::Gen(ref mut gen) = data.values
@@ -1154,14 +1129,12 @@ impl Interpreter
                 if let Some(frame) = frame
                 {
                     self.set_pc(dest);
-                    self.drain_vars(todrain);
                     self.push_new_frame(frame)?;
                 }
             }
             else
             {
                 self.set_pc(dest);
-                self.drain_vars(todrain);
             }
             return default_step_result();
         }
@@ -1171,6 +1144,7 @@ impl Interpreter
     {
         if let Some(Controller::ForEach(ref mut data)) = self.top_frame.controlstack.last_mut()
         {
+            let varindex = data.varindex;
             let dest = data.loop_end;
             if let Some(value) = match data.values
                 {
@@ -1189,7 +1163,7 @@ impl Interpreter
                     }
                 }
             {
-                self.top_frame.variables.push(value);
+                self.top_frame.variables[varindex] = value;
             }
             else
             {
