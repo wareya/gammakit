@@ -24,14 +24,16 @@ impl std::fmt::Debug for DebugInfo {
 
 pub struct Code {
     pub (crate) code : Rc<Vec<u64>>,
-    pub (crate) debug : Rc<BTreeMap<usize, DebugInfo>>
+    pub (crate) debug : Rc<BTreeMap<usize, DebugInfo>>,
+    pub (crate) booklet : Rc<Vec<usize>>,
+    pub (crate) cached : bool
 }
 
 impl std::clone::Clone for Code
 {
     fn clone(&self) -> Code
     {
-        Code{code : Rc::clone(&self.code), debug : Rc::clone(&self.debug)}
+        Code{code : Rc::clone(&self.code), debug : Rc::clone(&self.debug), booklet : self.booklet.clone(), cached : self.cached}
     }
 }
 
@@ -56,7 +58,12 @@ impl Code
 {
     pub (crate) fn new() -> Code
     {
-        Code{code : Rc::new(Vec::new()), debug : Rc::new(BTreeMap::new())}
+        Code{code : Rc::new(Vec::new()), debug : Rc::new(BTreeMap::new()), booklet : Rc::new(Vec::new()), cached : false}
+    }
+    fn push_op(&mut self, val : u64)
+    {
+        Rc::get_mut(&mut self.booklet).unwrap().push(self.code.len());
+        self.push(val)
     }
     fn push(&mut self, val : u64)
     {
@@ -64,6 +71,7 @@ impl Code
     }
     pub (crate) fn push_for_nop_thing_only(&mut self, val : u64)
     {
+        Rc::get_mut(&mut self.booklet).unwrap().push(self.code.len());
         Rc::get_mut(&mut self.code).unwrap().push(val);
     }
     pub (crate) fn len(&self) -> usize
@@ -429,7 +437,7 @@ impl<'a> CompilerState<'a> {
     
     fn compile_push_float(&mut self, float : f64)
     {
-        self.code.push(PUSHFLT);
+        self.code.push_op(PUSHFLT);
         self.compile_f64(float);
     }
     fn compile_string_index(&mut self, text : &String)
@@ -437,15 +445,15 @@ impl<'a> CompilerState<'a> {
         let index = self.get_string_index(text) as u64;
         self.compile_u64(index);
     }
-    fn compile_string_index_with_prefix(&mut self, prefix : u64, text : &String)
+    fn compile_string_index_with_op(&mut self, prefix : u64, text : &String)
     {
-        self.code.push(prefix);
+        self.code.push_op(prefix);
         self.compile_string_index(text);
     }
 
     fn compile_unscope(&mut self, var_stack_length : usize) -> Result<(), String>
     {
-        self.code.push(UNSCOPE);
+        self.code.push_op(UNSCOPE);
         self.compile_u64(var_stack_length as u64);
         Ok(())
     }
@@ -487,7 +495,7 @@ impl<'a> CompilerState<'a> {
     fn compile_program(&mut self, ast : &ASTNode) -> Result<(), String>
     {
         self.compile_children(ast)?;
-        self.code.push(EXIT);
+        self.code.push_op(EXIT);
         Ok(())
     }
     fn compile_children(&mut self, ast : &ASTNode) -> Result<(), String>
@@ -561,11 +569,11 @@ impl<'a> CompilerState<'a> {
     {
         if !matches!(self.context, Context::Lvar)
         {
-            self.code.push(EVALUATEINDIRECTION);
+            self.code.push_op(EVALUATEINDIRECTION);
         }
         else
         {
-            self.code.push(INDIRECTION);
+            self.code.push_op(INDIRECTION);
         }
         self.compile_string_index(&ast.child(1)?.child(0)?.text);
         
@@ -573,7 +581,7 @@ impl<'a> CompilerState<'a> {
     }
     fn compile_dismember(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.code.push(DISMEMBER);
+        self.code.push_op(DISMEMBER);
         self.compile_string_index(&ast.child(1)?.child(0)?.text);
         Ok(())
     }
@@ -582,11 +590,11 @@ impl<'a> CompilerState<'a> {
         self.compile_pushstr(&ast.child(1)?.child(0)?.text)?;
         if !matches!(self.context, Context::Lvar)
         {
-            self.code.push(EVALUATEARRAYEXPR);
+            self.code.push_op(EVALUATEARRAYEXPR);
         }
         else
         {
-            self.code.push(ARRAYEXPR);
+            self.code.push_op(ARRAYEXPR);
         }
         
         Ok(())
@@ -596,11 +604,11 @@ impl<'a> CompilerState<'a> {
         self.compile_context_wrapped(Context::Unknown, &|x| x.compile_nth_child(ast, 1))?;
         if !matches!(self.context, Context::Lvar)
         {
-            self.code.push(EVALUATEARRAYEXPR);
+            self.code.push_op(EVALUATEARRAYEXPR);
         }
         else
         {
-            self.code.push(ARRAYEXPR);
+            self.code.push_op(ARRAYEXPR);
         }
         
         Ok(())
@@ -618,8 +626,8 @@ impl<'a> CompilerState<'a> {
         })?;
         match self.context
         {
-            Context::Statement => self.code.push(FUNCCALL),
-            _ => self.code.push(FUNCEXPR)
+            Context::Statement => self.code.push_op(FUNCCALL),
+            _ => self.code.push_op(FUNCEXPR)
         }
         self.compile_u64(args.len() as u64);
         
@@ -640,12 +648,12 @@ impl<'a> CompilerState<'a> {
                 {
                     if !matches!(self.context, Context::Lvar)
                     {
-                        self.code.push(EVALUATEVAR);
+                        self.code.push_op(EVALUATEVAR);
                         self.compile_u64(index as u64);
                     }
                     else
                     {
-                        self.code.push(PUSHVAR);
+                        self.code.push_op(PUSHVAR);
                         self.compile_u64(index as u64);
                     }
                 }
@@ -653,45 +661,45 @@ impl<'a> CompilerState<'a> {
                 {
                     if !matches!(self.context, Context::Lvar)
                     {
-                        self.code.push(EVALUATEINSTVAR);
+                        self.code.push_op(EVALUATEINSTVAR);
                         self.compile_u64(index as u64);
                     }
                     else
                     {
-                        self.code.push(PUSHINSTVAR);
+                        self.code.push_op(PUSHINSTVAR);
                         self.compile_u64(index as u64);
                     }
                 }
                 IdenLocation::Binding(index) =>
                 {
-                    self.code.push(PUSHBIND);
+                    self.code.push_op(PUSHBIND);
                     self.compile_u64(index as u64);
                 }
                 IdenLocation::BareGlobal(index) =>
                 {
                     if !matches!(self.context, Context::Lvar)
                     {
-                        self.code.push(EVALUATEBAREGLOBAL);
+                        self.code.push_op(EVALUATEBAREGLOBAL);
                         self.compile_u64(index as u64);
                     }
                     else
                     {
-                        self.code.push(PUSHBAREGLOBAL);
+                        self.code.push_op(PUSHBAREGLOBAL);
                         self.compile_u64(index as u64);
                     }
                 }
                 IdenLocation::GlobalFunc(index) =>
                 {
-                    self.code.push(PUSHGLOBALFUNC);
+                    self.code.push_op(PUSHGLOBALFUNC);
                     self.compile_u64(index as u64);
                 }
                 IdenLocation::Object(index) =>
                 {
-                    self.code.push(PUSHOBJ);
+                    self.code.push_op(PUSHOBJ);
                     self.compile_u64(index as u64);
                 }
-                IdenLocation::Selfref => self.code.push(PUSHSELF),
-                IdenLocation::Other   => self.code.push(PUSHOTHER)
+                IdenLocation::Selfref => self.code.push_op(PUSHSELF),
+                IdenLocation::Other   => self.code.push_op(PUSHOTHER)
             }
         }
         else
@@ -702,22 +710,22 @@ impl<'a> CompilerState<'a> {
     }
     fn compile_pushglobal(&mut self, string : &String) -> Result<(), String>
     {
-        self.compile_string_index_with_prefix(PUSHGLOBAL, string);
+        self.compile_string_index_with_op(PUSHGLOBAL, string);
         Ok(())
     }
     fn compile_pushglobalval(&mut self, string : &String) -> Result<(), String>
     {
-        self.compile_string_index_with_prefix(PUSHGLOBALVAL, string);
+        self.compile_string_index_with_op(PUSHGLOBALVAL, string);
         Ok(())
     }
     fn compile_pushstr(&mut self, string : &str) -> Result<(), String>
     {
-        self.compile_string_index_with_prefix(PUSHSTR, &string.to_string());
+        self.compile_string_index_with_op(PUSHSTR, &string.to_string());
         Ok(())
     }
     fn compile_null(&mut self, _ast : &ASTNode) -> Result<(), String>
     {
-        self.code.push(PUSHNULL);
+        self.code.push_op(PUSHNULL);
         Ok(())
     }
     fn compile_name(&mut self, ast : &ASTNode) -> Result<(), String>
@@ -743,21 +751,21 @@ impl<'a> CompilerState<'a> {
         let op = get_binop_type(ast.child(1)?.child(0)?.text.as_str()).ok_or_else(|| minierr("internal error: unhandled type of binary expression"))?;
         
         let mut rewrite_location_jumplen = 0;
-        if op == BINOPAND as u8 // and
+        if op == BINOPAND as u8
         {
-            self.code.push(SHORTCIRCUITIFFALSE);
+            self.code.push_op(SHORTCIRCUITIFFALSE);
             rewrite_location_jumplen = self.compile_u64(0);
         }
-        else if op == BINOPOR as u8 // or
+        else if op == BINOPOR as u8
         {
-            self.code.push(SHORTCIRCUITIFTRUE);
+            self.code.push_op(SHORTCIRCUITIFTRUE);
             rewrite_location_jumplen = self.compile_u64(0);
         }
         
         let position_1 = self.code.len();
         
         self.compile_nth_child(ast, 2)?;
-        self.code.push(op as u64);
+        self.code.push_op(op as u64);
         
         let position_2 = self.code.len();
         let jump_distance = position_2 - position_1;
@@ -775,19 +783,19 @@ impl<'a> CompilerState<'a> {
     }
     fn compile_whilecondition(&mut self, ast : &ASTNode) -> Result<(), String>
     {
-        self.code.push(WHILE);
+        self.code.push_op(WHILE);
         let rewrite_location_exprlen = self.compile_u64(0);
         let rewrite_location_codelen = self.compile_u64(0);
         
         let point_1 = self.code.len();
         
         self.compile_nth_child(ast, 1)?;
-        self.code.push(WHILETEST);
+        self.code.push_op(WHILETEST);
         
         let point_2 = self.code.len();
         
         self.compile_nth_child(ast, 2)?;
-        self.code.push(WHILELOOP);
+        self.code.push_op(WHILELOOP);
         
         let point_3 = self.code.len();
         
@@ -809,7 +817,7 @@ impl<'a> CompilerState<'a> {
         {
             return plainerr("internal error: unhandled form of number");
         }
-        self.code.push(PUSHFLT);
+        self.code.push_op(PUSHFLT);
         let float = match ast.child(0)?.text.as_str()
         {
             "true" => 1.0,
@@ -864,20 +872,20 @@ impl<'a> CompilerState<'a> {
         // FIXME move to function
         match ast.child(0)?.text.as_str()
         {
-            "break" => self.code.push(BREAK),
-            "continue" => self.code.push(CONTINUE),
+            "break" => self.code.push_op(BREAK),
+            "continue" => self.code.push_op(CONTINUE),
             "return" | "yield" =>
             {
                 match ast.children.len()
                 {
                     2 => self.compile_nth_child(ast, 1)?,
-                    1 => self.code.push(PUSHNULL),
+                    1 => self.code.push_op(PUSHNULL),
                     _ => return plainerr("internal error: broken return/yield instruction")
                 }
                 match ast.child(0)?.text.as_str()
                 {
-                    "return" => self.code.push(RETURN),
-                    "yield" => self.code.push(YIELD),
+                    "return" => self.code.push_op(RETURN),
+                    "yield" => self.code.push_op(YIELD),
                     _ => return plainerr("internal error: broken logic in compiling return/yield AST node")
                 }
             }
@@ -983,7 +991,7 @@ impl<'a> CompilerState<'a> {
                 {
                     self.compile_any(&statement)?;
                 }
-                self.code.push(EXIT);
+                self.code.push_op(EXIT);
                 
                 self.close_frame();
                 let funccode = self.code.clone();
@@ -1031,7 +1039,7 @@ impl<'a> CompilerState<'a> {
             _ => return plainerr("error: first token of funcdef must be \"def\" | \"generator\"")
         }
         
-        self.code.push(prefix);
+        self.code.push_op(prefix);
         
         self.compile_u64(ast.child(3)?.children.len() as u64);
         
@@ -1051,7 +1059,7 @@ impl<'a> CompilerState<'a> {
         {
             self.compile_any(&statement)?;
         }
-        self.code.push(EXIT);
+        self.code.push_op(EXIT);
         
         self.close_frame();
         
@@ -1088,7 +1096,7 @@ impl<'a> CompilerState<'a> {
         {
             self.compile_any(&statement)?;
         }
-        self.code.push(EXIT);
+        self.code.push_op(EXIT);
         
         self.close_frame();
         let funccode = self.code.clone();
@@ -1114,7 +1122,7 @@ impl<'a> CompilerState<'a> {
     {
         let name = &ast.child(2)?.child(0)?.text;
         let index = self.get_string_index(name);
-        self.code.push(WITH);
+        self.code.push_op(WITH);
         self.compile_u64(index as u64);
         
         let len_position = self.compile_u64(0);
@@ -1125,7 +1133,7 @@ impl<'a> CompilerState<'a> {
         self.compile_scope_wrapped(&|x|
         {
             x.compile_nth_child(ast, 4)?;
-            x.code.push(WITHLOOP);
+            x.code.push_op(WITHLOOP);
             Ok(())
         })?;
         self.frames.last_mut().unwrap().objects.pop();
@@ -1138,7 +1146,7 @@ impl<'a> CompilerState<'a> {
     fn compile_withas(&mut self, ast : &ASTNode) -> Result<(), String>
     {
         self.compile_nth_child(ast, 2)?;
-        self.code.push(WITHAS);
+        self.code.push_op(WITHAS);
         
         let obj_name = &ast.child(4)?.child(0)?.text;
         let obj_index = self.get_string_index(obj_name);
@@ -1151,7 +1159,7 @@ impl<'a> CompilerState<'a> {
         self.compile_scope_wrapped(&|x|
         {
             x.compile_nth_child(ast, 6)?;
-            x.code.push(WITHLOOP);
+            x.code.push_op(WITHLOOP);
             Ok(())
         })?;
         self.frames.last_mut().unwrap().objects.pop();
@@ -1178,10 +1186,10 @@ impl<'a> CompilerState<'a> {
                         self.compile_nth_child(child, 2)?;
                         
                         self.add_variable(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
-                        self.code.push(NEWVAR);
+                        self.code.push_op(NEWVAR);
                         
                         self.compile_context_wrapped(Context::Lvar, &|x| x.compile_pushname(&child.child(0)?.child(0)?.text))?;
-                        self.code.push(BINSTATE);
+                        self.code.push_op(BINSTATE);
                     }
                     "globalvar" =>
                     {
@@ -1194,7 +1202,7 @@ impl<'a> CompilerState<'a> {
                         
                         self.compile_nth_child(child, 2)?;
                         self.compile_pushglobal(&child.child(0)?.child(0)?.text)?;
-                        self.code.push(BINSTATE);
+                        self.code.push_op(BINSTATE);
                     }
                     _ => return plainerr("internal error: unknown prefix to compound variable declaration")
                 }
@@ -1207,7 +1215,7 @@ impl<'a> CompilerState<'a> {
                     "var" =>
                     {
                         self.add_variable(name).ok_or_else(|| format!("error: redeclared identifier `{}`", name))?;
-                        self.code.push(NEWVAR);
+                        self.code.push_op(NEWVAR);
                     }
                     "globalvar" =>
                     {
@@ -1236,7 +1244,7 @@ impl<'a> CompilerState<'a> {
         self.globalstate.insert_bare_global(nameindex);
         
         self.compile_nth_child(ast, 3)?;
-        self.code.push(SETBAREGLOBAL);
+        self.code.push_op(SETBAREGLOBAL);
         self.compile_string_index(&ast.child(1)?.child(0)?.text);
         Ok(())
     }
@@ -1247,7 +1255,7 @@ impl<'a> CompilerState<'a> {
         
         self.compile_nth_child(ast, 2)?;
         self.compile_nth_child(ast, 0)?;
-        self.code.push(op as u64);
+        self.code.push_op(op as u64);
         
         Ok(())
     }
@@ -1258,8 +1266,8 @@ impl<'a> CompilerState<'a> {
         self.compile_nth_child(ast, 0)?;
         match operator.as_str()
         {
-            "++" => self.code.push(UNSTATEINCR),
-            "--" => self.code.push(UNSTATEDECR),
+            "++" => self.code.push_op(UNSTATEINCR),
+            "--" => self.code.push_op(UNSTATEDECR),
             _ => return Err(format!("internal error: unhandled or unsupported type of unary statement {}", operator))
         }
         
@@ -1282,7 +1290,7 @@ impl<'a> CompilerState<'a> {
         if operator != "+"
         {
             let op = get_unop_type(operator.as_str()).ok_or_else(|| minierr("internal error: unhandled type of unary expression"))?;
-            self.code.push(op as u64);
+            self.code.push_op(op as u64);
         }
         
         Ok(())
@@ -1305,7 +1313,7 @@ impl<'a> CompilerState<'a> {
         
         self.add_function(&"lambda_self".to_string()).ok_or_else(|| minierr("error: redeclared identifier `lambda_self`"))?;
         
-        self.code.push(LAMBDA);
+        self.code.push_op(LAMBDA);
         self.compile_u64(captures.len() as u64);
         for capture_name in capture_names.iter().rev()
         {
@@ -1327,7 +1335,7 @@ impl<'a> CompilerState<'a> {
             self.compile_any(statement)?;
         }
                 
-        self.code.push(EXIT);
+        self.code.push_op(EXIT);
         
         self.close_frame();
         
@@ -1348,7 +1356,7 @@ impl<'a> CompilerState<'a> {
             self.compile_any(expression)?;
             elementcount += 1;
         }
-        self.code.push(COLLECTARRAY);
+        self.code.push_op(COLLECTARRAY);
         self.compile_u64(elementcount as u64);
         
         Ok(())
@@ -1366,7 +1374,7 @@ impl<'a> CompilerState<'a> {
             self.compile_nth_child(expression, 2)?;
             elementcount += 1;
         }
-        self.code.push(COLLECTDICT);
+        self.code.push_op(COLLECTDICT);
         self.compile_u64(elementcount as u64);
         
         Ok(())
@@ -1383,7 +1391,7 @@ impl<'a> CompilerState<'a> {
             self.compile_any(expression)?;
             elementcount += 1;
         }
-        self.code.push(COLLECTSET);
+        self.code.push_op(COLLECTSET);
         self.compile_u64(elementcount as u64);
         
         Ok(())
@@ -1395,7 +1403,7 @@ impl<'a> CompilerState<'a> {
         
         if ast.children.len() == 3
         {
-            self.code.push(IF);
+            self.code.push_op(IF);
             let body_len_position = self.compile_u64(0);
             let position_1 = self.code.len();
             self.compile_nth_child(ast, 2)?;
@@ -1405,12 +1413,12 @@ impl<'a> CompilerState<'a> {
         }
         else if ast.children.len() == 5 && ast.child(3)?.text == "else"
         {
-            self.code.push(IF);
+            self.code.push_op(IF);
             let body_len_position = self.compile_u64(0);
             
             let position_1 = self.code.len();
             self.compile_nth_child(ast, 2)?;
-            self.code.push(JUMPRELATIVE);
+            self.code.push_op(JUMPRELATIVE);
             let else_len_position = self.compile_u64(0);
             let position_2 = self.code.len();
             let body_len = position_2 - position_1;
@@ -1446,7 +1454,7 @@ impl<'a> CompilerState<'a> {
             self.compile_nth_child(header, 0)?;
         }
         
-        self.code.push(FOR);
+        self.code.push_op(FOR);
         let post_len_rewrite_pos = self.compile_u64(0);
         let expr_len_rewrite_pos = self.compile_u64(0);
         let block_len_rewrite_pos = self.compile_u64(0);
@@ -1465,11 +1473,11 @@ impl<'a> CompilerState<'a> {
         {
             self.compile_push_float(1.0);
         }
-        self.code.push(WHILETEST);
+        self.code.push_op(WHILETEST);
         
         let position_3 = self.code.len();
         self.compile_last_child(ast)?;
-        self.code.push(WHILELOOP);
+        self.code.push_op(WHILELOOP);
         
         let position_4 = self.code.len();
         
@@ -1497,8 +1505,8 @@ impl<'a> CompilerState<'a> {
         }
         
         self.compile_nth_child(ast, 1)?;
-        self.code.push(INVOKE);
-        self.code.push(INVOKEEXPR);
+        self.code.push_op(INVOKE);
+        self.code.push_op(INVOKEEXPR);
         
         Ok(())
     }
@@ -1510,8 +1518,8 @@ impl<'a> CompilerState<'a> {
         }
         
         self.compile_nth_child(ast, 1)?;
-        self.code.push(INVOKE);
-        self.code.push(INVOKECALL);
+        self.code.push_op(INVOKE);
+        self.code.push_op(INVOKECALL);
         
         Ok(())
     }
@@ -1526,16 +1534,16 @@ impl<'a> CompilerState<'a> {
         {
             x.compile_nth_child(ast, 4)?;
             
-            x.code.push(FOREACH);
+            x.code.push_op(FOREACH);
             let block_len_rewrite_pos = x.compile_u64(0);
             let position_1 = x.code.len();
             
-            x.code.push(FOREACHHEAD);
+            x.code.push_op(FOREACHHEAD);
             x.add_variable(&ast.child(2)?.child(0)?.text);
             
             x.compile_nth_child(ast, 6)?;
             
-            x.code.push(FOREACHLOOP);
+            x.code.push_op(FOREACHLOOP);
             let position_2 = x.code.len();
             
             let block_len = position_2 - position_1;
@@ -1552,12 +1560,12 @@ impl<'a> CompilerState<'a> {
         for node in ast.child_slice(1, -2)? // implicitly causes switchdefault to have 0 labels
         {
             self.compile_any(node)?;
-            self.code.push(SWITCHCASE);
+            self.code.push_op(SWITCHCASE);
             self.compile_u64(which);
         }
         if ast.child_slice(1, -2)?.is_empty()
         {
-            self.code.push(SWITCHDEFAULT);
+            self.code.push_op(SWITCHDEFAULT);
             self.compile_u64(which);
         }
         Ok(())
@@ -1570,7 +1578,7 @@ impl<'a> CompilerState<'a> {
             return plainerr("error: tried to compile a non-switchcase/switchdefault ast node as a switch case")
         }
         self.compile_last_child(ast)?;
-        self.code.push(SWITCHEXIT);
+        self.code.push_op(SWITCHEXIT);
         Ok(())
     }
 
@@ -1585,7 +1593,7 @@ impl<'a> CompilerState<'a> {
         // case label expressions... (arbitrary)
         // case blocks... (arbitrary)
         
-        self.code.push(SWITCH);
+        self.code.push_op(SWITCH);
         let cases = &ast.child(5)?.children;
         let num_case_blocks = cases.len();
         self.compile_u64(num_case_blocks as u64);
@@ -1601,7 +1609,7 @@ impl<'a> CompilerState<'a> {
         {
             self.compile_switch_case_labels(node, i as u64)?
         }
-        self.code.push(SWITCHEXIT);
+        self.code.push_op(SWITCHEXIT);
         let mut case_block_positions = Vec::new();
         for node in cases
         {
@@ -1623,12 +1631,12 @@ impl<'a> CompilerState<'a> {
     fn compile_ternary(&mut self, ast : &ASTNode) -> Result<(), String>
     {
         self.compile_nth_child(ast, 0)?;
-        self.code.push(IF);
+        self.code.push_op(IF);
         let block1_len_rewrite_pos = self.compile_u64(0);
         
         let position_1 = self.code.len();
         self.compile_nth_child(ast, 2)?;
-        self.code.push(JUMPRELATIVE);
+        self.code.push_op(JUMPRELATIVE);
         let block2_len_rewrite_pos = self.compile_u64(0);
         let position_2 = self.code.len();
         

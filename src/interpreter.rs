@@ -16,10 +16,10 @@ pub use self::types::*;
 use variableaccess::ValueLoc;
 
 /// Returned by the step() method of an interpreter.
-pub type StepResult = Result<bool, String>;
+pub type StepResult = Result<(), String>;
 pub fn default_step_result() -> StepResult
 {
-    Ok(false)
+    Ok(())
 }
 /// Type signature of functions to be registered as bindings.
 pub type Binding = dyn FnMut(&mut Interpreter, Vec<Value>) -> Result<Value, String>;
@@ -248,20 +248,14 @@ impl Interpreter {
         {
             let op = self.pull_single_from_code();
             
-            use std::time::Instant;
-            
-            let test_time = Instant::now();
-            let start_time = Instant::now();
+            let start_time = std::time::Instant::now();
             let ret = unsafe { simulation::OPTABLE[op as usize](self) };
-            let end_time = Instant::now();
+            let end_time = std::time::Instant::now();
             
-            let reference_time = start_time.duration_since(test_time).as_nanos();
             let real_time = end_time.duration_since(start_time).as_nanos();
-            let adjusted_time = real_time - reference_time;
-            //let adjusted_time = real_time;
             
             unsafe { OP_MAP_HITS[op as usize] += 1 };
-            unsafe { OP_MAP[op as usize] += adjusted_time };
+            unsafe { OP_MAP[op as usize] += real_time };
             ret
         }
     }
@@ -279,19 +273,22 @@ impl Interpreter {
         let ret = self.step_internal();
         match ret
         {
-            Ok(r) => Ok(r),
+            Ok(()) => Ok(()),
             Err(err) =>
             {
-                let pc = self.get_pc();
-                if let Some(info) = self.top_frame.code.get_debug_info(pc)
+                if err.as_str() != "GRACEFUL_EXIT"
                 {
-                    self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X}", err, info.last_line, info.last_index, pc));
+                    let pc = self.get_pc();
+                    if let Some(info) = self.top_frame.code.get_debug_info(pc)
+                    {
+                        self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X}", err, info.last_line, info.last_index, pc));
+                    }
+                    else
+                    {
+                        self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, pc, self.top_frame.code.debug));
+                    }
                 }
-                else
-                {
-                    self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, pc, self.top_frame.code.debug));
-                }
-                Err(err.to_string())
+                Err(err)
             }
         }
     }
@@ -300,13 +297,17 @@ impl Interpreter {
         let mut steps = 1;
         
         let mut ret = self.step_internal();
-        while matches!(ret, Ok(false))
+        while ret.is_ok()
         {
             steps += 1;
             ret = self.step_internal();
         }
         if let Err(err) = ret
         {
+            if err.as_str() == "GRACEFUL_EXIT"
+            {
+                return Ok(steps);
+            }
             let pc = self.get_pc();
             if let Some(info) = self.top_frame.code.get_debug_info(pc)
             {
@@ -320,9 +321,113 @@ impl Interpreter {
         }
         else
         {
-            return Ok(steps);
+            panic!();
         }
     }
+    
+    pub fn prepare_cache(code : &mut Code)
+    {
+        if code.cached
+        {
+            return
+        }
+        code.cached = true;
+        
+        let code_data = Rc::get_mut(&mut code.code).unwrap();
+        
+        for addr in code.booklet.iter()
+        {
+            let op = &mut code_data[*addr];
+            let opfunc = unsafe { simulation::OPTABLE[*op as usize] };
+            let ptr = opfunc as *const OpFunc;
+            *op = ptr as u64;
+        }
+    }
+    
+    #[inline]
+    pub fn step_cached(&mut self) -> StepResult
+    {
+        let f : OpFunc = unsafe { std::mem::transmute(self.top_frame.code[self.top_frame.pc] as *const OpFunc) };
+        self.top_frame.pc += 1;
+        
+        #[cfg(not(feature = "track_op_performance"))]
+        {
+            f(self)
+        }
+        #[cfg(feature = "track_op_performance")]
+        {
+            let op = f as *const OpFunc as usize;
+            let op = * unsafe { simulation::REVERSE_OPTABLE.as_ref().unwrap().get(&op).unwrap() };
+            
+            //let test_time = Instant::now();
+            let start_time = std::time::Instant::now();
+            let ret = f(self);
+            let end_time = std::time::Instant::now();
+            
+            //let reference_time = start_time.duration_since(test_time).as_nanos();
+            let real_time = end_time.duration_since(start_time).as_nanos();
+            //let adjusted_time = real_time - reference_time;
+            //let adjusted_time = real_time;
+            
+            unsafe { OP_MAP_HITS[op as usize] += 1 };
+            unsafe { OP_MAP[op as usize] += real_time };
+            
+            ret
+        }
+    }
+    pub fn step_cached_until_error_or_exit(&mut self) -> Result<u64, String>
+    {
+        if !self.top_frame.code.cached
+        {
+            Interpreter::prepare_cache(&mut self.top_frame.code);
+            for spec in self.global.objects.iter_mut()
+            {
+                for func in spec.1.functions.iter_mut()
+                {
+                    Interpreter::prepare_cache(&mut func.1.code);
+                }
+            }
+            for func in self.global.functions.iter_mut()
+            {
+                match func.1
+                {
+                    Value::Func(func) => Interpreter::prepare_cache(&mut func.userdefdata.code),
+                    _ => panic!()
+                }
+            }
+        }
+        
+        let mut steps = 1;
+        let mut ret = self.step_cached();
+        while ret.is_ok()
+        {
+            steps += 1;
+            ret = self.step_cached();
+        }
+        if let Err(err) = ret
+        {
+            if err.as_str() == "GRACEFUL_EXIT"
+            {
+                return Ok(steps);
+            }
+            
+            let pc = self.get_pc();
+            if let Some(info) = self.top_frame.code.get_debug_info(pc)
+            {
+                self.last_error = Some(format!("{}\nline: {}\ncolumn: {}\npc: 0x{:X} (off by one instruction)", err, info.last_line, info.last_index, pc));
+            }
+            else
+            {
+                self.last_error = Some(format!("{}\n(unknown or missing context - code probably desynced - location {} - map {:?})", err, pc, self.top_frame.code.debug));
+            }
+            return Err(err);
+        }
+        else
+        {
+            panic!();
+        }
+    }
+    
     pub fn dump_code(&self) -> Vec<u8>
     {
         let mut out = Vec::new();
@@ -340,18 +445,21 @@ impl Interpreter {
         // messy per hit
         //let op_map = op_map.map(|(k, v)| (k, *v as f64 / 1_000_000.0 / (self.op_map_hits[k] as f64).sqrt())).collect::<Vec<_>>();
         // per hit
-        let op_map = unsafe { op_map.map(|(k, v)| (k, v as f64 / OP_MAP_HITS[k] as f64)) };
+        //let op_map = unsafe { op_map.map(|(k, v)| (k, v as f64 / OP_MAP_HITS[k] as f64)) };
         // raw
-        //let op_map = op_map.map(|(k, v)| (k, v as f64 / 1_000_000.0));
+        let op_map = op_map.map(|(k, v)| (k, v as f64 / 1_000.0));
         // mod (hacked together)
         // let op_map = op_map.map(|(k, v)| (k, (*v as f64 / *self.op_map_hits.get(k).unwrap() as f64 - 80.0) *  *self.op_map_hits.get(k).unwrap() as f64 / 1_000_000.0)).collect::<Vec<_>>();
         //let op_map = op_map.map(|(k, v)| (k, (*v as f64 / *self.op_map_hits.get(k).unwrap() as f64 - 80.0))).collect::<Vec<_>>();
         let mut op_map = op_map.collect::<Vec<_>>();
         op_map.retain(|x| !x.1.is_nan());
         op_map.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        let mut total_time = 0.0;
         for (op, time) in op_map
         {
-            println!("{:05.05}:\t{}", time, crate::bytecode::op_to_name(op as u8));
+            println!("{:05.05}:\t{} / {}", time, crate::bytecode::op_to_name(op as u8), unsafe { OP_MAP_HITS[op] });
+            total_time += time;
         }
+        println!("total time: {:05.05}", total_time/1_000.0);
     }
 }

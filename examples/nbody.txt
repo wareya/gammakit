@@ -127,7 +127,7 @@ globaldef advance(delta)
             var dz = global.z[i] - global.z[j];
             var distance_sq = dx*dx + dy*dy + dz*dz;
             var distance = sqrt(distance_sq);
-            var power = delta / distance_sq / distance;
+            var power = 0.01 / distance_sq / distance;
             var pj = global.mass[j] * power;
             var pi = global.mass[i] * power;
             global.xv[i] -= pj * dx;
@@ -140,9 +140,9 @@ globaldef advance(delta)
     }
     for(var i = 0; i < NUM_BODIES; i++)
     {
-        global.x[i] += global.xv[i] * delta;
-        global.y[i] += global.yv[i] * delta;
-        global.z[i] += global.zv[i] * delta;
+        global.x[i] += global.xv[i] * 0.01;
+        global.y[i] += global.yv[i] * 0.01;
+        global.z[i] += global.zv[i] * 0.01;
     }
 }
 

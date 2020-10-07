@@ -109,12 +109,11 @@ impl Interpreter
             return plainerr("internal error: fewer values on stack than expected in FUNCEXPR/FUNCCALL");
         }
         
-        let mut args = Vec::with_capacity(argcount);
-        for _ in 0..argcount
+        let mut args = vec!(Value::Null; argcount);
+        for i in argcount-1..=0
         {
-            args.push(self.stack_pop_val().ok_or_else(|| minierr("internal error: expected values, got variable on stack in FUNCEXPR/FUNCCALL"))?);
+            args[i] = self.stack_pop_val().ok_or_else(|| minierr("internal error: expected values, got variable on stack in FUNCEXPR/FUNCCALL"))?;
         }
-        args.reverse();
         
         // FIXME gives bad error message when can't access variable
         let funcdata = self.stack_pop_as_val().ok_or_else(|| minierr("internal error: not enough values on stack to run instruction FUNCEXPR/FUNCCALL (after args)"))?;

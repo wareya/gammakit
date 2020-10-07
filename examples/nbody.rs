@@ -23,7 +23,7 @@ fn main() -> Result<(), String>
     
     let start_time = Instant::now();
     
-    let steps = interpreter.step_until_error_or_exit().unwrap_or(0);
+    let steps = interpreter.step_cached_until_error_or_exit().unwrap_or(0);
     if let Some(err) = &interpreter.last_error
     {
         panic!("{}", err);

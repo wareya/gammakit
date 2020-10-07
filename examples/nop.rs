@@ -8,12 +8,14 @@ fn main() -> Result<(), String>
     use std::time::Instant;
     let mut interpreter = Interpreter::new(Parser::new_from_default()?);
     interpreter.insert_default_bindings();
-
-    interpreter.restart_full_of_nops(10_000_000);
+    interpreter.restart_full_of_nops(100_000_000);
+    
+    interpreter.step_cached_until_error_or_exit().unwrap_or(0);
+    interpreter.restart_in_place();
     
     let start_time = Instant::now();
     
-    let steps = interpreter.step_until_error_or_exit().unwrap_or(0);
+    let steps = interpreter.step_cached_until_error_or_exit().unwrap_or(0);
     if let Some(err) = &interpreter.last_error
     {
         panic!("{}", err);
@@ -24,6 +26,8 @@ fn main() -> Result<(), String>
     println!("steps {:?}", steps);
     println!("{:?} steps per second", steps as f64 / (duration.as_micros() as f64 / 1000_000.0));
     println!("{:?} nanoseconds per step", duration.as_micros() as f64 * 1000.0 / steps as f64);
+    
+    #[cfg(feature = "track_op_performance")]
     interpreter.print_op_perf_log();
     
     if let Some(err) = &interpreter.last_error

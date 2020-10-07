@@ -40,6 +40,7 @@ fn strange_err<S : ToString>(text : S) -> String
 }
 
 pub (crate) static mut OPTABLE : [OpFunc; 256] = [Interpreter::sim_INVALID as OpFunc; 256];
+pub (crate) static mut REVERSE_OPTABLE : Option<BTreeMap<usize, u8>> = None;
 
 pub (crate) fn build_opfunc_table()
 {
@@ -126,6 +127,21 @@ pub (crate) fn build_opfunc_table()
     set!(EXIT, sim_EXIT);
     set!(RETURN, sim_RETURN);
     set!(YIELD, sim_YIELD);
+    
+    let mut my_table = BTreeMap::new();
+    for i in 0..=255
+    {
+        unsafe
+        {
+            my_table.insert(OPTABLE[i as usize] as *const OpFunc as usize, i);
+        }
+    }
+    unsafe
+    {
+        REVERSE_OPTABLE = Some(my_table);
+    }
+    
+    println!("built opfunc table");
 }
 
 impl Interpreter
@@ -1213,7 +1229,7 @@ impl Interpreter
         }
         else
         {
-            return Ok(true)
+            return Err("GRACEFUL_EXIT".to_string())
         }
         default_step_result()
     }
@@ -1242,7 +1258,7 @@ impl Interpreter
         }
         else
         {
-            return Ok(true)
+            return Err("GRACEFUL_EXIT".to_string())
         }
         default_step_result()
     }
